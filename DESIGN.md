@@ -1,0 +1,102 @@
+# Ares Colony — conception technique
+
+Tycoon de colonie martienne en gestion active, pour ados et adultes curieux. Godot 4.5+
+(testé avec 4.7.2), GDScript, mobile en portrait (base 720×1280, renderer Mobile).
+Vision et choix de conception : [docs/CONCEPT_MARS.md](docs/CONCEPT_MARS.md).
+
+État : **prototype jouable de l'ère 1 « Survie »** (cratère Jezero).
+
+## Lancer
+
+- Ouvrir le dossier dans Godot, puis F5. Au premier lancement :
+  `godot --headless --path . --import` pour enregistrer les `class_name`.
+- Tests (simulation, sauvegarde, équilibrage par un joueur simulé) :
+  `godot --headless --path . -s tests/run_tests.gd` (code de sortie 0 si tout passe).
+- Captures d'écran (avec fenêtre) :
+  `godot --path . --resolution 720x1400 -s tests/capture.gd -- --save=capture --out=<dossier> --scenario=<nom>`
+  avec `debut`, `milieu`, `nuit`, `tempete` ou `interaction` (touchers simulés).
+- Icônes : `python tools/make_icons.py` ; sons : `python tools/make_sounds.py` (aucune dépendance).
+- Android : preset « Android » (arm64, vibrations) dans `export_presets.cfg`.
+
+## Comment on joue
+
+- **Construire** : choisir un module, toucher le sol pour placer le fantôme (vert : valide et
+  raccordé ; jaune : isolé ; rouge : impossible), « Construire ici ». On reste en placement pour
+  enchaîner (conduites, panneaux).
+- **Raccorder** : un module ne fonctionne que s'il touche, de proche en proche, l'atterrisseur.
+  Les conduites (4 matériaux) servent à aller loin, par exemple jusqu'à la glace.
+- **Équilibrer** : six ressources (énergie, oxygène, eau, nourriture, matériaux, données),
+  bilan moyen par sol affiché en haut. Toucher une ressource explique d'où elle vient.
+- **Rechercher** : les données (atterrisseur + colons) financent 8 recherches ; chacune débloque
+  une fiche de découverte sourcée.
+- **Survivre** : nuits sans soleil (batteries), tempêtes annoncées un sol à l'avance (20 % de
+  lumière), ravitaillements de la Terre tous les 8 sols (matériaux, nourriture qui diminue,
+  recrues s'il y a de la place).
+- **Temps** : pause, ×1, ×2, ×4. Un sol dure 60 s à ×1.
+
+## Architecture
+
+```
+AresColony/
+├── core/                  logique pure : RefCounted, aucun nœud, aucun accès disque
+│   ├── definitions.gd     types : module, recherche, fiche, objectif
+│   ├── colony_content.gd  contenu de l'ère 1 (modules, recherches, fiches sourcées, objectifs, équipage, humour)
+│   ├── colony_map.gd      grille 24×24 du cratère (plaines, rochers, rebord, glace)
+│   ├── colony_state.gd    état sauvegardable, lecture tolérante
+│   ├── colony_engine.gd   simulation : flux, jour/nuit, raccordements, recherche, colons, événements, hors-ligne
+│   ├── save_service.gd, save_storage.gd, number_formatter.gd   (repris de Seabed Tycoon)
+├── game/                  pont avec Godot : GameManager (boucle, sauvegarde, cycle de vie), AudioManager, fichiers
+├── world/                 monde 3D : terrain, modules, ciel, tempêtes, astronautes, placement, caméra, vignettes
+├── ui/                    interface : thème, bandeau des ressources, panneau à onglets, pages, fenêtres
+├── art/                   icônes (SVG) et sons (WAV) générés
+├── tools/                 générateurs d'icônes et de sons
+├── tests/                 run_tests.gd, colony_bot.gd (joueur simulé), capture.gd
+└── docs/                  concept
+```
+
+Règles de séparation (comme Seabed Tycoon) : `core/` ne connaît ni nœud ni disque ; `world/`
+et `ui/` lisent `GameManager.engine` et n'inventent aucune règle ; seul `game/` connaît le cycle
+de vie de l'application.
+
+## Simulation (ColonyEngine)
+
+- Pas de 0,02 sol. À chaque pas : production des modules sans entrée (panneaux) ; pour chaque
+  ressource demandée, part satisfaisable = (réserve + production passive) / demande ; chaque module
+  tourne au minimum des parts de ses entrées ; les colons consomment ; stocks bornés par les capacités.
+- Soleil : `max(0, cos(2π(heure − midi))) · π` (moyenne 1 par sol), ×0,2 en tempête, ×1,25 avec
+  la recherche « Nettoyage des panneaux ».
+- Santé : un manque d'oxygène vide les réserves de secours en environ un sol, puis le colon est
+  évacué (jamais de mort). La cause et la parade sont expliquées.
+- Hors-ligne (pilote automatique) : un sol toutes les 20 minutes d'absence, 8 h au plus, sans
+  événement ni perte de santé ; veille sécurisée dès qu'une ressource vitale descend sous un quart
+  de sol de consommation. Les échéances (tempêtes, ravitaillements) sont décalées d'autant.
+
+## Équilibrage mesuré (joueur simulé, tests/run_tests.gd)
+
+| Objectif | Sol atteint |
+|---|---|
+| Premier souffle (premier oxygène) | 0,8 |
+| Source vitale (extracteur de glace) | 2,8 |
+| Main verte (serre) | 8 |
+| Équipage complet (8 colons) | 40 |
+| Nuits sereines (150 kWh de stockage) | 24,5 |
+| Autonomie (10 sols sans déficit, 8 colons) | 50 |
+
+Sans évacuation pour un joueur raisonnable. Un joueur qui ne fait rien perd son premier colon au
+sol 9 environ : le danger est réel mais laisse le temps d'apprendre. Les tests vérifient ces
+fourchettes.
+
+## Pièges
+
+- `is_connected` est une méthode native de `Object` : d'où `is_linked`.
+- Un script lancé par `-s` ne doit pas typer une classe qui utilise un autoload (`GameManager`).
+- Sauter dans le temps en test déclenche les ravitaillements en retard : utiliser `_calm_engine()`.
+- Le contenu (`colony_content.gd`) mêle valeurs réelles (fiches) et valeurs de jeu simplifiées :
+  ne citer dans les fiches que des faits sourcés.
+
+## Prochaines étapes
+
+1. Tester sur téléphone (performances des ombres, ergonomie du placement).
+2. Rovers d'exploration et sites à découvrir ; quiz facultatifs.
+3. Ère 2 « Autonomie » : Sabatier, briques de régolithe, recyclage, deuxième région.
+4. Tutoriel guidé, traduction anglaise.

@@ -1,0 +1,14 @@
+# Cache et imports régénérés par Godot
+.godot/
+/android/
+
+# Exports
+*.apk
+*.aab
+/build/
+
+# Divers
+.DS_Store
+Thumbs.db
+__pycache__/
+*.tmp
