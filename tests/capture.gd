@@ -70,6 +70,36 @@ func _run() -> void:
 			main._window.toggle_collapsed()
 			await _frames(120)
 			await _shot("12_tempete")
+		"zoom":
+			ColonyBot.play(engine, 22.3)
+			engine.state.speed = 1
+			main = await _open_main()
+			_close_modals(main)
+			main._window.toggle_collapsed()
+			var rig: Node3D = main._world.rig
+			# Centre sur la première conduite (le réseau vers la glace).
+			var target := Vector3(engine.map.lander_cell.x, 0, engine.map.lander_cell.y)
+			for i in engine.state.buildings.size():
+				if engine.state.buildings[i].id == "link":
+					target = Vector3(engine.state.buildings[i].x + 0.5, 0, engine.state.buildings[i].y + 0.5)
+					break
+			rig.camera.size = 7.0
+			rig.position = target
+			await _frames(500)
+			await _shot("13_zoom_reseau")
+			# Plein jour, caméra sur un astronaute visible.
+			engine.state.sol = floorf(engine.state.sol) + 1.42
+			_close_modals(main)
+			await _frames(400)
+			_close_modals(main)
+			for agent: Dictionary in main._world._agents:
+				var a: Node3D = agent.node
+				if a.visible:
+					rig.position = a.position
+					break
+			rig.camera.size = 3.2
+			await _frames(5)
+			await _shot("14_zoom_astronautes")
 		"interaction":
 			main = await _open_main()
 			_close_modals(main)

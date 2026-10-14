@@ -12,6 +12,11 @@ const MARGIN := 9.0
 const TERRAIN_STEP := 0.5
 const BASE_Y := -6.0
 const MAX_ASTRONAUTS := 10
+const DIRS: Array[Vector2i] = [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOWN, Vector2i.UP]
+## Galeries vitrées : largeur, hauteur.
+const CORRIDOR_WIDTH := 0.42
+const CORRIDOR_HEIGHT := 0.5
+const CORRIDOR_GLASS := Color(0.72, 0.9, 1.0, 0.32)
 
 const DAY_SKY := Color(0.78, 0.55, 0.38)
 const NIGHT_SKY := Color(0.05, 0.06, 0.11)
@@ -30,7 +35,14 @@ var _ghost: Node3D
 var _ghost_def := ""
 var _ghost_cell := Vector2i(-1, -1)
 var _ghost_pad: MeshInstance3D
-var _astronauts: Array[Node3D] = []
+var _agents: Array[Dictionary] = []
+var _network_root: Node3D
+var _flow_on: ShaderMaterial
+var _flow_off: ShaderMaterial
+## Cases de déplacement : intérieur du réseau (modules raccordés), galeries, extérieur proche.
+var _inside_cells := {}
+var _link_cells := {}
+var _free_cells := {}
 var _env: Environment
 var _sun: DirectionalLight3D
 var _dust: CPUParticles3D
@@ -45,6 +57,10 @@ func _ready() -> void:
 	_build_rocks()
 	_build_ice()
 	_build_grid()
+	_flow_on = _flow_material(1.0)
+	_flow_off = _flow_material(0.0)
+	_network_root = Node3D.new()
+	add_child(_network_root)
 	rig = CameraRig.new()
 	rig.bounds = Rect2(-2, -2, ColonyMap.SIZE + 4, ColonyMap.SIZE + 4)
 	add_child(rig)
@@ -98,17 +114,19 @@ func _rebuild_buildings() -> void:
 	_lights.clear()
 	for i in _engine.state.buildings.size():
 		var def := _engine.def_of(i)
-		var node := ModelBuilder.building(def.id)
+		var node := _corridor(i) if def.id == "link" else ModelBuilder.building(def.id)
 		node.position = footprint_center(_engine.cell_of(i), def.size)
 		add_child(node)
 		_building_nodes.append(node)
 		var light: MeshInstance3D = null
-		if not def.inputs.is_empty() or def.id != "link":
+		if def.id != "link":
 			light = ModelBuilder.sphere(node, Vector3(def.size.x * 0.32, _model_height(node) + 0.08, def.size.y * 0.32), 0.045, Color.GREEN, Vector3.ONE, 1.2)
 			light.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_lights.append(light)
+	_rebuild_connectors()
+	_rebuild_walk_cells()
 	# Un module vient d'être posé : il tombe en place avec un nuage de poussière.
-	if _building_nodes.size() == previous + 1 and previous > 0:
+	if _building_nodes.size() == previous + 1 and previous > 0 and _engine.state.buildings.back().id != "link":
 		_drop_in(_building_nodes.back())
 
 
@@ -474,46 +492,240 @@ void fragment() {
 	add_child(_grid)
 
 
+# ---------- Réseau : galeries vitrées et passages ----------
+
+func _flow_material(active: float) -> ShaderMaterial:
+	var mat := ShaderMaterial.new()
+	mat.shader = preload("res://world/flow.gdshader")
+	mat.set_shader_parameter("active", active)
+	return mat
+
+
+## Galerie vitrée d'une conduite, avec un tronçon vers chaque voisin (droite, coude, T, croix).
+func _corridor(index: int) -> Node3D:
+	var root := Node3D.new()
+	var cell := _engine.cell_of(index)
+	var flow := _flow_on if _engine.is_linked(index) else _flow_off
+	_gallery(root, Vector3.ZERO, Vector2(CORRIDOR_WIDTH, CORRIDOR_WIDTH), Vector2i.ZERO, flow)
+	for dir in DIRS:
+		var other := _engine.building_at(cell + dir)
+		if other < 0:
+			continue
+		var length := 0.5 - CORRIDOR_WIDTH / 2.0
+		var center := Vector3(dir.x, 0, dir.y) * (CORRIDOR_WIDTH / 2.0 + length / 2.0)
+		var size := Vector2(length if dir.x != 0 else CORRIDOR_WIDTH, length if dir.y != 0 else CORRIDOR_WIDTH)
+		_gallery(root, center, size, dir, flow)
+		if _engine.state.buildings[other].id != "link":
+			_airlock(root, Vector3(dir.x, 0, dir.y) * 0.5, dir)
+	return root
+
+
+## Tronçon de galerie : sol, vitrage, arête de toit, câble d'énergie le long du sol.
+func _gallery(parent: Node3D, center: Vector3, size: Vector2, dir: Vector2i, flow: Material) -> void:
+	ModelBuilder.box(parent, center + Vector3(0, 0.025, 0), Vector3(size.x, 0.05, size.y), ModelBuilder.CONCRETE)
+	var glass := ModelBuilder.box(parent, center + Vector3(0, CORRIDOR_HEIGHT / 2.0 + 0.05, 0),
+			Vector3(size.x, CORRIDOR_HEIGHT, size.y), CORRIDOR_GLASS)
+	glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var spine := Vector3(size.x, 0.03, 0.07) if dir.x != 0 else (Vector3(0.07, 0.03, size.y) if dir.y != 0 else Vector3(0.07, 0.03, 0.07))
+	ModelBuilder.box(parent, center + Vector3(0, CORRIDOR_HEIGHT + 0.065, 0), spine, ModelBuilder.WHITE)
+	if dir == Vector2i.ZERO:
+		return
+	var side := Vector3(-dir.y, 0, dir.x) * (CORRIDOR_WIDTH / 2.0 - 0.04)
+	var length := (size.x if dir.x != 0 else size.y) + 0.02
+	var cable := ModelBuilder.cylinder(parent, center + side + Vector3(0, 0.08, 0), 0.022, length, Color.WHITE,
+			Vector3(90, 0, 0) if dir.y != 0 else Vector3(0, 0, 90), -1.0, 8)
+	cable.material_override = flow
+	cable.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+## Sas : cadre blanc et voyant vert là où une galerie entre dans un module.
+func _airlock(parent: Node3D, at: Vector3, dir: Vector2i) -> void:
+	var across := Vector3(absf(dir.y), 0, absf(dir.x))
+	var w := CORRIDOR_WIDTH + 0.06
+	for side in [-1.0, 1.0]:
+		ModelBuilder.box(parent, at + across * (w / 2.0) * side + Vector3(0, CORRIDOR_HEIGHT / 2.0 + 0.05, 0),
+				Vector3(0.05, CORRIDOR_HEIGHT + 0.06, 0.05), ModelBuilder.WHITE)
+	ModelBuilder.box(parent, at + Vector3(0, CORRIDOR_HEIGHT + 0.08, 0), across * w + Vector3(0.05, 0.05, 0.05),
+			ModelBuilder.WHITE)
+	ModelBuilder.box(parent, at + across * (w / 2.0 + 0.04) + Vector3(0, CORRIDOR_HEIGHT * 0.7, 0),
+			Vector3(0.04, 0.04, 0.04), Color("#5be49b"), Vector3.ZERO, 2.0)
+
+
+## Jonction basse entre deux modules qui se touchent : gaine, deux colliers et câble lumineux.
+func _joint(parent: Node3D, dir: Vector2i, flow: Material) -> void:
+	var rot := Vector3(90, 0, 0) if dir.y != 0 else Vector3(0, 0, 90)
+	var along := Vector3(dir.x, 0, dir.y)
+	ModelBuilder.box(parent, Vector3(0, 0.03, 0), Vector3(0.5 if dir.x != 0 else 0.3, 0.06, 0.5 if dir.y != 0 else 0.3), ModelBuilder.CONCRETE)
+	ModelBuilder.cylinder(parent, Vector3(0, 0.12, 0), 0.09, 0.5, ModelBuilder.WHITE, rot, -1.0, 12)
+	for side in [-0.22, 0.22]:
+		ModelBuilder.cylinder(parent, along * side + Vector3(0, 0.12, 0), 0.11, 0.05, ModelBuilder.GREY, rot, -1.0, 12)
+	var cable := ModelBuilder.cylinder(parent, Vector3(0, 0.215, 0), 0.025, 0.52, Color.WHITE, rot, -1.0, 8)
+	cable.material_override = flow
+	cable.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+## Jonctions entre modules qui se touchent (les conduites ont déjà leurs galeries).
+func _rebuild_connectors() -> void:
+	for child in _network_root.get_children():
+		child.queue_free()
+	var pairs := {}
+	for i in _engine.state.buildings.size():
+		if _engine.state.buildings[i].id == "link":
+			continue
+		var def := _engine.def_of(i)
+		var origin := _engine.cell_of(i)
+		for y in def.size.y:
+			for x in def.size.x:
+				var c := origin + Vector2i(x, y)
+				for dir in DIRS:
+					var j := _engine.building_at(c + dir)
+					if j <= i or _engine.state.buildings[j].id == "link":
+						continue
+					var key := "%d-%d" % [i, j]
+					if not pairs.has(key):
+						pairs[key] = { "points": [], "dir": dir, "linked": _engine.is_linked(i) }
+					pairs[key].points.append(cell_center(c) + Vector3(dir.x, 0, dir.y) * 0.5)
+	for pair: Dictionary in pairs.values():
+		var mid := Vector3.ZERO
+		for point: Vector3 in pair.points:
+			mid += point
+		mid /= pair.points.size()
+		var dir: Vector2i = pair.dir
+		var passage := Node3D.new()
+		passage.position = mid
+		_network_root.add_child(passage)
+		_joint(passage, dir, _flow_on if pair.linked else _flow_off)
+
+
 # ---------- Astronautes ----------
 
+## Recalcule les cases praticables : intérieur (modules raccordés et galeries), extérieur proche.
+func _rebuild_walk_cells() -> void:
+	_inside_cells.clear()
+	_link_cells.clear()
+	_free_cells.clear()
+	var near := {}
+	for i in _engine.state.buildings.size():
+		var def := _engine.def_of(i)
+		var origin := _engine.cell_of(i)
+		for y in def.size.y:
+			for x in def.size.x:
+				var c := origin + Vector2i(x, y)
+				if _engine.is_linked(i):
+					_inside_cells[c] = true
+					if def.id == "link":
+						_link_cells[c] = true
+				for dy in range(-3, 4):
+					for dx in range(-3, 4):
+						near[c + Vector2i(dx, dy)] = true
+	for c: Vector2i in near:
+		if _engine.map.is_buildable(c) and _engine.building_at(c) < 0:
+			_free_cells[c] = true
+
+
 func _sync_astronauts() -> void:
-	var wanted := mini(_engine.state.colonists.size(), MAX_ASTRONAUTS)
-	while _astronauts.size() < wanted:
-		var a := ModelBuilder.astronaut()
-		a.position = cell_center(_engine.map.lander_cell) + Vector3(_rng.randf_range(-1, 2), 0, 2.2)
-		a.set_meta("target", a.position)
-		a.set_meta("wait", _rng.randf_range(0.0, 2.0))
+	var colonists := _engine.state.colonists
+	var wanted := mini(colonists.size(), MAX_ASTRONAUTS)
+	while _agents.size() < wanted:
+		var a := Astronaut.new(colonists[_agents.size()].role)
+		a.position = cell_center(_engine.map.lander_cell)
 		add_child(a)
-		_astronauts.append(a)
-	while _astronauts.size() > wanted:
-		_astronauts.pop_back().queue_free()
+		_agents.append({ "node": a, "mode": "inside", "wait": _rng.randf_range(0.5, 4.0), "trips": 0 })
+	while _agents.size() > wanted:
+		_agents.pop_back().node.queue_free()
 
 
-## Les astronautes vont d'un module à l'autre, et rentrent la nuit.
 func _update_astronauts(delta: float) -> void:
-	var speed := 0.9 * maxf(1.0, _engine.state.speed)
-	if _engine.state.speed == 0:
-		return
-	for a in _astronauts:
-		var target: Vector3 = a.get_meta("target")
-		var to := target - a.position
-		if to.length() < 0.05:
-			var wait: float = a.get_meta("wait") - delta
-			a.set_meta("wait", wait)
-			if wait <= 0.0:
-				a.set_meta("target", _wander_target())
-				a.set_meta("wait", _rng.randf_range(1.0, 4.0))
+	var speed := float(_engine.state.speed)
+	for agent in _agents:
+		var a: Astronaut = agent.node
+		a.update(delta, speed)
+		var cell := Vector2i(floori(a.position.x), floori(a.position.z))
+		# Dans un module, on ne le voit pas ; dans une galerie vitrée ou dehors, si.
+		a.visible = not _inside_cells.has(cell) or _link_cells.has(cell)
+		a.position.y = 0.05 if _link_cells.has(cell) else 0.0
+		if a.is_walking() or speed <= 0.0:
 			continue
-		var step := minf(to.length(), speed * delta)
-		a.position += to.normalized() * step
-		a.rotation.y = atan2(to.x, to.z)
-		a.position.y = absf(sin(Time.get_ticks_msec() / 120.0)) * 0.03
-		a.visible = not _engine.is_night() or to.length() > 0.5
+		agent.wait -= delta * speed
+		if agent.wait <= 0.0:
+			_plan(agent, cell)
 
 
-func _wander_target() -> Vector3:
-	var n := _engine.state.buildings.size()
-	var i := _rng.randi_range(0, n - 1)
-	var def := _engine.def_of(i)
-	var center := footprint_center(_engine.cell_of(i), def.size)
-	return center + Vector3(def.size.x * 0.5 + 0.25, 0, _rng.randf_range(-0.4, 0.4))
+## Choisit la prochaine promenade : dans le réseau, sortie, balade dehors ou retour à l'abri.
+func _plan(agent: Dictionary, cell: Vector2i) -> void:
+	var a: Astronaut = agent.node
+	agent.wait = _rng.randf_range(1.0, 4.0)
+	# Le terrain a changé sous ses pieds (module construit ou démoli) : retour à l'atterrisseur.
+	var lost: bool = (agent.mode == "eva" and not _free_cells.has(cell)) \
+			or (agent.mode == "inside" and not _inside_cells.has(cell))
+	if lost:
+		a.position = cell_center(_engine.map.lander_cell)
+		agent.mode = "inside"
+		return
+	var cells: Array[Vector2i] = []
+	if agent.mode == "inside":
+		if not _engine.is_night() and _rng.randf() < 0.45:
+			var door := _random_door()
+			if not door.is_empty():
+				cells = _path(cell, door[0], _inside_cells)
+				if not cells.is_empty() or cell == door[0]:
+					cells.append(door[1])
+					agent.mode = "eva"
+					agent.trips = 0
+		if cells.is_empty() and agent.mode == "inside":
+			var targets := _inside_cells.keys()
+			cells = _path(cell, targets[_rng.randi_range(0, targets.size() - 1)], _inside_cells)
+	else:
+		if _engine.is_night() or agent.trips >= 2:
+			var door := _random_door()
+			if not door.is_empty():
+				cells = _path(cell, door[1], _free_cells)
+				if not cells.is_empty() or cell == door[1]:
+					cells.append(door[0])
+					agent.mode = "inside"
+		else:
+			var targets := _free_cells.keys()
+			cells = _path(cell, targets[_rng.randi_range(0, targets.size() - 1)], _free_cells)
+			agent.trips += 1
+	var points: Array[Vector3] = []
+	for c in cells:
+		var jitter := Vector3.ZERO if _inside_cells.has(c) else Vector3(_rng.randf_range(-0.15, 0.15), 0, _rng.randf_range(-0.15, 0.15))
+		points.append(cell_center(c) + jitter)
+	a.path = points
+
+
+## Une « porte » au hasard : [case d'un module raccordé, case libre voisine].
+func _random_door() -> Array:
+	var doors: Array = []
+	for c: Vector2i in _inside_cells:
+		if _link_cells.has(c):
+			continue
+		for dir in DIRS:
+			if _free_cells.has(c + dir):
+				doors.append([c, c + dir])
+	return doors[_rng.randi_range(0, doors.size() - 1)] if not doors.is_empty() else []
+
+
+## Plus court chemin sur la grille (4 voisins) parmi les cases autorisées, sans la case de départ.
+func _path(from: Vector2i, to: Vector2i, allowed: Dictionary) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	if from == to or not allowed.has(to):
+		return result
+	var previous := { from: from }
+	var queue: Array[Vector2i] = [from]
+	while not queue.is_empty():
+		var c: Vector2i = queue.pop_front()
+		if c == to:
+			break
+		for dir in DIRS:
+			var n := c + dir
+			if allowed.has(n) and not previous.has(n):
+				previous[n] = c
+				queue.append(n)
+	if not previous.has(to):
+		return result
+	var step := to
+	while step != from:
+		result.push_front(step)
+		step = previous[step]
+	return result
