@@ -8,9 +8,9 @@ signal cell_tapped(cell: Vector2i, building_index: int)
 ## Le fantôme de placement a changé de case.
 signal ghost_moved(cell: Vector2i)
 
-const MARGIN := 9.0
-const TERRAIN_STEP := 0.5
-const BASE_Y := -6.0
+## Le paysage s'étend bien au-delà du cratère et se perd dans la brume.
+const TERRAIN_EXTENT := 36.0
+const TERRAIN_STEP := 0.8
 const MAX_ASTRONAUTS := 10
 const DIRS: Array[Vector2i] = [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOWN, Vector2i.UP]
 ## Galeries vitrées : largeur, hauteur.
@@ -18,9 +18,9 @@ const CORRIDOR_WIDTH := 0.42
 const CORRIDOR_HEIGHT := 0.5
 const CORRIDOR_GLASS := Color(0.72, 0.9, 1.0, 0.32)
 
-const DAY_SKY := Color(0.78, 0.55, 0.38)
-const NIGHT_SKY := Color(0.05, 0.06, 0.11)
-const STORM_SKY := Color(0.62, 0.42, 0.28)
+const DAY_SKY := Color(0.74, 0.5, 0.34)
+const NIGHT_SKY := Color(0.03, 0.035, 0.07)
+const STORM_SKY := Color(0.62, 0.4, 0.26)
 
 var rig: CameraRig
 
@@ -44,8 +44,14 @@ var _inside_cells := {}
 var _link_cells := {}
 var _free_cells := {}
 var _env: Environment
+var _sky_mat: ProceduralSkyMaterial
 var _sun: DirectionalLight3D
 var _dust: CPUParticles3D
+var _motes: CPUParticles3D
+var _noise: FastNoiseLite
+var _storm_level := 0.0
+var _sky_timer := 0.0
+var _devil_timer := 12.0
 var _rng := RandomNumberGenerator.new()
 
 
@@ -69,7 +75,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	_update_sky()
+	_update_sky(delta)
+	_update_dust_devils(delta)
 	_update_astronauts(delta)
 
 
@@ -114,7 +121,7 @@ func _rebuild_buildings() -> void:
 	_lights.clear()
 	for i in _engine.state.buildings.size():
 		var def := _engine.def_of(i)
-		var node := _corridor(i) if def.id == "link" else ModelBuilder.building(def.id)
+		var node := ModelBuilder.bake(_corridor(i) if def.id == "link" else ModelBuilder.building(def.id))
 		node.position = footprint_center(_engine.cell_of(i), def.size)
 		add_child(node)
 		_building_nodes.append(node)
@@ -299,95 +306,223 @@ func launch_evacuation() -> void:
 
 # ---------- Ciel, soleil, tempête ----------
 
-func _update_sky() -> void:
+## Couleurs du ciel martien : caramel le jour, bleuté autour du soleil couchant
+## (la poussière fine diffuse le bleu vers l'avant), nuit bleu sombre.
+func _update_sky(delta: float) -> void:
 	var t := _engine.time_of_day()
 	var daylight := clampf(cos(TAU * (t - 0.5)) * 1.6 + 0.15, 0.0, 1.0)
-	var storm := 1.0 if _engine.is_storm() else 0.0
-	var sky := NIGHT_SKY.lerp(DAY_SKY, daylight).lerp(STORM_SKY * maxf(daylight, 0.35), storm * 0.8)
-	_env.background_color = sky
-	_env.ambient_light_color = Color(0.4, 0.45, 0.65).lerp(Color(0.95, 0.78, 0.65), daylight)
-	_env.ambient_light_energy = lerpf(0.3, 0.42, daylight)
-	_env.fog_density = lerpf(_env.fog_density, 0.018 * storm, 0.02)
-	_env.fog_light_color = sky
-	# Le soleil se lève à l'est (+X), culmine à midi, se couche à l'ouest.
+	var twilight := clampf(1.0 - absf(cos(TAU * (t - 0.5))) * 3.0, 0.0, 1.0) * (1.0 if daylight > 0.0 else 0.4)
+	_storm_level = move_toward(_storm_level, 1.0 if _engine.is_storm() else 0.0, delta * 0.5)
+	var storm := _storm_level
+
+	# Le jour, le soleil se lève à l'est (+X) et se couche à l'ouest ; la nuit, une lumière
+	# lunaire bleutée (Phobos et Deimos) garde la colonie lisible.
 	var angle := TAU * (t - 0.25)
-	_sun.rotation = Vector3(-maxf(0.12, sin(angle)) * 1.2, -0.6 + cos(angle) * 0.9, 0)
-	_sun.light_energy = lerpf(0.0, 1.0, daylight) * (1.0 - storm * 0.6)
-	_dust.emitting = storm > 0.0
+	if daylight > 0.08:
+		_sun.rotation = Vector3(-maxf(0.1, sin(angle)) * 1.15, -0.6 + cos(angle) * 0.9, 0)
+		_sun.light_energy = lerpf(0.0, 1.35, daylight) * (1.0 - storm * 0.65)
+		_sun.light_color = Color(1.0, 0.9, 0.78).lerp(Color(0.78, 0.85, 1.0), twilight * 0.6)
+	else:
+		_sun.rotation = Vector3(-0.95, -0.2, 0)
+		_sun.light_energy = lerpf(0.42, 0.1, daylight / 0.08)
+		_sun.light_color = Color(0.62, 0.72, 1.0)
+	_env.ambient_light_sky_contribution = lerpf(0.25, 1.0, daylight)
+	_env.ambient_light_color = Color(0.38, 0.45, 0.7)
+	_env.ambient_light_energy = lerpf(0.9, 0.75, daylight) * (1.0 - storm * 0.25)
+	_env.fog_density = 0.006 + 0.014 * storm
+	_env.fog_light_color = _sky_mat.sky_horizon_color
+	_motes.emitting = daylight > 0.1
+	_dust.emitting = storm > 0.5
+
+	# Le ciel (et donc l'éclairage d'ambiance) n'est recalculé que de temps en temps : coûteux sur mobile.
+	_sky_timer -= delta
+	if _sky_timer > 0.0:
+		return
+	_sky_timer = 10.0 if OS.has_feature("mobile") else 0.4
+	var top := NIGHT_SKY.lerp(DAY_SKY, daylight)
+	var horizon := Color(0.1, 0.1, 0.18).lerp(Color(0.9, 0.68, 0.5), daylight)
+	horizon = horizon.lerp(Color(0.55, 0.68, 0.9), twilight * 0.7)
+	top = top.lerp(STORM_SKY * maxf(daylight, 0.3), storm * 0.85)
+	horizon = horizon.lerp(STORM_SKY * maxf(daylight, 0.35), storm * 0.9)
+	_sky_mat.sky_top_color = top
+	_sky_mat.sky_horizon_color = horizon
+	_sky_mat.ground_horizon_color = horizon.darkened(0.2)
+	_sky_mat.ground_bottom_color = Color(0.3, 0.14, 0.08).lerp(Color(0.04, 0.03, 0.05), 1.0 - daylight)
 
 
 func _build_environment() -> void:
+	_sky_mat = ProceduralSkyMaterial.new()
+	_sky_mat.sky_top_color = DAY_SKY
+	_sky_mat.sky_horizon_color = Color(0.9, 0.68, 0.5)
+	_sky_mat.ground_bottom_color = Color(0.3, 0.14, 0.08)
+	_sky_mat.ground_horizon_color = Color(0.7, 0.5, 0.36)
+	_sky_mat.sun_angle_max = 20.0
+	_sky_mat.sun_curve = 0.08
+	var sky := Sky.new()
+	sky.sky_material = _sky_mat
+	sky.radiance_size = Sky.RADIANCE_SIZE_32
+
 	_env = Environment.new()
-	_env.background_mode = Environment.BG_COLOR
-	_env.background_color = DAY_SKY
-	_env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	_env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	_env.tonemap_exposure = 1.0
-	_env.glow_enabled = true
-	_env.glow_intensity = 0.5
-	_env.glow_hdr_threshold = 1.2
+	_env.background_mode = Environment.BG_SKY
+	_env.sky = sky
+	_env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	_env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+	_env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	_env.tonemap_exposure = 1.05
+	_env.tonemap_white = 6.0
+	# Halo lumineux : coûteux sur mobile pour peu de différence visible.
+	_env.glow_enabled = not OS.has_feature("mobile")
+	_env.glow_intensity = 0.55
+	_env.glow_bloom = 0.02
+	_env.glow_hdr_threshold = 1.1
 	_env.fog_enabled = true
-	_env.fog_density = 0.0
+	_env.fog_density = 0.006
+	_env.fog_sky_affect = 0.3
+	_env.adjustment_enabled = true
+	_env.adjustment_contrast = 1.08
+	_env.adjustment_saturation = 1.12
 	var world_env := WorldEnvironment.new()
 	world_env.environment = _env
 	add_child(world_env)
 
 	_sun = DirectionalLight3D.new()
-	_sun.light_color = Color(1.0, 0.9, 0.78)
 	_sun.shadow_enabled = true
-	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
-	_sun.directional_shadow_max_distance = 80.0
+	_sun.shadow_blur = 1.5
+	# Sur mobile, une seule cascade d'ombres : nettement moins coûteux.
+	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL if OS.has_feature("mobile") else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	_sun.directional_shadow_max_distance = 70.0
+	_sun.light_angular_distance = 0.6
 	add_child(_sun)
 
 	# Poussière soufflée par le vent pendant les tempêtes.
-	_dust = CPUParticles3D.new()
-	var mesh := QuadMesh.new()
-	mesh.size = Vector2(0.08, 0.08)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.85, 0.55, 0.35, 0.55)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	mesh.material = mat
-	_dust.mesh = mesh
-	_dust.amount = 400
-	_dust.lifetime = 4.0
-	_dust.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	_dust.emission_box_extents = Vector3(18, 2, 18)
+	_dust = _particles(Color(0.85, 0.55, 0.35, 0.35), 0.07, 300, 4.0)
+	_dust.emission_box_extents = Vector3(22, 2.5, 22)
 	_dust.position = Vector3(ColonyMap.SIZE / 2.0, 2.0, ColonyMap.SIZE / 2.0)
 	_dust.direction = Vector3(1, 0, 0.3)
 	_dust.spread = 10.0
-	_dust.gravity = Vector3.ZERO
 	_dust.initial_velocity_min = 4.0
 	_dust.initial_velocity_max = 8.0
-	_dust.emitting = false
 	add_child(_dust)
+
+	# Fines particules en suspension, visibles dans la lumière du jour.
+	_motes = _particles(Color(1.0, 0.88, 0.7, 0.3), 0.03, 90, 8.0)
+	_motes.emission_box_extents = Vector3(16, 2.0, 16)
+	_motes.position = Vector3(ColonyMap.SIZE / 2.0, 1.5, ColonyMap.SIZE / 2.0)
+	_motes.direction = Vector3(1, 0.1, 0.4)
+	_motes.spread = 40.0
+	_motes.initial_velocity_min = 0.1
+	_motes.initial_velocity_max = 0.35
+	add_child(_motes)
+
+
+## Point de poussière : disque au bord doux (et non un carré).
+func _soft_particle(color: Color) -> StandardMaterial3D:
+	var gradient := Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
+	gradient.colors = PackedColorArray([Color(1, 1, 1, 1), Color(1, 1, 1, 0.45), Color(1, 1, 1, 0)])
+	var texture := GradientTexture2D.new()
+	texture.gradient = gradient
+	texture.fill = GradientTexture2D.FILL_RADIAL
+	texture.fill_from = Vector2(0.5, 0.5)
+	texture.fill_to = Vector2(1.0, 0.5)
+	texture.width = 32
+	texture.height = 32
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	mat.albedo_texture = texture
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	return mat
+
+
+func _particles(color: Color, size: float, amount: int, lifetime: float) -> CPUParticles3D:
+	var particles := CPUParticles3D.new()
+	var mesh := QuadMesh.new()
+	mesh.size = Vector2(size, size)
+	mesh.material = _soft_particle(color)
+	particles.mesh = mesh
+	particles.amount = amount
+	particles.lifetime = lifetime
+	particles.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	particles.gravity = Vector3.ZERO
+	particles.emitting = false
+	return particles
+
+
+# ---------- Tourbillons de poussière ----------
+
+## De temps en temps, un tourbillon de poussière traverse le paysage (les rovers en ont filmé).
+func _update_dust_devils(delta: float) -> void:
+	if _engine.state.speed == 0 or _engine.is_night() or _engine.is_storm():
+		return
+	_devil_timer -= delta * _engine.state.speed
+	if _devil_timer > 0.0:
+		return
+	_devil_timer = _rng.randf_range(25.0, 60.0)
+	var c := ColonyMap.SIZE / 2.0
+	var angle := _rng.randf() * TAU
+	var start := Vector3(c + cos(angle) * 20.0, 0, c + sin(angle) * 20.0)
+	var end := Vector3(c - cos(angle + 0.6) * 20.0, 0, c - sin(angle + 0.6) * 20.0)
+	var devil := CPUParticles3D.new()
+	var mesh := QuadMesh.new()
+	mesh.size = Vector2(0.28, 0.28)
+	mesh.material = _soft_particle(Color(0.8, 0.52, 0.34, 0.16))
+	devil.mesh = mesh
+	devil.amount = 90
+	devil.lifetime = 2.5
+	devil.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
+	devil.emission_ring_axis = Vector3.UP
+	devil.emission_ring_radius = 0.35
+	devil.emission_ring_inner_radius = 0.1
+	devil.emission_ring_height = 0.1
+	devil.direction = Vector3.UP
+	devil.spread = 8.0
+	devil.gravity = Vector3(0, 0.6, 0)
+	devil.initial_velocity_min = 0.8
+	devil.initial_velocity_max = 1.4
+	devil.tangential_accel_min = 4.0
+	devil.tangential_accel_max = 6.0
+	devil.radial_accel_min = 0.4
+	devil.radial_accel_max = 0.8
+	devil.scale_amount_min = 0.6
+	devil.scale_amount_max = 1.5
+	devil.position = start + Vector3(0, height(start.x, start.z), 0)
+	add_child(devil)
+	devil.emitting = true
+	var tween := devil.create_tween()
+	tween.tween_property(devil, "position", end + Vector3(0, height(end.x, end.z), 0), 30.0)
+	tween.tween_callback(func() -> void: devil.emitting = false)
+	tween.tween_interval(3.0)
+	tween.tween_callback(devil.queue_free)
 
 
 # ---------- Terrain ----------
 
-## Hauteur du sol : plat dans le cratère (on y construit), puis le rebord qui monte.
+## Hauteur du sol : plat dans le cratère (on y construit), le rebord, puis des collines au loin.
 func height(x: float, z: float) -> float:
 	var c := ColonyMap.SIZE / 2.0
 	var r := Vector2(x - c, z - c).length()
 	var wobble := sin(atan2(z - c, x - c) * 5.0) * 0.6
-	var rim := smoothstep(c - 1.5 + wobble, c + 2.5 + wobble, r) * 2.6
-	var outside := smoothstep(c + 2.5, c + 7.0, r) * -1.0
-	var bumps := 0.12 * (sin(x * 1.7) * cos(z * 1.3) + sin((x + z) * 0.9)) * smoothstep(c - 2.0, c + 1.0, r)
-	return rim + outside + bumps
-
-
-func _ground_color(x: float, z: float, y: float) -> Color:
-	var n := 0.04 * (sin(x * 3.1 + z * 1.7) + sin(x * 0.7 - z * 2.3))
-	var base := Color(0.64, 0.29, 0.15).lightened(n)
-	return base.lerp(Color(0.45, 0.2, 0.12), clampf(y / 2.6, 0.0, 1.0)).lerp(Color(0.55, 0.26, 0.15), clampf(-y, 0.0, 1.0))
+	var rim := smoothstep(c - 1.0 + wobble, c + 2.5 + wobble, r) * 2.8
+	var beyond := smoothstep(c + 2.5, c + 9.0, r)
+	var hills := (_noise.get_noise_2d(x, z) * 2.6 + 0.6) * beyond
+	var mesas := smoothstep(0.25, 0.4, _noise.get_noise_2d(x * 0.35 + 40.0, z * 0.35)) * 4.5 * smoothstep(c + 14.0, c + 26.0, r)
+	var bumps := _noise.get_noise_2d(x * 4.0, z * 4.0) * 0.18 * smoothstep(c - 1.5, c + 1.0, r)
+	return rim * (1.0 - beyond * 0.6) + hills + mesas + bumps
 
 
 func _build_terrain() -> void:
+	_noise = FastNoiseLite.new()
+	_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	_noise.frequency = 0.045
+	_noise.fractal_octaves = 4
+	_noise.seed = 3
+
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var lo := -MARGIN
-	var hi := ColonyMap.SIZE + MARGIN
+	var lo := -TERRAIN_EXTENT
+	var hi := ColonyMap.SIZE + TERRAIN_EXTENT
 	var count := int((hi - lo) / TERRAIN_STEP)
 	for i in count:
 		for j in count:
@@ -396,56 +531,109 @@ func _build_terrain() -> void:
 			var quad := [_vertex(x0, z0), _vertex(x0 + TERRAIN_STEP, z0),
 					_vertex(x0 + TERRAIN_STEP, z0 + TERRAIN_STEP), _vertex(x0, z0 + TERRAIN_STEP)]
 			for k in [0, 1, 2, 0, 2, 3]:
-				var v: Vector3 = quad[k]
-				st.set_color(_ground_color(v.x, v.z, v.y))
-				st.add_vertex(v)
-	# Coupe de la maquette sur les deux faces visibles.
-	for i in count:
-		var a := lo + i * TERRAIN_STEP
-		var b := a + TERRAIN_STEP
-		_skirt(st, Vector3(a, height(a, hi), hi), Vector3(b, height(b, hi), hi))
-		_skirt(st, Vector3(lo, height(lo, b), b), Vector3(lo, height(lo, a), a))
+				st.add_vertex(quad[k])
 	st.generate_normals()
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.roughness = 1.0
+
+	var mat := ShaderMaterial.new()
+	mat.shader = preload("res://world/terrain.gdshader")
+	mat.set_shader_parameter("noise_large", _noise_texture(0.012, 5, false, 1))
+	mat.set_shader_parameter("noise_fine", _noise_texture(0.08, 2, false, 2))
+	mat.set_shader_parameter("detail_normal", _noise_texture(0.05, 4, true, 3))
 	var terrain := MeshInstance3D.new()
 	terrain.mesh = st.commit()
 	terrain.material_override = mat
 	add_child(terrain)
+	_build_pebbles()
+
+
+func _noise_texture(frequency: float, octaves: int, normal_map: bool, seed_value: int) -> NoiseTexture2D:
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	noise.frequency = frequency
+	noise.fractal_octaves = octaves
+	noise.seed = seed_value
+	var texture := NoiseTexture2D.new()
+	texture.width = 512
+	texture.height = 512
+	texture.seamless = true
+	texture.noise = noise
+	if normal_map:
+		texture.as_normal_map = true
+		texture.bump_strength = 6.0
+	return texture
 
 
 func _vertex(x: float, z: float) -> Vector3:
 	return Vector3(x, height(x, z), z)
 
 
-func _skirt(st: SurfaceTool, top_a: Vector3, top_b: Vector3) -> void:
-	var bottom_a := Vector3(top_a.x, BASE_Y, top_a.z)
-	var bottom_b := Vector3(top_b.x, BASE_Y, top_b.z)
-	for v: Vector3 in [top_a, bottom_b, top_b, top_a, bottom_a, bottom_b]:
-		var band := int(floor(-v.y * 1.4 + sin(v.x + v.z) * 0.5)) % 3
-		var color: Color = [Color(0.5, 0.27, 0.17), Color(0.42, 0.22, 0.14), Color(0.58, 0.33, 0.2)][absi(band)]
-		st.set_color(color.darkened(clampf(-v.y / 14.0, 0.0, 0.4)))
-		st.add_vertex(v)
+## Milliers de petits cailloux (une seule instance multiple : peu coûteux).
+func _build_pebbles() -> void:
+	var mesh := SphereMesh.new()
+	mesh.radius = 1.0
+	mesh.height = 2.0
+	mesh.radial_segments = 5
+	mesh.rings = 2
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.mesh = mesh
+	var transforms: Array[Transform3D] = []
+	var lander := cell_center(_engine.map.lander_cell + Vector2i.ONE) - Vector3(0.5, 0, 0.5)
+	for i in 2600:
+		var x := _rng.randf_range(-14.0, ColonyMap.SIZE + 14.0)
+		var z := _rng.randf_range(-14.0, ColonyMap.SIZE + 14.0)
+		if Vector2(x - lander.x, z - lander.z).length() < 2.2:
+			continue
+		var s := _rng.randf_range(0.015, 0.055) * (2.5 if _rng.randf() < 0.05 else 1.0)
+		var basis := Basis.from_euler(Vector3(_rng.randf() * TAU, _rng.randf() * TAU, 0)).scaled(Vector3(s * _rng.randf_range(1.0, 1.6), s * 0.6, s))
+		transforms.append(Transform3D(basis, Vector3(x, height(x, z) + s * 0.2, z)))
+	multimesh.instance_count = transforms.size()
+	for i in transforms.size():
+		multimesh.set_instance_transform(i, transforms[i])
+	var pebbles := MultiMeshInstance3D.new()
+	pebbles.multimesh = multimesh
+	pebbles.material_override = ModelBuilder.rock_material(Color("#4e2516"))
+	pebbles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(pebbles)
 
 
+## Rochers : tous dans une seule instance multiple (un seul objet à dessiner).
 func _build_rocks() -> void:
+	var transforms: Array[Transform3D] = []
 	for y in ColonyMap.SIZE:
 		for x in ColonyMap.SIZE:
 			if _engine.map.tile_at(Vector2i(x, y)) == ColonyMap.Tile.ROCK:
-				for k in 2:
-					var rock := ModelBuilder.rock(_rng)
-					rock.position = cell_center(Vector2i(x, y)) + Vector3(_rng.randf_range(-0.25, 0.25), 0.05, _rng.randf_range(-0.25, 0.25))
-					add_child(rock)
-	# Rochers épars sur le rebord, pour le décor.
-	for i in 60:
+				for k in 3:
+					var at := cell_center(Vector2i(x, y)) + Vector3(_rng.randf_range(-0.3, 0.3), 0.04, _rng.randf_range(-0.3, 0.3))
+					transforms.append(_rock_transform(at, _rng.randf_range(0.15, 0.3)))
+	# Blocs sur le rebord du cratère et dans les collines.
+	for i in 180:
 		var angle := _rng.randf() * TAU
-		var radius := _rng.randf_range(ColonyMap.SIZE / 2.0 + 0.5, ColonyMap.SIZE / 2.0 + 6.0)
+		var radius := _rng.randf_range(ColonyMap.SIZE / 2.0 + 0.3, ColonyMap.SIZE / 2.0 + 16.0)
 		var x := ColonyMap.SIZE / 2.0 + cos(angle) * radius
 		var z := ColonyMap.SIZE / 2.0 + sin(angle) * radius
-		var rock := ModelBuilder.rock(_rng, Color("#6a3826"))
-		rock.position = Vector3(x, height(x, z), z)
-		add_child(rock)
+		transforms.append(_rock_transform(Vector3(x, height(x, z), z), _rng.randf_range(0.15, 0.6)))
+	var mesh := SphereMesh.new()
+	mesh.radius = 1.0
+	mesh.height = 2.0
+	mesh.radial_segments = 7
+	mesh.rings = 4
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.mesh = mesh
+	multimesh.instance_count = transforms.size()
+	for i in transforms.size():
+		multimesh.set_instance_transform(i, transforms[i])
+	var rocks := MultiMeshInstance3D.new()
+	rocks.multimesh = multimesh
+	rocks.material_override = ModelBuilder.rock_material()
+	add_child(rocks)
+
+
+func _rock_transform(at: Vector3, size: float) -> Transform3D:
+	var basis := Basis.from_euler(Vector3(_rng.randf_range(-0.3, 0.3), _rng.randf() * TAU, _rng.randf_range(-0.3, 0.3)))
+	basis = basis.scaled(Vector3(_rng.randf_range(0.9, 1.5), _rng.randf_range(0.45, 0.8), _rng.randf_range(0.8, 1.4)) * size)
+	return Transform3D(basis, at)
 
 
 func _build_ice() -> void:
@@ -453,18 +641,22 @@ func _build_ice() -> void:
 	_ice_root.visible = false
 	add_child(_ice_root)
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.7, 0.86, 1.0, 0.55)
+	mat.albedo_color = Color(0.8, 0.84, 0.88, 0.28)
+	mat.roughness = 0.6
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.roughness = 0.2
+	# Toutes les plaques de glace dans un seul maillage.
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(1.0, 1.0)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for cell in _engine.map.ice_cells():
-		var patch := MeshInstance3D.new()
-		var plane := PlaneMesh.new()
-		plane.size = Vector2(1.0, 1.0)
-		patch.mesh = plane
-		patch.material_override = mat
-		patch.position = cell_center(cell) + Vector3(0, 0.015, 0)
-		patch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		_ice_root.add_child(patch)
+		st.append_from(plane, 0, Transform3D(Basis.IDENTITY, cell_center(cell) + Vector3(0, 0.015, 0)))
+	var patches := MeshInstance3D.new()
+	patches.mesh = st.commit()
+	patches.material_override = mat
+	patches.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_ice_root.add_child(patches)
 
 
 func _build_grid() -> void:
@@ -593,8 +785,8 @@ func _rebuild_connectors() -> void:
 		var dir: Vector2i = pair.dir
 		var passage := Node3D.new()
 		passage.position = mid
-		_network_root.add_child(passage)
 		_joint(passage, dir, _flow_on if pair.linked else _flow_off)
+		_network_root.add_child(ModelBuilder.bake(passage))
 
 
 # ---------- Astronautes ----------

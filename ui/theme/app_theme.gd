@@ -102,7 +102,8 @@ static func _box(color: Color, radius: int, margin: int, border := Color.TRANSPA
 	if border.a > 0.0:
 		box.border_color = border
 		box.set_border_width_all(2)
-	if shadow:
+	# Ombres douces : coûteuses en plein écran sur mobile, réservées aux autres plateformes.
+	if shadow and not OS.has_feature("mobile"):
 		box.shadow_color = Palette.SHADOW
 		box.shadow_size = 16
 		box.shadow_offset = Vector2(0, 6)
@@ -134,7 +135,7 @@ static func _button(theme: Theme, type: String, color: Color, text: Color, font:
 	if type != "Button":
 		theme.set_type_variation(type, "Button")
 	var normal := _margins(_box(color, 18, 0), 18, 10) as StyleBoxFlat
-	if glow:
+	if glow and not OS.has_feature("mobile"):
 		normal.shadow_color = Color(color, 0.3)
 		normal.shadow_size = 10
 		normal.shadow_offset = Vector2(0, 4)

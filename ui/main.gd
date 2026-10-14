@@ -41,6 +41,9 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
+	# Mobile : la 3D est calculée en plus basse résolution puis agrandie (l'interface reste nette).
+	if OS.has_feature("mobile"):
+		get_viewport().scaling_3d_scale = 0.55
 	add_child(IconStudio.new())
 	_world = ColonyWorld.new()
 	add_child(_world)

@@ -24,6 +24,7 @@ var _since_last_save := 0.0
 var _since_last_refresh := 0.0
 var _startup_report := {}
 var _skip_next_delta := false
+var _fps_timer := 0.0
 
 
 func _ready() -> void:
@@ -53,6 +54,18 @@ func _process(delta: float) -> void:
 	_since_last_save += delta
 	if _since_last_save >= AUTOSAVE_INTERVAL:
 		save()
+
+	# Version de développement : images par seconde dans le journal (mesure sur téléphone).
+	if OS.is_debug_build():
+		_fps_timer += delta
+		if _fps_timer >= 5.0:
+			_fps_timer = 0.0
+			var rid := get_viewport().get_viewport_rid()
+			RenderingServer.viewport_set_measure_render_time(rid, true)
+			print("FPS %d · GPU %.1f ms · objets %d · primitives %d" % [
+				Engine.get_frames_per_second(), RenderingServer.viewport_get_measured_render_time_gpu(rid),
+				Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
+				Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)])
 
 
 func _notification(what: int) -> void:
