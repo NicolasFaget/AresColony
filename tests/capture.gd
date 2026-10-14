@@ -100,6 +100,16 @@ func _run() -> void:
 			rig.camera.size = 3.2
 			await _frames(5)
 			await _shot("14_zoom_astronautes")
+		"alerte":
+			engine.state.next_storm = 1e9
+			engine.advance(7.4)
+			main = await _open_main()
+			_close_modals(main)
+			await _frames(30)
+			await _shot("15_alerte")
+			await _tap(main._alert.get_child(0).get_child(2).get_global_rect().get_center())
+			await _frames(40)
+			await _shot("16_que_faire")
 		"interaction":
 			main = await _open_main()
 			_close_modals(main)

@@ -44,6 +44,25 @@ func on_shown() -> void:
 	refresh()
 
 
+## Fait défiler jusqu'à une ligne et la fait clignoter (guide, alertes).
+func flash_row(row: Control) -> void:
+	if row == null:
+		return
+	# Deux images : la liste vient peut-être d'être réordonnée, attendre sa mise en page.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	scroll.scroll_vertical = int(maxf(0.0, row.position.y - 8.0))
+	var tween := row.create_tween()
+	for i in 3:
+		tween.tween_property(row, "modulate", Color(1.6, 1.5, 0.8), 0.18)
+		tween.tween_property(row, "modulate", Color.WHITE, 0.28)
+
+
+## Met en évidence l'élément `target` (module, recherche...). Redéfini par les pages concernées.
+func highlight(_target: String) -> void:
+	pass
+
+
 ## Marge en bas de liste, pour que la dernière carte ne colle pas à la barre d'onglets.
 func add_bottom_padding() -> void:
 	var pad := Control.new()

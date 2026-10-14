@@ -36,6 +36,8 @@ var speed: int = 1
 var haptics_enabled: bool = true
 var music_enabled: bool = true
 var sound_enabled: bool = true
+## Tutoriel terminé ou passé.
+var tutorial_done: bool = false
 
 
 func amount(resource: String) -> float:
@@ -66,6 +68,7 @@ func to_dict() -> Dictionary:
 		"last_saved_unix": last_saved_unix,
 		"settings": {
 			"speed": speed, "haptics": haptics_enabled, "music": music_enabled, "sound": sound_enabled,
+			"tutorial_done": tutorial_done,
 		},
 	}
 
@@ -111,6 +114,7 @@ static func from_dict(data: Dictionary) -> ColonyState:
 		state.haptics_enabled = settings.get("haptics") if settings.get("haptics") is bool else true
 		state.music_enabled = settings.get("music") if settings.get("music") is bool else true
 		state.sound_enabled = settings.get("sound") if settings.get("sound") is bool else true
+		state.tutorial_done = settings.get("tutorial_done") if settings.get("tutorial_done") is bool else false
 	return state
 
 

@@ -22,6 +22,7 @@ func _init() -> void:
 	_test_events()
 	_test_offline()
 	_test_save()
+	_test_advisor()
 	_test_number_formatter()
 	_simulate_campaign()
 	print("\n%d vérifications, %d échec(s)" % [_checks, _failures])
@@ -308,6 +309,38 @@ func _test_offline() -> void:
 	_check(_near(capped.sols, ColonyEngine.OFFLINE_CAP_SECONDS / ColonyEngine.OFFLINE_SECONDS_PER_SOL, 1e-3),
 			"hors-ligne plafonné à 8 h")
 	_check(_engine().apply_offline_seconds(10.0).sols == 0.0, "absence très courte : rien à faire")
+
+
+# ---------- Conseiller ----------
+
+func _test_advisor() -> void:
+	var engine := _calm_engine()
+	var days := ColonyAdvisor.forecast(engine)
+	_check(_near(days[R.OXYGEN], 30.0 / 3.36, 1e-3), "prévision : oxygène pour ~9 sols au départ")
+	_check(ColonyAdvisor.alerts(engine).is_empty(), "pas d'alerte au départ")
+
+	engine.state.resources[R.OXYGEN] = 3.0
+	var alerts := ColonyAdvisor.alerts(engine)
+	_check(alerts.size() == 1 and alerts[0].resource == R.OXYGEN and alerts[0].level == "danger", "alerte rouge : oxygène")
+	_check(alerts[0].target == "moxie" and alerts[0].tab == ColonyAdvisor.TAB_RESEARCH, "conseil : lancer la recherche")
+	engine.state.research_done.append("moxie")
+	_check(ColonyAdvisor.alerts(engine)[0].target == "moxie" and ColonyAdvisor.alerts(engine)[0].tab == ColonyAdvisor.TAB_BUILD,
+			"conseil suivant : construire l'électrolyseur")
+	engine.state.resources[R.OXYGEN] = 7.0
+	_check(ColonyAdvisor.alerts(engine)[0].level == "warning", "alerte orange quand il reste ~2 sols")
+
+	var isolated := _calm_engine()
+	isolated.place("solar", isolated.map.lander_cell + Vector2i(5, 0))
+	_check(ColonyAdvisor.alerts(isolated).back().target == "link", "alerte : module isolé, poser des conduites")
+
+	# Le tutoriel avance tout seul avec le joueur simulé, puis se termine.
+	var tuto := _engine()
+	_check(ColonyAdvisor.tutorial_step(tuto) == 0, "tutoriel : première étape")
+	ColonyBot.play(tuto, 12.0)
+	_check(ColonyAdvisor.tutorial_step(tuto) == -1, "tutoriel terminé en jouant normalement")
+	var skipped := _engine()
+	skipped.state.tutorial_done = true
+	_check(ColonyAdvisor.tutorial_step(skipped) == -1, "tutoriel passé")
 
 
 # ---------- Sauvegarde ----------

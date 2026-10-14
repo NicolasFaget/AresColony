@@ -19,6 +19,12 @@ func _ready() -> void:
 	refresh()
 
 
+func highlight(target: String) -> void:
+	for row in _rows:
+		if row.def.id == target:
+			flash_row(row)
+
+
 func refresh() -> void:
 	var engine := GameManager.engine
 	# Modules débloqués en premier, dans l'ordre du contenu.

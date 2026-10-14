@@ -12,6 +12,8 @@ const CHATTER_EVERY := 1.5
 var _engine: ColonyEngine
 var _world: ColonyWorld
 var _status: StatusPanel
+var _alert: AlertBanner
+var _coach: CoachCard
 var _window: GameWindow
 var _news: NewsTicker
 var _safe_area: MarginContainer
@@ -86,9 +88,19 @@ func _build_layout() -> void:
 	_status.settings_requested.connect(_show_settings)
 	_status.resource_requested.connect(_show_resource)
 	root.add_child(_status)
+	_alert = AlertBanner.new()
+	_alert.action_requested.connect(_go_to)
+	root.add_child(_alert)
 	var spacer := UiFx.spacer()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(spacer)
+	_coach = CoachCard.new()
+	_coach.show_requested.connect(_go_to)
+	_coach.skip_requested.connect(func() -> void:
+		_engine.state.tutorial_done = true
+		_news.post("Guide masqué. Les alertes restent là pour vous prévenir.")
+		_refresh())
+	root.add_child(_coach)
 
 	root.add_child(_build_placement_bar())
 
@@ -192,9 +204,12 @@ func _layout_changed() -> void:
 	_safe_area.add_theme_constant_override("margin_bottom", int(bottom) + MARGIN)
 	_window.custom_minimum_size.y = 0.0 if _window.collapsed else size.y * WINDOW_SHARE
 	await get_tree().process_frame
-	var covered_top := _status.get_global_rect().end.y
-	var covered_bottom := size.y - minf(_window.get_global_rect().position.y,
-			_placement_bar.get_global_rect().position.y if _placement_bar.visible else INF)
+	var covered_top := (_alert if _alert.visible else _status).get_global_rect().end.y
+	var bottom_top := _window.get_global_rect().position.y
+	for panel: Control in [_placement_bar, _coach]:
+		if panel.visible:
+			bottom_top = minf(bottom_top, panel.get_global_rect().position.y)
+	var covered_bottom := size.y - bottom_top
 	_world.rig.covered_fraction = clampf((covered_bottom - covered_top) / size.y, -0.5, 0.9)
 
 
@@ -206,11 +221,39 @@ func _refresh() -> void:
 		_world.refresh_ghost()
 		_refresh_placement()
 	_window.set_badge(2, _research_page.has_available_research())
+	_refresh_guidance()
 	AudioManager.set_mood("storm" if _engine.is_storm() else ("night" if _engine.is_night() else "day"))
 	AudioManager.set_wind(1.0 if _engine.is_storm() else 0.0)
 	if _engine.state.sol >= _next_chatter and _engine.state.speed > 0:
 		_next_chatter = _engine.state.sol + CHATTER_EVERY + randf()
 		_news.post(ColonyContent.CHATTER[randi() % ColonyContent.CHATTER.size()])
+
+
+## Alertes et guide : affichés sans gêner le placement.
+func _refresh_guidance() -> void:
+	var alerts := ColonyAdvisor.alerts(_engine)
+	var top: Dictionary = alerts[0] if not alerts.is_empty() else {}
+	var was_visible := _alert.visible
+	var was_danger: bool = _alert.visible and _alert._alert.get("level") == "danger"
+	_alert.show_alert(top, maxi(0, alerts.size() - 1))
+	if not top.is_empty() and top.level == "danger" and not was_danger:
+		AudioManager.play("alert")
+		GameManager.vibrate(40)
+	var step := ColonyAdvisor.tutorial_step(_engine) if _placing.is_empty() else -1
+	var coach_was_visible := _coach.visible
+	if _coach.show_step(step) and coach_was_visible and _placing.is_empty():
+		AudioManager.play("milestone")
+		_news.post("Étape du guide réussie !" if step >= 0 else "Guide terminé : votre colonie respire, boit et mange. Bravo !")
+	if _alert.visible != was_visible or _coach.visible != coach_was_visible:
+		_layout_changed.call_deferred()
+
+
+## Emmène le joueur à la solution : ouvre l'onglet et met la ligne en évidence.
+func _go_to(tab: int, target: String) -> void:
+	if not _placing.is_empty():
+		_stop_placement()
+	_select_tab(tab)
+	_pages[tab].highlight(target)
 
 
 func _show_page(index: int) -> void:
@@ -408,9 +451,7 @@ func _show_welcome() -> void:
 	Modal.open(_modal_layer, {
 		"icon": "rocket", "title": "Bienvenue dans le cratère Jezero",
 		"body": "Votre équipage de 4 colons vient de se poser. Les réserves d'oxygène tiennent environ 9 sols.\n\n"
-				+ "1. Lancez la recherche « Électrolyse du CO₂ » (onglet Recherche).\n"
-				+ "2. Construisez un électrolyseur et des panneaux solaires contre l'atterrisseur.\n"
-				+ "3. Trouvez de l'eau, puis faites pousser votre nourriture.\n\n"
+				+ "Suivez le guide en bas de l'écran : il vous montre quoi faire, étape par étape.\n"
 				+ "Touchez une ressource en haut pour savoir d'où elle vient.",
 		"confirm_text": "C'est parti",
 	})

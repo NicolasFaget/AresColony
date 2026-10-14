@@ -29,6 +29,12 @@ func refresh() -> void:
 		engine.state.research_done.size(), engine.research_defs.size()]
 
 
+func highlight(target: String) -> void:
+	for row in _rows:
+		if row.research.id == target:
+			flash_row(row)
+
+
 func has_available_research() -> bool:
 	var engine := GameManager.engine
 	if not engine.state.research_active.is_empty():
