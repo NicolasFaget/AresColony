@@ -107,10 +107,10 @@ func set_wind(strength: float) -> void:
 
 ## Active ou coupe musique, ambiance et effets selon les préférences du joueur.
 func apply_settings() -> void:
-	var state := GameManager.engine.state
-	AudioServer.set_bus_mute(AudioServer.get_bus_index("Music"), not state.music_enabled)
-	AudioServer.set_bus_mute(AudioServer.get_bus_index("Ambience"), not state.sound_enabled)
-	AudioServer.set_bus_mute(AudioServer.get_bus_index("SFX"), not state.sound_enabled)
+	var settings: Dictionary = GameManager.settings
+	AudioServer.set_bus_mute(AudioServer.get_bus_index("Music"), not settings.music)
+	AudioServer.set_bus_mute(AudioServer.get_bus_index("Ambience"), not settings.sound)
+	AudioServer.set_bus_mute(AudioServer.get_bus_index("SFX"), not settings.sound)
 
 
 # ---------- Séquenceur ----------

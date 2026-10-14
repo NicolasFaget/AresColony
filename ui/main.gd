@@ -38,6 +38,10 @@ var _next_chatter := 2.0
 
 
 func _ready() -> void:
+	# Lancée directement (éditeur, outils) : on reprend la dernière partie.
+	if GameManager.engine == null:
+		var slot := GameManager.most_recent_slot()
+		GameManager.start_game(slot if not slot.is_empty() else GameManager.SLOTS[0])
 	_engine = GameManager.engine
 	theme = AppTheme.build()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -576,43 +580,25 @@ func _show_offline_report(report: Dictionary) -> void:
 
 
 func _show_settings() -> void:
-	var state := _engine.state
-	var music := _setting_toggle("Musique", state.music_enabled, func(on: bool) -> void:
-		state.music_enabled = on
-		AudioManager.apply_settings())
-	var sound := _setting_toggle("Sons et ambiance", state.sound_enabled, func(on: bool) -> void:
-		state.sound_enabled = on
-		AudioManager.apply_settings()
-		AudioManager.play("click"))
-	var haptics := _setting_toggle("Vibrations", state.haptics_enabled, func(on: bool) -> void:
-		state.haptics_enabled = on
-		GameManager.vibrate(20))
-	Modal.open(_modal_layer, {
-		"icon": "gear", "title": "Réglages",
-		"extra": UiFx.vbox(10, [music, sound, haptics,
-			UiFx.paragraph("Glissez pour parcourir le cratère, pincez (ou molette) pour zoomer.\n"
-					+ "Touchez un module pour le détail, une ressource pour son explication.\n"
-					+ "Hors-ligne : pilote automatique prudent, 8 h au plus, sans tempête.",
-					"SmallLabel", HORIZONTAL_ALIGNMENT_CENTER),
-			UiFx.label("Ares Colony · v%s" % ProjectSettings.get_setting("application/config/version", "0.1"),
-					"CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER)]),
-		"confirm_text": "Fermer",
+	var to_menu := Button.new()
+	to_menu.text = "Menu principal"
+	to_menu.custom_minimum_size.y = 60
+	to_menu.focus_mode = Control.FOCUS_NONE
+	var modal: Modal
+	to_menu.pressed.connect(func() -> void:
+		AudioManager.play("click")
+		modal.close()
+		GameManager.open_menu())
+	var extra := SettingsPanel.build()
+	extra.add_child(UiFx.paragraph("Glissez pour parcourir le cratère, pincez (ou molette) pour zoomer.\n"
+			+ "Touchez un module pour le détail, une ressource pour son explication.\n"
+			+ "Hors-ligne : pilote automatique prudent, 8 h au plus, sans tempête.",
+			"SmallLabel", HORIZONTAL_ALIGNMENT_CENTER))
+	extra.add_child(to_menu)
+	extra.add_child(UiFx.label("La partie est sauvegardée automatiquement.", "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER))
+	modal = Modal.open(_modal_layer, {
+		"icon": "gear", "title": "Réglages", "extra": extra, "confirm_text": "Fermer",
 	})
-
-
-func _setting_toggle(title: String, value: bool, on_change: Callable) -> Button:
-	var button := Button.new()
-	button.toggle_mode = true
-	button.button_pressed = value
-	button.custom_minimum_size.y = 60
-	button.focus_mode = Control.FOCUS_NONE
-	button.theme_type_variation = "GreenButton" if value else "Button"
-	button.text = "%s : %s" % [title, "activé" if value else "désactivé"]
-	button.toggled.connect(func(on: bool) -> void:
-		button.theme_type_variation = "GreenButton" if on else "Button"
-		button.text = "%s : %s" % [title, "activé" if on else "désactivé"]
-		on_change.call(on))
-	return button
 
 
 func _show_load_problem() -> void:

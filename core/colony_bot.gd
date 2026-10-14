@@ -1,6 +1,7 @@
 class_name ColonyBot
 extends RefCounted
-## Joueur simulé raisonnable, utilisé par les tests (rythme, équilibrage) et les captures d'écran :
+## Joueur simulé raisonnable, utilisé par les tests (rythme, équilibrage), les captures d'écran
+## et la colonie de démonstration du menu principal :
 ## construit ce qui manque le plus, garde une réserve de matériaux, étend ses conduites vers la glace.
 
 const R = preload("res://core/colony_content.gd")

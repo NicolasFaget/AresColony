@@ -27,6 +27,15 @@ func _run() -> void:
 	var main: Control
 
 	match scenario:
+		"menu":
+			manager.stop_game()
+			var menu: Control = load("res://ui/menu.tscn").instantiate()
+			root.add_child(menu)
+			await _frames(150)
+			await _shot("17_menu")
+			menu._show_slots()
+			await _frames(30)
+			await _shot("18_sauvegardes")
 		"debut":
 			main = await _open_main()
 			await _shot("1_bienvenue")

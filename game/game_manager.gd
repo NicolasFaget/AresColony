@@ -1,6 +1,7 @@
 extends Node
 ## Autoload « GameManager » : seul point de contact entre le cœur du jeu et Godot.
-## Boucle de simulation, sauvegarde automatique, pilote automatique hors-ligne, vibrations.
+## Emplacements de sauvegarde, partie en cours (boucle de simulation, sauvegarde automatique,
+## pilote automatique hors-ligne), réglages du joueur, vibrations.
 ## Les écrans lisent `engine` et appellent ses méthodes ; ils ne touchent ni au disque ni à l'horloge.
 
 ## Retour après une absence : rapport du pilote automatique (voir ColonyEngine.apply_offline).
@@ -16,8 +17,18 @@ const LONG_FRAME_SECONDS := 5.0
 ## En dessous, le pilote automatique tourne sans afficher de rapport.
 const REPORT_MIN_SECONDS := 60.0
 
+## Emplacements de sauvegarde (le premier reprend l'ancien fichier unique « save »).
+const SLOTS: Array[String] = ["save", "save2", "save3"]
+const SETTINGS_PATH := "user://settings.json"
+const MENU_SCENE := "res://ui/menu.tscn"
+const GAME_SCENE := "res://ui/main.tscn"
+
+## Partie en cours, ou null au menu principal.
 var engine: ColonyEngine
+var current_slot := ""
 var load_result: SaveService.LoadResult
+## Réglages communs à toutes les parties.
+var settings := { "music": true, "sound": true, "haptics": true }
 
 var _save_service: SaveService
 var _since_last_save := 0.0
@@ -29,16 +40,17 @@ var _fps_timer := 0.0
 
 func _ready() -> void:
 	get_tree().auto_accept_quit = false
-	_save_service = SaveService.new(FileSaveStorage.new("user://", _save_slot()))
-	var state := _save_service.load_state()
-	load_result = _save_service.last_result
-	engine = ColonyEngine.new(state)
-	engine.changed.connect(_on_engine_changed)
-	_startup_report = engine.apply_offline(SaveService.now_unix())
-	save()
+	_load_settings()
+	# Outils (tests, captures) : `-- --save=nom` démarre directement une partie dans cet emplacement.
+	var slot := _cmdline_slot()
+	if not slot.is_empty():
+		start_game(slot)
 
 
 func _process(delta: float) -> void:
+	_debug_fps(delta)
+	if engine == null:
+		return
 	if _skip_next_delta:
 		_skip_next_delta = false
 	elif delta > LONG_FRAME_SECONDS:
@@ -55,28 +67,17 @@ func _process(delta: float) -> void:
 	if _since_last_save >= AUTOSAVE_INTERVAL:
 		save()
 
-	# Version de développement : images par seconde dans le journal (mesure sur téléphone).
-	if OS.is_debug_build():
-		_fps_timer += delta
-		if _fps_timer >= 5.0:
-			_fps_timer = 0.0
-			var rid := get_viewport().get_viewport_rid()
-			RenderingServer.viewport_set_measure_render_time(rid, true)
-			print("FPS %d · GPU %.1f ms · objets %d · primitives %d" % [
-				Engine.get_frames_per_second(), RenderingServer.viewport_get_measured_render_time_gpu(rid),
-				Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
-				Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)])
-
 
 func _notification(what: int) -> void:
 	match what:
 		NOTIFICATION_APPLICATION_PAUSED:
 			save()
 		NOTIFICATION_APPLICATION_RESUMED:
-			_skip_next_delta = true
-			var report := engine.apply_offline(SaveService.now_unix())
-			save()
-			_report(report)
+			if engine != null:
+				_skip_next_delta = true
+				var report := engine.apply_offline(SaveService.now_unix())
+				save()
+				_report(report)
 		NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_WM_GO_BACK_REQUEST:
 			save()
 		NOTIFICATION_WM_CLOSE_REQUEST:
@@ -84,9 +85,77 @@ func _notification(what: int) -> void:
 			get_tree().quit()
 
 
-func save() -> void:
-	_save_service.save_state(engine.state, SaveService.now_unix())
+# ---------- Parties ----------
+
+## Charge (ou crée, si `new_game`) la partie de l'emplacement `slot`.
+func start_game(slot: String, new_game := false) -> void:
+	current_slot = slot
+	_save_service = SaveService.new(FileSaveStorage.new("user://", slot))
+	var state := ColonyState.new() if new_game else _save_service.load_state()
+	load_result = SaveService.LoadResult.NEW_GAME if new_game else _save_service.last_result
+	engine = ColonyEngine.new(state)
+	engine.changed.connect(_on_engine_changed)
+	_startup_report = engine.apply_offline(SaveService.now_unix())
 	_since_last_save = 0.0
+	save()
+
+
+## Sauvegarde et ferme la partie en cours.
+func stop_game() -> void:
+	save()
+	engine = null
+	_save_service = null
+	current_slot = ""
+
+
+func open_menu() -> void:
+	stop_game()
+	get_tree().change_scene_to_file(MENU_SCENE)
+
+
+func open_game(slot: String, new_game := false) -> void:
+	start_game(slot, new_game)
+	get_tree().change_scene_to_file(GAME_SCENE)
+
+
+func save() -> void:
+	if engine != null and _save_service != null:
+		_save_service.save_state(engine.state, SaveService.now_unix())
+	_since_last_save = 0.0
+
+
+## Résumé d'un emplacement (voir ColonyState.summary), ou {} s'il est vide.
+func slot_summary(slot: String) -> Dictionary:
+	var storage := FileSaveStorage.new("user://", slot)
+	if storage.read().strip_edges().is_empty() and storage.read_backup().strip_edges().is_empty():
+		return {}
+	return SaveService.new(storage).load_state().summary()
+
+
+## Emplacement joué le plus récemment, ou "" s'il n'y a aucune sauvegarde.
+func most_recent_slot() -> String:
+	var best := ""
+	var latest := -1
+	for slot in SLOTS:
+		var summary := slot_summary(slot)
+		if not summary.is_empty() and summary.last_saved_unix > latest:
+			latest = summary.last_saved_unix
+			best = slot
+	return best
+
+
+func first_free_slot() -> String:
+	for slot in SLOTS:
+		if slot_summary(slot).is_empty():
+			return slot
+	return ""
+
+
+func delete_slot(slot: String) -> void:
+	var storage := FileSaveStorage.new("user://", slot)
+	for path in [storage.save_path, storage.backup_path, storage.temp_path]:
+		if FileAccess.file_exists(path):
+			DirAccess.remove_absolute(path)
 
 
 ## Rapport hors-ligne du démarrage, à afficher une seule fois. Vide s'il n'y a rien à montrer.
@@ -104,10 +173,31 @@ func notify_changed() -> void:
 	_on_engine_changed()
 
 
+# ---------- Réglages ----------
+
+func set_setting(key: String, value: bool) -> void:
+	settings[key] = value
+	var file := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
+	if file != null:
+		file.store_string(JSON.stringify(settings))
+
+
 func vibrate(duration_ms := 12) -> void:
-	if engine.state.haptics_enabled and OS.has_feature("mobile"):
+	if settings.haptics and OS.has_feature("mobile"):
 		Input.vibrate_handheld(duration_ms)
 
+
+func _load_settings() -> void:
+	if not FileAccess.file_exists(SETTINGS_PATH):
+		return
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(SETTINGS_PATH))
+	if data is Dictionary:
+		for key: String in settings:
+			if data.get(key) is bool:
+				settings[key] = data[key]
+
+
+# ---------- Interne ----------
 
 func _on_engine_changed() -> void:
 	_since_last_refresh = 0.0
@@ -119,9 +209,23 @@ func _report(report: Dictionary) -> void:
 		offline_report.emit(report)
 
 
-## Emplacement de sauvegarde : « save » par défaut, `-- --save=nom` en ligne de commande.
-static func _save_slot() -> String:
+## Version de développement : images par seconde dans le journal (mesure sur téléphone).
+func _debug_fps(delta: float) -> void:
+	if not OS.is_debug_build():
+		return
+	_fps_timer += delta
+	if _fps_timer >= 5.0:
+		_fps_timer = 0.0
+		var rid := get_viewport().get_viewport_rid()
+		RenderingServer.viewport_set_measure_render_time(rid, true)
+		print("FPS %d · GPU %.1f ms · objets %d · primitives %d" % [
+			Engine.get_frames_per_second(), RenderingServer.viewport_get_measured_render_time_gpu(rid),
+			Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
+			Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)])
+
+
+static func _cmdline_slot() -> String:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--save="):
 			return arg.trim_prefix("--save=").validate_filename()
-	return "save"
+	return ""

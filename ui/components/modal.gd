@@ -51,7 +51,7 @@ func _build(options: Dictionary) -> void:
 	title_row.add_child(title)
 
 	var content := UiFx.vbox(14)
-	if options.has("body"):
+	if not str(options.get("body", "")).is_empty():
 		content.add_child(UiFx.paragraph(options.body, "BodyLabel", HORIZONTAL_ALIGNMENT_CENTER))
 	if options.has("extra"):
 		content.add_child(options.extra)

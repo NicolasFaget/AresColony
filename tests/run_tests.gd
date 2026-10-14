@@ -373,7 +373,11 @@ func _test_save() -> void:
 	_check(bad.buildings.size() == 1 and bad.colonists[0].health == 1.0, "listes invalides filtrées")
 	_check(bad.speed == 1 and bad.music_enabled, "préférences invalides : défaut")
 
+	var summary := loaded.summary()
+	_check(summary.sol == int(loaded.sol) + 1 and summary.colonists == 4 and summary.modules == loaded.buildings.size() - 1,
+			"résumé de sauvegarde")
 	storage.write("{cassé")
+
 	_check(not service.load_state().buildings.is_empty() and service.last_result == SaveService.LoadResult.RESTORED_FROM_BACKUP,
 			"sauvegarde corrompue : copie de secours restaurée")
 

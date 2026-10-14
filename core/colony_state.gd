@@ -44,6 +44,17 @@ func amount(resource: String) -> float:
 	return resources.get(resource, 0.0)
 
 
+## Résumé affiché dans la liste des sauvegardes.
+func summary() -> Dictionary:
+	return {
+		"sol": int(sol) + 1,
+		"colonists": colonists.size(),
+		"objectives": objectives_done.size(),
+		"modules": maxi(0, buildings.size() - 1),
+		"last_saved_unix": last_saved_unix,
+	}
+
+
 func to_dict() -> Dictionary:
 	return {
 		"version": FORMAT_VERSION,

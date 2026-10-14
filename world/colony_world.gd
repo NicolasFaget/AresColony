@@ -23,6 +23,8 @@ const NIGHT_SKY := Color(0.03, 0.035, 0.07)
 const STORM_SKY := Color(0.62, 0.4, 0.26)
 
 var rig: CameraRig
+## Colonie affichée ; par défaut, la partie en cours.
+var engine: ColonyEngine
 
 var _engine: ColonyEngine
 var _building_nodes: Array[Node3D] = []
@@ -56,7 +58,7 @@ var _rng := RandomNumberGenerator.new()
 
 
 func _ready() -> void:
-	_engine = GameManager.engine
+	_engine = engine if engine != null else GameManager.engine
 	_rng.seed = 11
 	_build_environment()
 	_build_terrain()

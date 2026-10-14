@@ -446,7 +446,8 @@ static func bake(root: Node3D) -> Node3D:
 			order.append(mat)
 		tools[mat].append_from(part.mesh, 0, _relative_transform(root, part))
 	var baked := Node3D.new()
-	baked.name = root.name
+	if not str(root.name).is_empty():
+		baked.name = root.name
 	baked.transform = root.transform
 	var opaque := ArrayMesh.new()
 	var clear := ArrayMesh.new()
