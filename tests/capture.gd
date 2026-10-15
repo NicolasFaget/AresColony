@@ -329,6 +329,31 @@ func _run() -> void:
 			main._world.rig.zoom(0.7)
 			await _frames(30)
 			await _shot("93_biodome")
+		"arcadia":
+			manager.stop_game()
+			var menu: Control = load("res://ui/menu.tscn").instantiate()
+			root.add_child(menu)
+			await _frames(120)
+			menu._choose_region("save3")
+			await _frames(20)
+			await _shot("95_choix_site")
+			menu.queue_free()
+			await _frames(5)
+			var st := ColonyState.new()
+			st.region = "arcadia"
+			engine = ColonyEngine.new(st)
+			manager.engine = engine
+			ColonyBot.play(engine, 25.0)
+			engine.state.speed = 0
+			engine.state.sol = floorf(engine.state.sol) + 1.45
+			engine.state.research_done.append("ice")
+			main = await _open_main()
+			_close_modals(main)
+			if not main._window.collapsed:
+				main._window.toggle_collapsed()
+			main._world.rig.zoom(1.25)
+			await _frames(30)
+			await _shot("96_arcadia")
 		"interaction":
 			main = await _open_main()
 			_close_modals(main)

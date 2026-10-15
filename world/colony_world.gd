@@ -666,6 +666,9 @@ func height(x: float, z: float) -> float:
 	var hills := (_noise.get_noise_2d(x, z) * 2.6 + 0.6) * beyond
 	var mesas := smoothstep(0.25, 0.4, _noise.get_noise_2d(x * 0.35 + 40.0, z * 0.35)) * 4.5 * smoothstep(c + 14.0, c + 26.0, r)
 	var bumps := _noise.get_noise_2d(x * 4.0, z * 4.0) * 0.18 * smoothstep(c - 1.5, c + 1.0, r)
+	if _engine != null and _engine.state.region == "arcadia":
+		# Une plaine du nord : bord de zone à peine relevé, collines douces.
+		return rim * 0.3 * (1.0 - beyond * 0.6) + hills * 0.5 + mesas * 0.3 + bumps
 	return rim * (1.0 - beyond * 0.6) + hills + mesas + bumps
 
 

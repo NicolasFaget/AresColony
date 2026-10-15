@@ -124,11 +124,13 @@ func _init(p_state: ColonyState) -> void:
 	for card in ColonyContent.cards():
 		cards[card.id] = card
 	objectives = ColonyContent.objectives()
-	map = ColonyMap.new(state.map_seed)
+	map = ColonyMap.new(state.map_seed, state.region)
 	_rng.seed = state.map_seed
 	_rng.state = state.event_seed
 	if state.buildings.is_empty():
 		_new_game()
+		if not region().card.is_empty():
+			state.cards_unlocked.append(region().card)
 	_rebuild()
 
 
@@ -212,7 +214,7 @@ func sunlight() -> float:
 
 
 func effect(key: String) -> float:
-	var value := 1.0
+	var value: float = region().effects.get(key, 1.0)
 	for id in state.research_done:
 		var r: Defs.Research = research_defs.get(id)
 		if r != null:
@@ -685,7 +687,22 @@ func rate_factor(index: int, resource: String, output: bool) -> float:
 
 
 func _input_rate(index: int, resource: String) -> float:
-	return def_of(index).inputs[resource] * rate_factor(index, resource, false)
+	var rate: float = def_of(index).inputs[resource] * rate_factor(index, resource, false)
+	if resource == ColonyContent.ENERGY and state.buildings[index].id in ColonyContent.HEATED:
+		rate *= effect("heating")
+	return rate
+
+
+func region() -> Dictionary:
+	return ColonyContent.REGIONS[state.region]
+
+
+## Sites d'expédition de la région, dans l'ordre.
+func region_sites() -> Array[Dictionary]:
+	var list: Array[Dictionary] = []
+	for id: String in region().sites:
+		list.append(site_by_id(id))
+	return list
 
 
 func _output_rate(index: int, resource: String, sun: float) -> float:
@@ -924,7 +941,7 @@ func _count_of(def_id: String) -> int:
 
 ## Prochain site à découvrir (ou une prospection une fois tous les sites visités).
 func next_site() -> Dictionary:
-	for site: Dictionary in ColonyContent.SITES:
+	for site: Dictionary in region_sites():
 		if not state.sites_done.has(site.id):
 			return site
 	return ColonyContent.PROSPECTION

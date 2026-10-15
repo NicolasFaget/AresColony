@@ -32,6 +32,8 @@ var cards_read: Array[String] = []
 var quiz_answers: Dictionary = {}
 
 var map_seed: int = 1
+## Région d'atterrissage (ColonyContent.REGIONS).
+var region: String = "jezero"
 ## Graine des événements, avancée à chaque tirage (parties reproductibles).
 var event_seed: int = 1
 var next_storm: float = 12.0
@@ -67,6 +69,7 @@ func summary() -> Dictionary:
 		"objectives": objectives_done.size(),
 		"modules": maxi(0, buildings.size() - 1),
 		"last_saved_unix": last_saved_unix,
+		"region": region,
 	}
 
 
@@ -91,6 +94,7 @@ func to_dict() -> Dictionary:
 		"cards_read": cards_read.duplicate(),
 		"quiz_answers": quiz_answers.duplicate(),
 		"map_seed": map_seed,
+		"region": region,
 		"event_seed": event_seed,
 		"next_storm": next_storm,
 		"storm_until": storm_until,
@@ -153,6 +157,8 @@ static func from_dict(data: Dictionary) -> ColonyState:
 			if answers[key] is bool:
 				state.quiz_answers[str(key)] = answers[key]
 	state.map_seed = int(_num(data.get("map_seed"), 1))
+	var region: Variant = data.get("region")
+	state.region = region if region is String and ColonyContent.REGIONS.has(region) else "jezero"
 	state.event_seed = int(_num(data.get("event_seed"), 1))
 	state.next_storm = _num(data.get("next_storm"), state.next_storm)
 	state.storm_until = _num(data.get("storm_until"), -1.0)

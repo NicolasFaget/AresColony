@@ -22,6 +22,7 @@ func _init() -> void:
 	_test_hazards()
 	_test_era2()
 	_test_era3()
+	_test_regions()
 	_test_night_and_batteries()
 	_test_colonists()
 	_test_research()
@@ -73,6 +74,27 @@ func _rich_engine() -> ColonyEngine:
 		engine.state.research_done.append(r.id)
 	engine.state.resources[R.MATERIALS] = 400.0
 	return engine
+
+
+# ---------- Régions ----------
+
+func _test_regions() -> void:
+	var jezero := _engine()
+	var state := ColonyState.new()
+	state.region = "arcadia"
+	var arcadia := ColonyEngine.new(state)
+	_check(arcadia.map.ice_cells().size() > jezero.map.ice_cells().size() + 20, "Arcadia : beaucoup plus de glace")
+	_check(_near(arcadia.effect("solar"), 0.8) and _near(jezero.effect("solar"), 1.0), "Arcadia : moins de soleil")
+	_check(arcadia.state.cards_unlocked.has("arcadia"), "Arcadia : fiche de la région")
+	_check(arcadia.next_site().id == "ice_impact" and jezero.next_site().id == "delta", "sites propres à chaque région")
+	arcadia.state.research_done.append("ice")
+	arcadia.state.resources[R.MATERIALS] = 400.0
+	var spot := ColonyBot.connected_spot(arcadia, "habitat")
+	arcadia.place("habitat", spot)
+	var home := arcadia.state.buildings.size() - 1
+	_check(_near(arcadia._input_rate(home, R.ENERGY), arcadia.def_of(home).inputs[R.ENERGY] * 1.25), "Arcadia : chauffage +25 %")
+	var copy := ColonyState.from_dict(JSON.parse_string(JSON.stringify(arcadia.state.to_dict())))
+	_check(copy.region == "arcadia" and ColonyEngine.new(copy).map.tiles == arcadia.map.tiles, "région sauvegardée")
 
 
 # ---------- Ère 3 ----------

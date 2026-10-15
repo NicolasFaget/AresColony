@@ -159,17 +159,38 @@ static func buildings() -> Array[Defs.Building]:
 ## Ères : titre et but affichés dans l'onglet Colonie.
 const ERAS := {
 	1: "Ère 1 · Survie : tenir sans dépendre de la Terre.",
-	2: "Ère 2 · Expansion : explorer Jezero et préparer le retour.",
+	2: "Ère 2 · Expansion : explorer les environs et préparer le retour.",
 	3: "Ère 3 · Racines : vivre durablement sur Mars.",
 }
 
-## Expéditions en rover (ère 2) : sites réels autour de Jezero, découverts dans l'ordre ; ensuite,
+## Régions d'atterrissage, choisies à la création de la colonie.
+## effects : multiplicateurs (comme ceux des recherches) ; sites : expéditions, dans l'ordre.
+const REGIONS := {
+	"jezero": {
+		"name": "Cratère Jezero", "tagline": "Un ancien lac, au bord du grand bassin d'Isidis.",
+		"traits": ["Équilibré : soleil et glace modérés", "4 sites célèbres à explorer"],
+		"effects": {}, "sites": ["delta", "meteorite", "rochette", "nili"], "card": "",
+		"rim": "Le rebord du cratère Jezero. Superbe vue, mais trop pentu pour bâtir.",
+	},
+	"arcadia": {
+		"name": "Arcadia Planitia", "tagline": "Une plaine du nord où la glace affleure sous la poussière.",
+		"traits": ["Beaucoup de glace, presque pas de rochers", "Plus au nord : −20 % de soleil, +25 % de chauffage"],
+		"effects": { "solar": 0.8, "heating": 1.25 }, "sites": ["ice_impact", "meteorite"], "card": "arcadia",
+		"rim": "Le terrain se soulève ici : trop accidenté pour bâtir.",
+	},
+}
+const REGION_ORDER := ["jezero", "arcadia"]
+## Modules chauffés : leur besoin d'énergie suit l'effet « heating » de la région.
+const HEATED := ["habitat", "greenhouse", "bunker", "biodome"]
+
+## Expéditions en rover (ère 2) : sites réels, découverts dans l'ordre de la région ; ensuite,
 ## des prospections qui rapportent des matériaux.
 const SITES := [
 	{ "id": "delta", "name": "Le delta de Jezero", "card": "jezero", "reward": { DATA: 30.0 } },
 	{ "id": "meteorite", "name": "Un caillou métallique", "card": "meteorite", "reward": { MATERIALS: 60.0 } },
 	{ "id": "rochette", "name": "Le rocher « Rochette »", "card": "sample", "reward": { DATA: 40.0 } },
 	{ "id": "nili", "name": "Les fractures de Nili Fossae", "card": "nili", "reward": { DATA: 40.0, MATERIALS: 40.0 } },
+	{ "id": "ice_impact", "name": "Un cratère tout neuf", "card": "impact_ice", "reward": { WATER: 60.0, DATA: 40.0 } },
 ]
 const PROSPECTION := { "id": "prospect", "name": "Prospection de minerais", "card": "", "reward": { MATERIALS: 50.0 } }
 
@@ -322,7 +343,7 @@ static func research() -> Array[Defs.Research]:
 				"summary": "Débloque le réacteur Sabatier et les réservoirs : du méthane et de l'oxygène." }),
 		Defs.Research.new({ "id": "rovers", "name": "Rovers pressurisés", "cost": 50.0, "duration": 2.0, "era": 2,
 				"requires": ["sabatier"],
-				"summary": "Débloque le garage à rovers : partez en expédition autour de Jezero." }),
+				"summary": "Débloque le garage à rovers : partez en expédition autour de la colonie." }),
 		Defs.Research.new({ "id": "erv", "name": "Mars Direct", "cost": 80.0, "duration": 3.0, "era": 2,
 				"requires": ["sabatier"], "card": "mars_direct",
 				"summary": "Débloque le véhicule de retour, à remplir de méthane fabriqué sur Mars." }),
@@ -363,7 +384,7 @@ static func objectives() -> Array[Defs.Objective]:
 				"description": "Construire un réacteur Sabatier (recherche « Réaction de Sabatier »).",
 				"reward": { DATA: 25.0 } }),
 		Defs.Objective.new({ "id": "explorer", "title": "Explorateurs", "era": 2,
-				"description": "Mener 3 expéditions en rover autour de Jezero.",
+				"description": "Mener 3 expéditions en rover autour de la colonie.",
 				"reward": { MATERIALS: 100.0 } }),
 		Defs.Objective.new({ "id": "city", "title": "Petite ville", "era": 2,
 				"description": "Accueillir 14 colons.",
@@ -533,6 +554,20 @@ static func cards() -> Array[Defs.Card]:
 			"in_game": "D'où l'ère « Racines » : on ne transforme pas la planète, on rend la colonie durable.",
 			"sources": [["Astronomy", "https://www.astronomy.com/science/theres-not-enough-co2-to-terraform-mars/"],
 				["Space.com", "https://space.com/41318-we-cant-terraform-mars.html"]] }),
+		Defs.Card.new({ "id": "arcadia", "figure": "2,5 cm", "figure_label": "sous la surface : la glace la plus proche, par endroits", "visual": "extractor",
+			"quiz": "Selon le chercheur, avec quoi pourrait-on dégager cette glace ?", "choices": ["Une simple pelle", "Une pelleteuse géante", "Des explosifs"], "answer": 0,
+			"title": "Une carte au trésor de glace", "status": "Mesuré",
+			"fact": "En 2019, la NASA publie une « carte au trésor » de la glace martienne, établie grâce aux sondes Mars Reconnaissance Orbiter et Mars Odyssey : par endroits, la glace d'eau se trouverait à seulement 2,5 cm sous la surface. La plaine d'Arcadia Planitia, au nord, ressort comme un site prometteur pour des astronautes. Une pelle suffirait, résume le chercheur Sylvain Piqueux.",
+			"in_game": "À Arcadia, la glace est partout ; mais plus au nord, le soleil est plus bas et il faut chauffer davantage.",
+			"sources": [["NASA JPL (2019)", "https://www.jpl.nasa.gov/news/nasas-treasure-map-for-water-ice-on-mars"],
+				["Live Science", "https://www.livescience.com/mars-water-ice-map.html"]] }),
+		Defs.Card.new({ "id": "impact_ice", "figure": "150 m", "figure_label": "de large pour le cratère creusé le 24 décembre 2021", "visual": "extractor",
+			"quiz": "Comment a-t-on d'abord détecté cet impact ?", "choices": ["Un séisme enregistré par InSight", "Un astronaute l'a vu", "Une tempête l'a révélé"], "answer": 0,
+			"title": "De la glace à l'air libre", "status": "Mesuré",
+			"fact": "Le 24 décembre 2021, le sismomètre de l'atterrisseur InSight enregistre un séisme de magnitude 4. La sonde Mars Reconnaissance Orbiter en trouve ensuite la cause : une météorite a creusé un cratère d'environ 150 m de large dans Amazonis Planitia, voisine d'Arcadia, en projetant des blocs de glace d'eau. Jamais on n'avait vu de glace aussi près de l'équateur.",
+			"in_game": "Votre rover a trouvé de la glace fraîchement exposée : de l'eau et des données.",
+			"sources": [["Sci.News", "https://www.sci.news/space/mars-meteoroid-impact-water-ice-11343.html"],
+				["Solar Daily", "https://www.solardaily.com/reports/Meteorite_impact_provides_a_glimpse_beneath_Mars_surface_999.html"]] }),
 	]
 
 

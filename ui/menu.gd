@@ -84,7 +84,7 @@ func _build_layout() -> void:
 				b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var card := UiFx.panel("WindowPanel", buttons)
 
-	var version := UiFx.label("v%s · cratère Jezero" % ProjectSettings.get_setting("application/config/version", "0.1"),
+	var version := UiFx.label("v%s · Mars" % ProjectSettings.get_setting("application/config/version", "0.1"),
 			"CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	var spacer := UiFx.spacer()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -121,7 +121,8 @@ func _refresh() -> void:
 static func _summary_text(summary: Dictionary) -> String:
 	if summary.is_empty():
 		return "Emplacement libre"
-	return "Sol %d · %d colon%s · %d/%d objectifs · %s" % [summary.sol, summary.colonists,
+	var region: String = ColonyContent.REGIONS.get(summary.get("region", "jezero"), ColonyContent.REGIONS.jezero).name
+	return "%s · Sol %d · %d colon%s · %d/%d objectifs · %s" % [region, summary.sol, summary.colonists,
 			"s" if summary.colonists > 1 else "", summary.objectives, ColonyContent.objectives().size(),
 			_ago(summary.last_saved_unix)]
 
@@ -144,7 +145,30 @@ func _on_new_game() -> void:
 	if slot.is_empty():
 		_show_slots(true)
 		return
-	GameManager.open_game(slot, true)
+	_choose_region(slot)
+
+
+## Choix du site d'atterrissage d'une nouvelle colonie.
+func _choose_region(slot: String) -> void:
+	var list := UiFx.vbox(12)
+	var modal: Modal
+	for id: String in ColonyContent.REGION_ORDER:
+		var region: Dictionary = ColonyContent.REGIONS[id]
+		var title := UiFx.label(region.name, "HeadingLabel")
+		var tagline := UiFx.paragraph(region.tagline, "SmallLabel")
+		var traits := UiFx.vbox(2)
+		for line: String in region.traits:
+			var point := UiFx.label("• " + line, "SmallLabel")
+			point.add_theme_color_override("font_color", Palette.ACCENT)
+			traits.add_child(point)
+		var go := _slot_button("Se poser ici", "GoldButton", func() -> void:
+			modal.close()
+			GameManager.open_game(slot, true, id))
+		list.add_child(UiFx.panel("Row", UiFx.vbox(6, [title, tagline, traits, go])))
+	modal = Modal.open(_modal_layer, {
+		"icon": "rocket", "title": "Choisir le site d'atterrissage", "extra": list,
+		"confirm_text": "Retour", "confirm_style": "Button",
+	})
 
 
 ## Liste des emplacements. En mode « remplacer », chaque emplacement propose d'y recommencer.
@@ -159,7 +183,7 @@ func _show_slots(replacing := false) -> void:
 		if summary.is_empty():
 			actions.add_child(_slot_button("Commencer", "GoldButton", func() -> void:
 				modal.close()
-				GameManager.open_game(slot, true)))
+				_choose_region(slot)))
 		else:
 			if not replacing:
 				actions.add_child(_slot_button("Charger", "GreenButton", func() -> void:
@@ -204,7 +228,7 @@ func _confirm_erase(slot: String, then_start: bool, list_modal: Modal) -> void:
 			GameManager.delete_slot(slot)
 			list_modal.close()
 			if then_start:
-				GameManager.open_game(slot, true)
+				_choose_region(slot)
 			else:
 				AudioManager.play("whoosh")
 				_refresh()

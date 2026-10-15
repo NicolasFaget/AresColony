@@ -429,7 +429,7 @@ func _on_cell_tapped(cell: Vector2i, index: int) -> void:
 		ColonyMap.Tile.ROCK:
 			_news.post("Des rochers basaltiques : impossible de construire ici.")
 		ColonyMap.Tile.RIM:
-			_news.post("Le rebord du cratère Jezero. Superbe vue, mais trop pentu pour bâtir.")
+			_news.post(_engine.region().rim)
 		ColonyMap.Tile.ICE:
 			_news.post("De la glace d'eau, juste sous la poussière !" if _engine.state.research_done.has("ice")
 					else "Régolithe martien : poussière fine et sels de perchlorate.")
@@ -465,7 +465,7 @@ func _on_objective_completed(objective_id: String) -> void:
 				Modal.open(_modal_layer, {
 					"icon": "rocket", "title": "Retour assuré !",
 					"body": "Les réservoirs du véhicule de retour sont pleins de méthane fabriqué sur Mars, comme dans le plan "
-							+ "Mars Direct. Votre colonie est autonome, explore Jezero, et peut rentrer quand elle le veut.\n\n"
+							+ "Mars Direct. Votre colonie est autonome, explore les environs, et peut rentrer quand elle le veut.\n\n"
 							+ "Bravo, commandant ! La suite arrivera dans une prochaine version.",
 					"confirm_text": "Continuer à jouer",
 				})
@@ -514,7 +514,7 @@ func _on_evacuation(colonist_name: String, cause: String) -> void:
 
 func _show_welcome() -> void:
 	Modal.open(_modal_layer, {
-		"icon": "rocket", "title": "Bienvenue dans le cratère Jezero",
+		"icon": "rocket", "title": "Bienvenue : " + _engine.region().name,
 		"body": "Votre équipage de 4 colons vient de se poser. Les réserves d'oxygène tiennent environ 9 sols.\n\n"
 				+ "Suivez le guide en bas de l'écran : il vous montre quoi faire, étape par étape.\n"
 				+ "Touchez une ressource en haut pour savoir d'où elle vient.",
@@ -617,7 +617,7 @@ func _on_era_started(era: int) -> void:
 		"icon": "rocket", "title": "Ère 2 · Expansion",
 		"body": "Votre colonie tient seule sur Mars, bravo ! Place à l'expansion :\n\n"
 				+ "• Fabriquer du méthane avec la réaction de Sabatier (onglet Recherche).\n"
-				+ "• Explorer Jezero en rover pressurisé et découvrir de vrais sites.\n"
+				+ "• Explorer les environs en rover pressurisé et découvrir de vrais sites.\n"
 				+ "• Accueillir de nouveaux volontaires.\n"
 				+ "• Construire le véhicule de retour et remplir ses réservoirs, comme dans le plan Mars Direct.",
 		"confirm_text": "En route !",
@@ -631,7 +631,7 @@ func _show_expeditions() -> void:
 	box.add_child(UiFx.paragraph("Le rover pressurisé roule au méthane. Chaque expédition dure %s sols et coûte %s kg de méthane ; "
 			% [NumberFormatter.format(ColonyEngine.EXPEDITION_SOLS), NumberFormatter.format(ColonyEngine.EXPEDITION_METHANE)]
 			+ "elle rapporte des données ou des matériaux, et une fiche de découverte.", "SmallLabel"))
-	for site: Dictionary in ColonyContent.SITES:
+	for site: Dictionary in _engine.region_sites():
 		var found := _engine.state.sites_done.has(site.id)
 		var title := UiFx.label(("✓ " + site.name) if found else "Site inconnu", "BodyLabel")
 		title.add_theme_color_override("font_color", Palette.SUCCESS if found else Palette.TEXT_DIM)

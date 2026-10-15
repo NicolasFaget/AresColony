@@ -12,7 +12,13 @@ var tiles := PackedByteArray()
 var lander_cell := Vector2i(11, 11)
 
 
-func _init(seed_value := 1) -> void:
+## Arcadia Planitia : une plaine du nord, peu de rochers et beaucoup de glace.
+var region := "jezero"
+
+
+func _init(seed_value := 1, p_region := "jezero") -> void:
+	region = p_region
+	var arcadia := region == "arcadia"
 	tiles.resize(SIZE * SIZE)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
@@ -24,14 +30,14 @@ func _init(seed_value := 1) -> void:
 			var tile := Tile.PLAIN
 			if distance > SIZE / 2.0 - 1.0 + sin(atan2(y - center.y, x - center.x) * 5.0) * 0.6:
 				tile = Tile.RIM
-			elif rng.randf() < 0.06 and distance > 3.5:
+			elif rng.randf() < (0.02 if arcadia else 0.06) and distance > 3.5:
 				tile = Tile.ROCK
 			set_tile(Vector2i(x, y), tile)
 
 	# Plaques de glace enfouie, loin de l'atterrisseur : il faudra s'étendre pour les exploiter.
-	for i in 3:
+	for i in (6 if arcadia else 3):
 		var angle := rng.randf() * TAU
-		var radius := rng.randf_range(6.0, 8.5)
+		var radius := rng.randf_range(4.0, 9.0) if arcadia else rng.randf_range(6.0, 8.5)
 		var patch := center + Vector2(cos(angle), sin(angle)) * radius
 		for y in SIZE:
 			for x in SIZE:

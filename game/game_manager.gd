@@ -88,10 +88,12 @@ func _notification(what: int) -> void:
 # ---------- Parties ----------
 
 ## Charge (ou crée, si `new_game`) la partie de l'emplacement `slot`.
-func start_game(slot: String, new_game := false) -> void:
+func start_game(slot: String, new_game := false, region := "jezero") -> void:
 	current_slot = slot
 	_save_service = SaveService.new(FileSaveStorage.new("user://", slot))
 	var state := ColonyState.new() if new_game else _save_service.load_state()
+	if new_game:
+		state.region = region
 	load_result = SaveService.LoadResult.NEW_GAME if new_game else _save_service.last_result
 	engine = ColonyEngine.new(state)
 	engine.changed.connect(_on_engine_changed)
@@ -113,8 +115,8 @@ func open_menu() -> void:
 	get_tree().change_scene_to_file(MENU_SCENE)
 
 
-func open_game(slot: String, new_game := false) -> void:
-	start_game(slot, new_game)
+func open_game(slot: String, new_game := false, region := "jezero") -> void:
+	start_game(slot, new_game, region)
 	get_tree().change_scene_to_file(GAME_SCENE)
 
 
