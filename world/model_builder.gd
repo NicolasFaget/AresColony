@@ -340,14 +340,25 @@ static func _garage(r: Node3D, with_rover: bool) -> void:
 		box(r, Vector3(0, 0.12 + k * 0.12, 0.118), Vector3(0.78, 0.015, 0.01), GREY)
 	light(r, Vector3(0.5, 0.58, 0.11), WARM_LIGHT, 0.03, 2.0)
 	if with_rover:
-		var at := Vector3(0.1, 0.0, 0.5)
-		box(r, at + Vector3(0, 0.28, 0), Vector3(0.7, 0.22, 0.34), WHITE)
-		box(r, at + Vector3(0.28, 0.33, 0), Vector3(0.14, 0.14, 0.3), Color(0.35, 0.6, 0.7))
-		for x in [-0.25, 0.0, 0.25]:
-			for z in [-0.19, 0.19]:
-				cylinder(r, at + Vector3(x, 0.11, z), 0.09, 0.07, DARK, Vector3(90, 0, 0), -1.0, 12)
-		cylinder(r, at + Vector3(-0.2, 0.5, 0), 0.015, 0.25, GREY, Vector3.ZERO, -1.0, 6)
-		box(r, at + Vector3(-0.2, 0.63, 0), Vector3(0.08, 0.05, 0.12), DARK)
+		var parked := rover()
+		parked.position = Vector3(0.1, 0.0, 0.5)
+		r.add_child(parked)
+
+
+## Rover pressurisé à six roues (avant vers +X).
+static func rover() -> Node3D:
+	var r := Node3D.new()
+	box(r, Vector3(0, 0.28, 0), Vector3(0.7, 0.22, 0.34), WHITE)
+	box(r, Vector3(0.28, 0.33, 0), Vector3(0.14, 0.14, 0.3), Color(0.35, 0.6, 0.7))
+	box(r, Vector3(0, 0.4, 0), Vector3(0.5, 0.03, 0.3), Color("#e98a5a"))
+	for x in [-0.25, 0.0, 0.25]:
+		for z in [-0.19, 0.19]:
+			cylinder(r, Vector3(x, 0.11, z), 0.09, 0.07, DARK, Vector3(90, 0, 0), -1.0, 12)
+	cylinder(r, Vector3(-0.2, 0.5, 0), 0.015, 0.25, GREY, Vector3.ZERO, -1.0, 6)
+	box(r, Vector3(-0.2, 0.63, 0), Vector3(0.08, 0.05, 0.12), DARK)
+	light(r, Vector3(0.36, 0.3, 0.1), WARM_LIGHT, 0.025, 3.0)
+	light(r, Vector3(0.36, 0.3, -0.1), WARM_LIGHT, 0.025, 3.0)
+	return r
 
 
 ## Véhicule de retour : la fusée sur son pas de tir, avec bras de remplissage.

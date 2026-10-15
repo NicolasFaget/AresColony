@@ -269,6 +269,29 @@ func _run() -> void:
 						await _frames(30)
 						await _shot("73_" + id)
 						break
+		"rover":
+			ColonyBot.play(engine, 40.0)
+			engine.state.speed = 0
+			engine.state.era = 2
+			for id in ["sabatier", "rovers"]:
+				if not engine.state.research_done.has(id):
+					engine.state.research_done.append(id)
+			engine.state.resources[ColonyContent.MATERIALS] = 300.0
+			engine.place("garage", ColonyBot.connected_spot(engine, "garage"))
+			engine.state.resources[ColonyContent.METHANE] = 0.0
+			engine.state.sol = floorf(engine.state.sol) + 1.4
+			engine.state.expedition = { "site": "delta", "until": engine.state.sol + ColonyEngine.EXPEDITION_SOLS - 0.12 }
+			main = await _open_main()
+			_close_modals(main)
+			if not main._window.collapsed:
+				main._window.toggle_collapsed()
+			main._world.rig.focus(main._world._rover.position if main._world._rover != null else Vector3(12, 0, 12), 0.0)
+			await _frames(5)
+			print("rover ", main._world._rover.position if main._world._rover != null else "absent", " visible ", main._world._rover.visible if main._world._rover != null else false)
+			main._world.rig.focus(main._world._rover.position, 0.0)
+			main._world.rig.zoom(0.8)
+			await _frames(40)
+			await _shot("80_rover")
 		"interaction":
 			main = await _open_main()
 			_close_modals(main)

@@ -55,6 +55,9 @@ var _storm_level := 0.0
 var _sky_timer := 0.0
 var _devil_timer := 12.0
 var _rng := RandomNumberGenerator.new()
+## Rover en expédition : il sort du garage, file vers l'horizon, puis revient.
+var _rover: Node3D
+var _rover_trail: CPUParticles3D
 
 
 func _ready() -> void:
@@ -80,6 +83,7 @@ func _process(delta: float) -> void:
 	_update_sky(delta)
 	_update_dust_devils(delta)
 	_update_astronauts(delta)
+	_update_rover()
 
 
 # ---------- Coordonnées ----------
@@ -215,6 +219,60 @@ func _dust_puff(at: Vector3, strength: float) -> void:
 	add_child(puff)
 	puff.emitting = true
 	get_tree().create_timer(1.5).timeout.connect(puff.queue_free)
+
+
+# ---------- Rover en expédition ----------
+
+## Part de l'expédition passée à rouler à l'aller (et autant au retour).
+const ROVER_DRIVE := 0.2
+
+
+func _update_rover() -> void:
+	var trip: Dictionary = _engine.state.expedition
+	var garage := -1
+	for i in _engine.state.buildings.size():
+		if _engine.state.buildings[i].id == "garage":
+			garage = i
+			break
+	var progress := 0.0
+	if not trip.is_empty():
+		progress = clampf(1.0 - (trip.until - _engine.state.sol) / ColonyEngine.EXPEDITION_SOLS, 0.0, 1.0)
+	var driving := garage >= 0 and not trip.is_empty() and (progress < ROVER_DRIVE or progress > 1.0 - ROVER_DRIVE)
+	if not driving:
+		if _rover != null:
+			_rover.visible = false
+			_rover_trail.emitting = false
+		return
+	if _rover == null:
+		_rover = ModelBuilder.rover()
+		add_child(_rover)
+		_rover_trail = _particles(Color(0.78, 0.52, 0.36, 0.5), 0.22, 24, 1.4)
+		_rover_trail.direction = Vector3.UP
+		_rover_trail.spread = 40.0
+		_rover_trail.initial_velocity_min = 0.1
+		_rover_trail.initial_velocity_max = 0.4
+		_rover_trail.gravity = Vector3(0, 0.15, 0)
+		_rover_trail.emission_shape = CPUParticles3D.EMISSION_SHAPE_POINT
+		_rover_trail.local_coords = false
+		_rover.add_child(_rover_trail)
+		_rover_trail.position = Vector3(-0.4, 0.1, 0)
+	var home := footprint_center(_engine.cell_of(garage), Vector2i(2, 2)) + Vector3(0.1, 0.0, 0.5)
+	# Il sort du cratère du côté de la caméra, pour qu'on le voie partir et revenir.
+	var back := rig.camera.global_transform.basis.z
+	var out := Vector3(back.x, 0.0, back.z).normalized()
+	var center := Vector3(ColonyMap.SIZE / 2.0, 0.0, ColonyMap.SIZE / 2.0)
+	var away := center + out * (ColonyMap.SIZE / 2.0 + 6.0) + (home - center) * 0.3
+	var t := progress / ROVER_DRIVE if progress < ROVER_DRIVE else (1.0 - progress) / ROVER_DRIVE
+	t = smoothstep(0.0, 1.0, t)
+	var from := home.lerp(away, t)
+	var ahead := home.lerp(away, minf(1.0, t + 0.02))
+	var pos := Vector3(from.x, height(from.x, from.z) + 0.06, from.z)
+	_rover.visible = true
+	_rover.position = pos
+	var heading := (ahead - from) if progress < ROVER_DRIVE else (from - ahead)
+	if heading.length() > 0.001:
+		_rover.rotation.y = atan2(-heading.z, heading.x)
+	_rover_trail.emitting = _engine.state.speed > 0
 
 
 # ---------- Placement ----------
