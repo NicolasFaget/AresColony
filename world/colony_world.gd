@@ -58,6 +58,8 @@ var _rng := RandomNumberGenerator.new()
 ## Rover en expédition : il sort du garage, file vers l'horizon, puis revient.
 var _rover: Node3D
 var _rover_trail: CPUParticles3D
+var _rover_route: Array[Vector3] = []
+var _rover_key := ""
 
 
 func _ready() -> void:
@@ -256,16 +258,14 @@ func _update_rover() -> void:
 		_rover_trail.local_coords = false
 		_rover.add_child(_rover_trail)
 		_rover_trail.position = Vector3(-0.4, 0.1, 0)
-	var home := footprint_center(_engine.cell_of(garage), Vector2i(2, 2)) + Vector3(0.1, 0.0, 0.5)
-	# Il sort du cratère du côté de la caméra, pour qu'on le voie partir et revenir.
-	var back := rig.camera.global_transform.basis.z
-	var out := Vector3(back.x, 0.0, back.z).normalized()
-	var center := Vector3(ColonyMap.SIZE / 2.0, 0.0, ColonyMap.SIZE / 2.0)
-	var away := center + out * (ColonyMap.SIZE / 2.0 + 6.0) + (home - center) * 0.3
+	var key := "%d:%s:%s" % [garage, trip.site, trip.until]
+	if key != _rover_key:
+		_rover_key = key
+		_rover_route = _route_out(garage)
 	var t := progress / ROVER_DRIVE if progress < ROVER_DRIVE else (1.0 - progress) / ROVER_DRIVE
 	t = smoothstep(0.0, 1.0, t)
-	var from := home.lerp(away, t)
-	var ahead := home.lerp(away, minf(1.0, t + 0.02))
+	var from := _along(_rover_route, t)
+	var ahead := _along(_rover_route, minf(1.0, t + 0.01))
 	var pos := Vector3(from.x, height(from.x, from.z) + 0.06, from.z)
 	_rover.visible = true
 	_rover.position = pos
@@ -273,6 +273,88 @@ func _update_rover() -> void:
 	if heading.length() > 0.001:
 		_rover.rotation.y = atan2(-heading.z, heading.x)
 	_rover_trail.emitting = _engine.state.speed > 0
+
+
+## Trajet du rover : du garage au bord du cratère (côté caméra) en évitant les modules, puis au loin.
+func _route_out(garage: int) -> Array[Vector3]:
+	var origin := _engine.cell_of(garage)
+	var home := footprint_center(origin, Vector2i(2, 2)) + Vector3(0.1, 0.0, 0.5)
+	var back := rig.camera.global_transform.basis.z
+	var out := Vector3(back.x, 0.0, back.z).normalized()
+	var center := Vector3(ColonyMap.SIZE / 2.0, 0.0, ColonyMap.SIZE / 2.0)
+	var exit := center + out * (ColonyMap.SIZE / 2.0)
+	# Départ devant le garage ; recherche du trajet le moins coûteux jusqu'au bord du cratère
+	# (sol nu : 1, conduite : 3, module : 40, pour ne traverser un module qu'en dernier recours).
+	var start := origin + Vector2i(0, 2)
+	if not _engine.map.in_bounds(start):
+		start = origin + Vector2i(0, -1)
+	var points: Array[Vector3] = [home]
+	if _engine.map.in_bounds(start):
+		var cost := { start: 0.0 }
+		var previous := { start: start }
+		var open: Array[Vector2i] = [start]
+		while not open.is_empty():
+			var pick := 0
+			for k in open.size():
+				if cost[open[k]] < cost[open[pick]]:
+					pick = k
+			var c: Vector2i = open.pop_at(pick)
+			for dir in DIRS:
+				var n := c + dir
+				if not _engine.map.in_bounds(n):
+					continue
+				var next: float = cost[c] + _drive_cost(n, garage)
+				if next < cost.get(n, INF):
+					cost[n] = next
+					previous[n] = c
+					if not open.has(n):
+						open.append(n)
+		var best := start
+		var best_score := INF
+		for c: Vector2i in cost:
+			if c.x == 0 or c.y == 0 or c.x == ColonyMap.SIZE - 1 or c.y == ColonyMap.SIZE - 1:
+				var score: float = cost[c] + 1.5 * Vector2(cell_center(c).x - exit.x, cell_center(c).z - exit.z).length()
+				if score < best_score:
+					best_score = score
+					best = c
+		var cells: Array[Vector2i] = []
+		var step := best
+		while step != start:
+			cells.push_front(step)
+			step = previous[step]
+		cells.push_front(start)
+		# On ne garde que les virages, pour une trajectoire moins hachée.
+		for k in cells.size():
+			var turning := k == 0 or k == cells.size() - 1 or (cells[k] - cells[k - 1]) != (cells[k + 1] - cells[k])
+			if turning:
+				points.append(cell_center(cells[k]))
+		out = (points.back() - center).normalized()
+	points.append(points.back() + out * 8.0)
+	return points
+
+
+## Coût de passage d'une case pour le rover.
+func _drive_cost(cell: Vector2i, garage: int) -> float:
+	var index := _engine.building_at(cell)
+	if index < 0:
+		return 1.0
+	return 3.0 if _engine.state.buildings[index].id == "link" else 40.0
+
+
+## Point à la fraction t (0 à 1) de la longueur d'un trajet.
+static func _along(route: Array[Vector3], t: float) -> Vector3:
+	if route.size() < 2:
+		return route[0] if not route.is_empty() else Vector3.ZERO
+	var total := 0.0
+	for k in route.size() - 1:
+		total += route[k].distance_to(route[k + 1])
+	var left := t * total
+	for k in route.size() - 1:
+		var piece := route[k].distance_to(route[k + 1])
+		if left <= piece or k == route.size() - 2:
+			return route[k].lerp(route[k + 1], clampf(left / maxf(piece, 0.001), 0.0, 1.0))
+		left -= piece
+	return route.back()
 
 
 # ---------- Placement ----------

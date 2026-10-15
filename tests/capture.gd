@@ -287,7 +287,6 @@ func _run() -> void:
 				main._window.toggle_collapsed()
 			main._world.rig.focus(main._world._rover.position if main._world._rover != null else Vector3(12, 0, 12), 0.0)
 			await _frames(5)
-			print("rover ", main._world._rover.position if main._world._rover != null else "absent", " visible ", main._world._rover.visible if main._world._rover != null else false)
 			main._world.rig.focus(main._world._rover.position, 0.0)
 			main._world.rig.zoom(0.8)
 			await _frames(40)
