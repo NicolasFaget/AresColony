@@ -1,6 +1,6 @@
 class_name ColonyPage
 extends Page
-## Onglet « Colonie » : objectif en cours, objectifs atteints, équipage et santé.
+## Onglet « Colonie » : note, objectif en cours, entretien, équipage et santé.
 
 var _objective_title: Label
 var _objective_text: Label
@@ -14,6 +14,9 @@ var _score: Label
 var _rating_bars: Array[ProgressBar] = []
 var _rating_values: Array[Label] = []
 var _rating_tip: Label
+var _care: Button
+
+signal maintenance_requested
 
 
 func _ready() -> void:
@@ -34,6 +37,14 @@ func _ready() -> void:
 	]))
 	objective.mouse_filter = Control.MOUSE_FILTER_PASS
 	list.add_child(objective)
+
+	_care = Button.new()
+	_care.custom_minimum_size = Vector2(0, 60)
+	_care.focus_mode = Control.FOCUS_NONE
+	_care.pressed.connect(func() -> void:
+		AudioManager.play("click")
+		maintenance_requested.emit())
+	list.add_child(_care)
 
 	_crew_title = UiFx.label("", "HeadingLabel")
 	_crew = UiFx.vbox(8)
@@ -79,10 +90,17 @@ func refresh() -> void:
 		bar.value = colonist.health * 100.0
 		bar.theme_type_variation = "ProgressBar" if colonist.health > 0.5 else "MilestoneBar"
 
+	var broken := engine.broken_count()
+	_care.text = "Entretien · poussière %d %% · %s" % [roundi(engine.average_dust() * 100.0),
+			"%d panne%s" % [broken, "s" if broken > 1 else ""] if broken > 0 else "aucune panne"]
+	_care.theme_type_variation = "GoldButton" if broken > 0 or engine.average_dust() >= ColonyAdvisor.DUST_ALERT else "Button"
 	var next := engine.state.next_resupply - engine.state.sol
 	var housing_left := engine.housing() - engine.state.colonists.size()
-	_info.text = "Prochain ravitaillement de la Terre dans %s sol%s. %s\nÉvacués vers la Terre : %d." % [
-		NumberFormatter.format(next), "s" if next >= 2.0 else "",
+	var left := engine.resupplies_left()
+	_info.text = "%s %s\nÉvacués vers la Terre : %d." % [
+		("Prochain ravitaillement de la Terre dans %s sol%s (%s)." % [NumberFormatter.format(next), "s" if next >= 2.0 else "",
+				"le dernier avec des matériaux" if left == 1 else "encore %d avec des matériaux" % left]) if left > 0
+				else "La Terre n'envoie plus de matériaux : fabriquez-les avec le four à régolithe.",
 		"Places libres : des recrues arriveront." if housing_left > 0 else "Aucune place libre : construisez un habitat pour accueillir des recrues.",
 		engine.state.evacuated]
 

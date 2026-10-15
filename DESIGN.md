@@ -74,6 +74,12 @@ de vie de l'application.
   coût = 0,8 puis 1,2 × le prix du module en matériaux, et 15 puis 30 données.
 - Note d'efficacité (`colony_rating()`) sur 100 : fonctionnement 40 (rendement lissé des modules
   consommateurs), raccordement 10, synergies 25, améliorations 25. A ≥ 85, B ≥ 70, C ≥ 55, D ≥ 40.
+- Difficulté : poussière sur les panneaux (1,5 %/sol, 6 %/sol en tempête, jusqu'à −70 % ; tourbillons
+  qui en nettoient quelques-uns tous les 5 à 9 sols ; sortie de nettoyage = 0,3 kg d'O₂ par panneau) ;
+  pannes des machines (2 % par machine et par sol dès le sol 6, réparation = 30 % du prix, jamais
+  en pilote automatique) ; chaque colon consomme 0,5 kWh/sol ; six ravitaillements avec matériaux,
+  ensuite seulement des volontaires : le four à régolithe (recherche « Frittage du régolithe »)
+  fabrique les matériaux. Les tests coupent poussière et pannes (`dust_rate`, `breakdown_rate`).
 - Fiches : chacune a un chiffre clé, une illustration et un quiz à trois choix, tirés uniquement de
   son texte sourcé. Déblocage = écran plein « Nouvelle découverte » ; première lecture +5 données,
   bonne réponse au quiz +10 (une seule tentative).
@@ -108,7 +114,7 @@ fourchettes.
 
 ## Prochaines étapes
 
-1. Difficulté : poussière sur les panneaux, pannes, besoins qui grandissent, fin des ravitaillements.
+1. Ère 2 « Autonomie » : Sabatier, recyclage poussé, deuxième région.
 2. Rovers d'exploration et sites à découvrir ; quiz facultatifs.
 3. Ère 2 « Autonomie » : Sabatier, briques de régolithe, recyclage, deuxième région.
 4. Tutoriel guidé, traduction anglaise.

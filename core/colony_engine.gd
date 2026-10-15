@@ -18,6 +18,8 @@ signal storm_ended
 signal resupply_arrived(report: Dictionary)
 ## Une ressource vitale vient d'être épuisée.
 signal shortage(resource: String)
+signal breakdown(index: int)
+signal dust_devil(cleaned: int)
 
 ## Durée d'un sol en jeu, à vitesse ×1 (secondes réelles).
 const SECONDS_PER_SOL := 60.0
@@ -44,11 +46,23 @@ const UPGRADE_DATA: Array[float] = [15.0, 30.0]
 const MODEL_MODULES := 12
 const RATING_GRADES := [[85.0, "A"], [70.0, "B"], [55.0, "C"], [40.0, "D"], [0.0, "E"]]
 const AUTONOMY_GOAL := 10.0
+## Poussière sur les panneaux (0 à 1) : dépôt par sol, beaucoup plus en tempête ; perte maximale.
+const DUST_RATE := 0.015
+const DUST_STORM_RATE := 0.06
+const DUST_LOSS := 0.7
+## Sortie de nettoyage : oxygène des combinaisons par panneau nettoyé.
+const CLEAN_OXYGEN := 0.3
+## Pannes : probabilité par machine et par sol, à partir du sol indiqué ; réparation = part du prix.
+const BREAKDOWN_RATE := 0.02
+const BREAKDOWN_START := 6.0
+const REPAIR_SHARE := 0.3
+## Nombre de ravitaillements qui apportent des matériaux et de la nourriture.
+const RESUPPLY_LIMIT := 6
 const AUTONOMY_CREW := 8
 
 const START_RESOURCES := {
 	ColonyContent.ENERGY: 30.0, ColonyContent.OXYGEN: 30.0, ColonyContent.WATER: 80.0,
-	ColonyContent.FOOD: 50.0, ColonyContent.MATERIALS: 180.0, ColonyContent.DATA: 10.0,
+	ColonyContent.FOOD: 50.0, ColonyContent.MATERIALS: 200.0, ColonyContent.DATA: 10.0,
 }
 
 ## Explications données au joueur quand un colon est évacué.
@@ -69,6 +83,9 @@ var _connected: Array[bool] = []
 ## Synergies actives de chaque module (identifiants de ColonyContent.SYNERGIES).
 var _synergies: Array = []
 var _efficiency: Array[float] = []
+## Réglables par les tests (0 = aucune poussière, aucune panne).
+var dust_rate := DUST_RATE
+var breakdown_rate := BREAKDOWN_RATE
 ## Rendement moyen récent de chaque module (lissé sur environ un demi-sol, pour la note).
 var _efficiency_avg: Array[float] = []
 var _occupied := {}
@@ -229,6 +246,8 @@ func building_status(index: int) -> Dictionary:
 	var def := def_of(index)
 	if not _connected[index]:
 		return { "ok": false, "text": "Non raccordé : collez-le à un module relié à l'atterrisseur." }
+	if is_broken(index):
+		return { "ok": false, "text": "En panne : réparez-le (%s matériaux)." % NumberFormatter.format(repair_cost(index)[ColonyContent.MATERIALS]) }
 	if not def.inputs.is_empty():
 		var e := _efficiency[index]
 		if e < 0.999:
@@ -582,7 +601,7 @@ func _step(ds: float) -> void:
 	var demand := {}
 	var passive := {}
 	for i in n:
-		if not _connected[i]:
+		if not _connected[i] or is_broken(i):
 			continue
 		var def := def_of(i)
 		if def.inputs.is_empty():
@@ -605,7 +624,7 @@ func _step(ds: float) -> void:
 	var delta := {}
 	for i in n:
 		var e := 0.0
-		if _connected[i]:
+		if _connected[i] and not is_broken(i):
 			var def := def_of(i)
 			e = 1.0
 			for r: String in def.inputs:
@@ -622,6 +641,7 @@ func _step(ds: float) -> void:
 
 	for r: String in delta:
 		_add(r, delta[r])
+	_settle_dust(ds)
 	_update_health(satisfied, ds)
 	_advance_research(ds)
 	state.sol += ds
@@ -648,7 +668,7 @@ func _output_rate(index: int, resource: String, sun: float) -> float:
 	var def := def_of(index)
 	var rate: float = def.outputs[resource] * rate_factor(index, resource, true)
 	if def.solar and resource == ColonyContent.ENERGY:
-		rate *= sun
+		rate *= sun * (1.0 - DUST_LOSS * dust_of(index))
 	if resource == ColonyContent.FOOD:
 		rate *= effect("food")
 	return rate
@@ -710,8 +730,10 @@ func _events() -> void:
 	if state.sol >= state.next_resupply:
 		state.next_resupply += RESUPPLY_INTERVAL
 		state.resupply_count += 1
-		var food := maxf(0.0, 30.0 - 6.0 * state.resupply_count)
-		_add(ColonyContent.MATERIALS, RESUPPLY_MATERIALS)
+		var supplies := state.resupply_count <= RESUPPLY_LIMIT
+		var materials := RESUPPLY_MATERIALS if supplies else 0.0
+		var food := maxf(0.0, 30.0 - 6.0 * state.resupply_count) if supplies else 0.0
+		_add(ColonyContent.MATERIALS, materials)
 		_add(ColonyContent.FOOD, food)
 		var arrived: Array[String] = []
 		while arrived.size() < 2 and state.colonists.size() < housing() \
@@ -720,7 +742,144 @@ func _events() -> void:
 			state.recruits_sent += 1
 			_arrive(member)
 			arrived.append(member[0])
-		resupply_arrived.emit({ "materials": RESUPPLY_MATERIALS, "food": food, "colonists": arrived })
+		if supplies or not arrived.is_empty():
+			resupply_arrived.emit({ "materials": materials, "food": food, "colonists": arrived,
+					"last": state.resupply_count == RESUPPLY_LIMIT })
+
+	_dust_devils()
+	_breakdowns()
+
+
+# ---------- Poussière et pannes ----------
+
+func dust_of(index: int) -> float:
+	return float(state.buildings[index].get("dust", 0.0))
+
+
+## Panneaux (et atterrisseur) raccordés.
+func _solar_indices() -> Array[int]:
+	var list: Array[int] = []
+	for i in state.buildings.size():
+		if _connected[i] and def_of(i).solar:
+			list.append(i)
+	return list
+
+
+func average_dust() -> float:
+	var panels := _solar_indices()
+	var total := 0.0
+	for i in panels:
+		total += dust_of(i)
+	return total / panels.size() if not panels.is_empty() else 0.0
+
+
+func _settle_dust(ds: float) -> void:
+	var rate := (DUST_STORM_RATE if is_storm() else dust_rate) * effect("dust") * (1.0 if dust_rate > 0.0 else 0.0)
+	if rate <= 0.0:
+		return
+	for i in _solar_indices():
+		state.buildings[i].dust = minf(1.0, dust_of(i) + rate * ds)
+
+
+## Panneaux assez sales pour mériter une sortie.
+func _dirty_panels() -> Array[int]:
+	var list: Array[int] = []
+	for i in _solar_indices():
+		if dust_of(i) > 0.02:
+			list.append(i)
+	return list
+
+
+func cleaning_cost() -> float:
+	return CLEAN_OXYGEN * _dirty_panels().size()
+
+
+func cleaning_problem() -> String:
+	if _dirty_panels().is_empty():
+		return "Les panneaux sont propres."
+	if is_storm():
+		return "Sortie impossible pendant la tempête."
+	if state.amount(ColonyContent.OXYGEN) < cleaning_cost() + 1.0:
+		return "Pas assez d'oxygène pour les combinaisons."
+	return ""
+
+
+## Sortie extravéhiculaire : les colons brossent tous les panneaux.
+func clean_panels() -> bool:
+	if not cleaning_problem().is_empty():
+		return false
+	_add(ColonyContent.OXYGEN, -cleaning_cost())
+	for i in _dirty_panels():
+		state.buildings[i].dust = 0.0
+	changed.emit()
+	return true
+
+
+## De temps en temps, un tourbillon de poussière balaie quelques panneaux (comme pour Spirit et Opportunity).
+func _dust_devils() -> void:
+	if is_storm() or state.sol < state.next_dust_devil:
+		return
+	state.next_dust_devil = state.sol + _rng.randf_range(5.0, 9.0)
+	var dirty := _dirty_panels()
+	var count := mini(dirty.size(), _rng.randi_range(2, 4))
+	for k in count:
+		var pick: int = dirty.pop_at(_rng.randi() % dirty.size())
+		state.buildings[pick].dust = 0.0
+	state.event_seed = _rng.state
+	if count > 0:
+		dust_devil.emit(count)
+
+
+func is_broken(index: int) -> bool:
+	return state.buildings[index].get("broken", false) == true
+
+
+func broken_count() -> int:
+	var count := 0
+	for i in state.buildings.size():
+		if is_broken(i):
+			count += 1
+	return count
+
+
+func repair_cost(index: int) -> Dictionary:
+	return { ColonyContent.MATERIALS: maxf(5.0, roundf(def_of(index).cost * REPAIR_SHARE)) }
+
+
+func repair_problem(index: int) -> String:
+	if not is_broken(index):
+		return "Ce module fonctionne."
+	if state.amount(ColonyContent.MATERIALS) < repair_cost(index)[ColonyContent.MATERIALS]:
+		return "Pas assez de matériaux."
+	return ""
+
+
+func repair(index: int) -> bool:
+	if not repair_problem(index).is_empty():
+		return false
+	_add(ColonyContent.MATERIALS, -repair_cost(index)[ColonyContent.MATERIALS])
+	state.buildings[index].erase("broken")
+	changed.emit()
+	return true
+
+
+func _breakdowns() -> void:
+	if breakdown_rate <= 0.0 or state.sol < BREAKDOWN_START:
+		return
+	var drew := false
+	for i in state.buildings.size():
+		if not _connected[i] or is_broken(i) or not state.buildings[i].id in ColonyContent.BREAKABLE:
+			continue
+		drew = true
+		if _rng.randf() < breakdown_rate * STEP:
+			state.buildings[i].broken = true
+			breakdown.emit(i)
+	if drew:
+		state.event_seed = _rng.state
+
+
+func resupplies_left() -> int:
+	return maxi(0, RESUPPLY_LIMIT - state.resupply_count)
 
 
 func _check_shortages(demand: Dictionary) -> void:

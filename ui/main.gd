@@ -122,6 +122,7 @@ func _build_layout() -> void:
 	build.place_requested.connect(_start_placement)
 	build.synergies_requested.connect(_show_synergies)
 	var colony := ColonyPage.new()
+	colony.maintenance_requested.connect(_show_maintenance)
 	_research_page = ResearchPage.new()
 	var knowledge := KnowledgePage.new()
 	knowledge.open_card.connect(_show_card)
@@ -199,6 +200,12 @@ func _connect_engine() -> void:
 		GameManager.vibrate(60)
 		_news.post("Alerte : plus %s ! Les colons puisent dans leurs réserves de secours." % ColonyContent.RESOURCE_PARTITIVE[r]))
 	_engine.building_placed.connect(func(_i: int) -> void: _world.sync_with_game())
+	_engine.breakdown.connect(func(i: int) -> void:
+		AudioManager.play("alert")
+		GameManager.vibrate(60)
+		_news.post("Panne ! " + ColonyContent.BREAKDOWN_LINES.get(_engine.state.buildings[i].id, "Une machine s'est arrêtée.")))
+	_engine.dust_devil.connect(func(count: int) -> void:
+		_news.post("Un tourbillon de poussière a balayé %d panneau%s. Merci le vent !" % [count, "x" if count > 1 else ""]))
 
 
 func _layout_changed() -> void:
@@ -269,6 +276,9 @@ func _refresh_guidance() -> void:
 func _go_to(tab: int, target: String) -> void:
 	if not _placing.is_empty():
 		_stop_placement()
+	if target == "maintenance":
+		_show_maintenance()
+		return
 	_select_tab(tab)
 	_pages[tab].highlight(target)
 
@@ -443,14 +453,27 @@ func _on_objective_completed(objective_id: String) -> void:
 func _on_resupply(report: Dictionary) -> void:
 	_world.land_capsule()
 	AudioManager.play("landing")
-	var text := "Ravitaillement de la Terre : +%s matériaux" % NumberFormatter.format(report.materials)
-	if report.food > 0.0:
-		text += ", +%s rations" % NumberFormatter.format(report.food)
+	var text := ""
+	if report.materials > 0.0:
+		text = "Ravitaillement de la Terre : +%s matériaux" % NumberFormatter.format(report.materials)
+		if report.food > 0.0:
+			text += ", +%s rations" % NumberFormatter.format(report.food)
+		else:
+			text += ". Plus de nourriture : la Terre compte sur vos serres"
+		if not report.colonists.is_empty():
+			text += ". À bord : %s" % ", ".join(report.colonists)
+		text += "."
 	else:
-		text += ". Plus de nourriture : la Terre compte sur vos serres"
-	if not report.colonists.is_empty():
-		text += ". À bord : %s" % ", ".join(report.colonists)
-	_news.post(text + ".")
+		text = "Une capsule de volontaires se pose : %s. Pas de matériaux à bord." % ", ".join(report.colonists)
+	_news.post(text)
+	if report.get("last", false):
+		Modal.open(_modal_layer, {
+			"icon": "materials", "title": "Dernier envoi de matériaux",
+			"body": "La Terre ne peut plus financer les envois de matériaux. Des volontaires viendront encore, mais "
+					+ "il faut désormais fabriquer vos matériaux sur place : recherchez « Frittage du régolithe » "
+					+ "et construisez des fours à régolithe.",
+			"confirm_text": "Compris",
+		})
 
 
 func _on_evacuation(colonist_name: String, cause: String) -> void:
@@ -490,13 +513,26 @@ func _show_building(index: int) -> void:
 		lines.append("Stockage : +%s %s %s" % [NumberFormatter.format(def.storage[r]), ColonyContent.RESOURCE_UNITS[r], ColonyContent.RESOURCE_NAMES[r].to_lower()])
 	if def.housing > 0:
 		lines.append("Loge %d colons" % def.housing)
+	if def.solar:
+		lines.append("Poussière : %d %% (−%d %% d'énergie)" % [roundi(_engine.dust_of(index) * 100.0),
+				roundi(ColonyEngine.DUST_LOSS * _engine.dust_of(index) * 100.0)])
 	var status_label := UiFx.paragraph(status.text, "HeadingLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	status_label.add_theme_color_override("font_color", Palette.SUCCESS if status.ok else Palette.WARNING)
 	var extra := UiFx.vbox(8, [UiFx.panel("Thumb", UiFx.building_icon(def.id, Vector2(200, 160))), status_label,
 			UiFx.paragraph("\n".join(lines), "BodyLabel", HORIZONTAL_ALIGNMENT_CENTER)])
 	(extra.get_child(0) as Control).size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	extra.add_child(_synergy_block(index))
 	var holder: Array[Modal] = []
+	if _engine.is_broken(index) or def.solar:
+		var care := Button.new()
+		care.theme_type_variation = "GoldButton" if _engine.is_broken(index) else "Button"
+		care.text = "Réparer…" if _engine.is_broken(index) else "Entretien des panneaux…"
+		care.custom_minimum_size = Vector2(0, 60)
+		care.focus_mode = Control.FOCUS_NONE
+		care.pressed.connect(func() -> void:
+			holder[0].close()
+			_show_maintenance.call_deferred())
+		extra.add_child(care)
+	extra.add_child(_synergy_block(index))
 	extra.add_child(_upgrade_block(index, holder))
 	if not def.card.is_empty() and _engine.state.cards_unlocked.has(def.card):
 		var learn := Button.new()
@@ -525,6 +561,68 @@ func _show_building(index: int) -> void:
 		modal.cancelled.connect(func() -> void:
 			if _engine.demolish(index):
 				AudioManager.play("whoosh"))
+
+
+## Entretien : poussière des panneaux (sortie de nettoyage) et machines en panne (réparations).
+func _show_maintenance() -> void:
+	var holder: Array[Modal] = []
+	var reopen := func() -> void:
+		if not holder.is_empty():
+			holder[0].close()
+		_show_maintenance.call_deferred()
+	var box := UiFx.vbox(10)
+	var dust := _engine.average_dust()
+	box.add_child(UiFx.label("Panneaux solaires", "HeadingLabel"))
+	box.add_child(UiFx.paragraph("Poussière moyenne : %d %%, soit −%d %% d'énergie solaire." % [roundi(dust * 100.0),
+			roundi(ColonyEngine.DUST_LOSS * dust * 100.0)], "BodyLabel"))
+	box.add_child(UiFx.paragraph("La poussière se dépose chaque sol, bien plus pendant les tempêtes. Les tourbillons de "
+			+ "poussière en balaient parfois quelques-uns, comme pour les rovers Spirit et Opportunity.", "SmallLabel"))
+	var problem := _engine.cleaning_problem()
+	var clean := Button.new()
+	clean.theme_type_variation = "GoldButton"
+	clean.text = "Sortie de nettoyage · %s kg d'oxygène" % NumberFormatter.format(_engine.cleaning_cost())
+	clean.custom_minimum_size = Vector2(0, 64)
+	clean.focus_mode = Control.FOCUS_NONE
+	clean.disabled = not problem.is_empty()
+	clean.pressed.connect(func() -> void:
+		if _engine.clean_panels():
+			AudioManager.play("whoosh")
+			_news.post("Sortie réussie : les panneaux brillent à nouveau. Les colons, eux, sont couverts de poussière.")
+			reopen.call())
+	box.add_child(clean)
+	if not problem.is_empty():
+		var reason := UiFx.label(problem, "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
+		reason.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+		box.add_child(reason)
+
+	box.add_child(UiFx.label("Machines", "HeadingLabel"))
+	var any := false
+	for i in _engine.state.buildings.size():
+		if not _engine.is_broken(i):
+			continue
+		any = true
+		var name := UiFx.label(_engine.def_of(i).name, "BodyLabel")
+		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var fix := Button.new()
+		fix.theme_type_variation = "GoldButton"
+		fix.text = "Réparer · %s" % NumberFormatter.format(_engine.repair_cost(i)[ColonyContent.MATERIALS])
+		fix.custom_minimum_size = Vector2(170, 56)
+		fix.focus_mode = Control.FOCUS_NONE
+		fix.disabled = not _engine.repair_problem(i).is_empty()
+		fix.pressed.connect(func() -> void:
+			if _engine.repair(i):
+				AudioManager.play("build")
+				GameManager.vibrate(25)
+				reopen.call())
+		box.add_child(UiFx.hbox(8, [UiFx.image(UiFx.icon("warning"), 24, Palette.WARNING), name, fix]))
+	if not any:
+		var fine := UiFx.paragraph("Aucune panne : tout tourne. Les machines lâchent de temps en temps ; une réparation coûte "
+				+ "30 % de leur prix en matériaux.", "SmallLabel")
+		fine.add_theme_color_override("font_color", Palette.SUCCESS)
+		box.add_child(fine)
+	holder.append(Modal.open(_modal_layer, {
+		"icon": "gear", "title": "Entretien", "extra": box, "confirm_text": "Fermer",
+	}))
 
 
 ## Niveau d'un module, améliorations faites et prochaine amélioration (avec son pourquoi).

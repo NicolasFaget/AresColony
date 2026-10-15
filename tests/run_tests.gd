@@ -19,6 +19,7 @@ func _init() -> void:
 	_test_synergies()
 	_test_cards()
 	_test_upgrades()
+	_test_hazards()
 	_test_night_and_batteries()
 	_test_colonists()
 	_test_research()
@@ -53,6 +54,9 @@ func _calm_engine() -> ColonyEngine:
 	var engine := _engine()
 	engine.state.next_resupply = 1e9
 	engine.state.next_storm = 1e9
+	engine.state.next_dust_devil = 1e9
+	engine.dust_rate = 0.0
+	engine.breakdown_rate = 0.0
 	var lander := engine.map.lander_cell
 	for x in range(lander.x + 2, lander.x + 9):
 		for y in range(lander.y - 1, lander.y + 3):
@@ -67,6 +71,58 @@ func _rich_engine() -> ColonyEngine:
 		engine.state.research_done.append(r.id)
 	engine.state.resources[R.MATERIALS] = 400.0
 	return engine
+
+
+# ---------- Poussière, pannes, fin des ravitaillements ----------
+
+func _test_hazards() -> void:
+	var engine := _rich_engine()
+	var lander := engine.map.lander_cell
+	engine.place("solar", lander + Vector2i(2, 0))
+	var panel := engine.state.buildings.size() - 1
+	var clean := engine._output_rate(panel, R.ENERGY, 1.0)
+	engine.dust_rate = ColonyEngine.DUST_RATE
+	engine.advance(10.0)
+	_check(engine.dust_of(panel) > 0.05, "la poussière se dépose")
+	_check(engine._output_rate(panel, R.ENERGY, 1.0) < clean, "panneau poussiéreux : moins d'énergie")
+	engine.state.resources[R.OXYGEN] = 40.0
+	var o2 := engine.state.amount(R.OXYGEN)
+	var cost := engine.cleaning_cost()
+	_check(cost > 0.0 and engine.clean_panels(), "sortie de nettoyage")
+	_check(engine.dust_of(panel) == 0.0 and _near(engine.state.amount(R.OXYGEN), o2 - cost), "nettoyage : propre, oxygène dépensé")
+	_check(engine.cleaning_problem() == "Les panneaux sont propres.", "rien à nettoyer")
+
+	engine.place("moxie", lander + Vector2i(3, 0))
+	var machine := engine.state.buildings.size() - 1
+	engine.state.buildings[machine].broken = true
+	engine.advance(0.1)
+	_check(engine.efficiency(machine) == 0.0 and not engine.building_status(machine).ok, "machine en panne : à l'arrêt")
+	var materials := engine.state.amount(R.MATERIALS)
+	_check(engine.repair(machine) and not engine.is_broken(machine), "réparation")
+	_check(_near(engine.state.amount(R.MATERIALS), materials - 9.0), "réparation : 30 % du prix")
+	engine.breakdown_rate = 50.0
+	engine.state.sol = maxf(engine.state.sol, ColonyEngine.BREAKDOWN_START)
+	engine.advance(0.5)
+	_check(engine.is_broken(machine), "les machines tombent en panne")
+	_check(not engine.is_broken(panel), "les panneaux ne tombent pas en panne")
+	var copy := ColonyState.from_dict(JSON.parse_string(JSON.stringify(engine.state.to_dict())))
+	_check(copy.buildings[machine].get("broken") == true and copy.buildings[panel].has("dust"), "panne et poussière sauvegardées")
+
+	var earth := _calm_engine()
+	earth.state.resupply_count = ColonyEngine.RESUPPLY_LIMIT
+	earth.state.next_resupply = earth.state.sol + 0.1
+	var reports: Array[Dictionary] = []
+	earth.resupply_arrived.connect(func(r: Dictionary) -> void: reports.append(r))
+	var stock := earth.state.amount(R.MATERIALS)
+	earth.advance(0.2)
+	_check(_near(earth.state.amount(R.MATERIALS), stock) and earth.resupplies_left() == 0, "après six ravitaillements : plus de matériaux")
+
+	var kiln := _rich_engine()
+	_check(kiln.place("kiln", kiln.map.lander_cell + Vector2i(2, 0)), "pose d'un four à régolithe")
+	kiln.state.resources[R.ENERGY] = 60.0
+	var before := kiln.state.amount(R.MATERIALS)
+	kiln.advance(0.2)
+	_check(kiln.state.amount(R.MATERIALS) > before, "le four fabrique des matériaux")
 
 
 # ---------- Améliorations et note ----------
@@ -277,7 +333,7 @@ func _test_production() -> void:
 
 	var flows := _engine().average_flows()
 	_check(_near(flows[R.OXYGEN], -0.84 * 4), "bilan : 4 colons respirent 3,36 kg d'oxygène par sol")
-	_check(_near(flows[R.ENERGY], 8.0), "bilan : l'atterrisseur produit 8 kWh par sol en moyenne")
+	_check(_near(flows[R.ENERGY], 10.0 - 0.5 * 4), "bilan : l'atterrisseur produit 10 kWh, les 4 colons en utilisent 2")
 
 	# Électrolyse de l'eau : vrai rapport de masse 8/9.
 	var def: Defs.Building = engine.building_defs["electrolyser"]
@@ -500,8 +556,9 @@ func _simulate_campaign() -> void:
 		var flows := engine.average_flows()
 		print("  évacuation de %s au sol %.1f (O₂ %.1f, eau %.1f, nourriture %.1f, énergie %.1f/sol, matériaux %.0f, O₂ stock %.1f) : %s" % [
 			n, engine.state.sol, flows[R.OXYGEN], flows[R.WATER], flows[R.FOOD], flows[R.ENERGY], engine.state.amount(R.MATERIALS), engine.state.amount(R.OXYGEN), c.left(20)]))
-	while engine.state.sol < 80.0 and not done.has("autonomy"):
+	while engine.state.sol < 90.0 and done.size() < engine.objectives.size():
 		ColonyBot.research(engine)
+		ColonyBot.maintain(engine)
 		ColonyBot.build(engine)
 		engine.advance(0.25)
 
@@ -511,7 +568,8 @@ func _simulate_campaign() -> void:
 	print("Évacuations : %d, colons : %d, modules : %d" % [evacuations[0], engine.state.colonists.size(), engine.state.buildings.size()])
 	_check(done.get("first_breath", INF) <= 3.0, "premier oxygène avant le sol 3")
 	_check(done.get("water", INF) <= 10.0, "eau avant le sol 10")
-	_check(done.get("autonomy", INF) >= 20.0 and done.get("autonomy", INF) <= 60.0, "autonomie entre les sols 20 et 60")
+	_check(done.get("autonomy", INF) >= 20.0 and done.get("autonomy", INF) <= 70.0, "autonomie entre les sols 20 et 70")
+	_check(done.size() == engine.objectives.size() and done.values().max() <= 80.0, "tous les objectifs avant le sol 80")
 	_check(evacuations[0] == 0, "un joueur raisonnable ne perd aucun colon")
 
 	# Un joueur qui ne fait rien finit par mettre la colonie en danger, mais pas tout de suite.

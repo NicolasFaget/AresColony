@@ -11,6 +11,8 @@ const TAB_RESEARCH := 2
 ## En dessous de ce nombre de sols de réserve, l'alerte devient rouge ; au-dessus, orange.
 const DANGER_SOLS := 1.0
 const WARNING_SOLS := 2.5
+## Poussière moyenne à partir de laquelle on conseille un nettoyage.
+const DUST_ALERT := 0.3
 
 ## Tutoriel : identifiant, consigne, onglet et cible à montrer.
 const TUTORIAL := [
@@ -72,6 +74,27 @@ static func alerts(engine: ColonyEngine) -> Array[Dictionary]:
 			"title": "%d module%s isolé%s" % [isolated, "s" if isolated > 1 else "", "s" if isolated > 1 else ""],
 			"advice": "Un module ne fonctionne que s'il est relié à l'atterrisseur. Posez des conduites.",
 			"tab": TAB_BUILD, "target": "link" })
+
+	var broken := engine.broken_count()
+	if broken > 0:
+		list.append({ "level": "warning", "resource": "", "sols": INF,
+			"title": "%d machine%s en panne" % [broken, "s" if broken > 1 else ""],
+			"advice": "Une machine en panne ne produit plus rien : réparez-la (matériaux).",
+			"tab": TAB_COLONY, "target": "maintenance" })
+	var dust := engine.average_dust()
+	if dust >= DUST_ALERT:
+		list.append({ "level": "warning", "resource": ColonyContent.ENERGY, "sols": INF,
+			"title": "Panneaux poussiéreux : −%d %% d'énergie" % roundi(ColonyEngine.DUST_LOSS * dust * 100.0),
+			"advice": "Envoyez une sortie de nettoyage (elle coûte de l'oxygène), ou espérez un tourbillon de poussière.",
+			"tab": TAB_COLONY, "target": "maintenance" })
+	if engine.resupplies_left() <= 1 and not _has_linked(engine, "kiln"):
+		var researched := engine.state.research_done.has("regolith")
+		list.append({ "level": "warning", "resource": ColonyContent.MATERIALS, "sols": INF,
+			"title": "Dernier envoi de matériaux au prochain ravitaillement" if engine.resupplies_left() == 1
+					else "La Terre n'envoie plus de matériaux",
+			"advice": "Construisez un four à régolithe pour fabriquer vos matériaux." if researched
+					else "Recherchez « Frittage du régolithe » pour fabriquer vos propres matériaux.",
+			"tab": TAB_BUILD if researched else TAB_RESEARCH, "target": "kiln" if researched else "regolith" })
 	return list
 
 

@@ -103,7 +103,10 @@ func cell_under(screen_position: Vector2) -> Vector2i:
 
 ## Met le monde en accord avec la partie : modules, voyants, glace révélée, astronautes.
 func sync_with_game() -> void:
-	var signature := JSON.stringify(_engine.state.buildings)
+	var parts: Array[String] = []
+	for b in _engine.state.buildings:
+		parts.append("%s:%d:%d:%d" % [b.id, b.x, b.y, b.get("level", 1)])
+	var signature := ",".join(parts)
 	if signature != _signature:
 		_signature = signature
 		_rebuild_buildings()
@@ -157,6 +160,11 @@ func _update_lights() -> void:
 			color = Color("#ffb347")
 		light.material_override = ModelBuilder.material(color, 1.2)
 		light.visible = color != Color("#5be49b")
+	for i in mini(_building_nodes.size(), _engine.state.buildings.size()):
+		if _engine.def_of(i).solar:
+			for mesh in _building_nodes[i].get_children():
+				if mesh is GeometryInstance3D:
+					(mesh as GeometryInstance3D).set_instance_shader_parameter("dust", _engine.dust_of(i))
 
 
 static func _model_height(node: Node3D) -> float:

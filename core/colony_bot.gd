@@ -5,7 +5,7 @@ extends RefCounted
 ## construit ce qui manque le plus, garde une réserve de matériaux, étend ses conduites vers la glace.
 
 const R = preload("res://core/colony_content.gd")
-const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate"]
+const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate", "regolith"]
 
 
 ## Lance la prochaine recherche disponible, dans l'ordre conseillé.
@@ -20,6 +20,7 @@ static func research(engine: ColonyEngine) -> void:
 static func play(engine: ColonyEngine, until: float) -> void:
 	while engine.state.sol < until:
 		research(engine)
+		maintain(engine)
 		build(engine)
 		engine.advance(0.25)
 
@@ -63,6 +64,9 @@ static func build(engine: ColonyEngine) -> void:
 		want = "extractor"
 	elif urgent == R.FOOD:
 		want = "greenhouse"
+	elif engine.is_unlocked(engine.building_defs["kiln"]) and engine.resupplies_left() <= 2 \
+			and _count(engine, "kiln") < 1 + engine.state.colonists.size() / 6:
+		want = "kiln"
 	elif engine.state.colonists.size() >= engine.housing() - 1 and engine.state.recruits_sent < R.RECRUITS.size() 			and flows[R.OXYGEN] >= margin[R.OXYGEN] and flows[R.FOOD] >= margin[R.FOOD]:
 		want = "habitat"
 	elif engine.capacity(R.ENERGY) < 150.0 and engine.is_unlocked(engine.building_defs["battery"]):
@@ -81,6 +85,23 @@ static func build(engine: ColonyEngine) -> void:
 	var spot := connected_spot(engine, want)
 	if spot.x >= 0:
 		engine.place(want, spot)
+
+
+## Répare les machines en panne et nettoie les panneaux trop poussiéreux.
+static func maintain(engine: ColonyEngine) -> void:
+	for i in engine.state.buildings.size():
+		if engine.is_broken(i):
+			engine.repair(i)
+	if engine.average_dust() > 0.3:
+		engine.clean_panels()
+
+
+static func _count(engine: ColonyEngine, def_id: String) -> int:
+	var count := 0
+	for building in engine.state.buildings:
+		if building.id == def_id:
+			count += 1
+	return count
 
 
 ## Améliore le module le moins cher, en gardant une réserve de matériaux et de données pour la recherche.

@@ -200,6 +200,48 @@ func _run() -> void:
 			main._world.rig.zoom(0.7)
 			await _frames(30)
 			await _shot("52_niveaux")
+		"entretien":
+			ColonyBot.play(engine, 47.0)
+			engine.state.speed = 0
+			engine.dust_rate = 0.0
+			for i in engine.state.buildings.size():
+				if engine.def_of(i).solar:
+					engine.state.buildings[i].dust = 0.55
+			var kiln := -1
+			for i in engine.state.buildings.size():
+				if engine.state.buildings[i].id in ["moxie", "extractor"] and kiln < 0:
+					engine.state.buildings[i].broken = true
+					kiln = i
+			engine.state.research_done.append("regolith")
+			engine.state.resources[ColonyContent.MATERIALS] = 300.0
+			var spot := ColonyBot.connected_spot(engine, "kiln")
+			engine.place("kiln", spot)
+			engine.state.sol = floorf(engine.state.sol) + 1.45
+			engine.advance(0.05)
+			main = await _open_main()
+			_close_modals(main)
+			if not main._window.collapsed:
+				main._window.toggle_collapsed()
+			main._world.rig.zoom(0.75)
+			await _frames(30)
+			await _shot("60_alerte_entretien")
+			main._show_maintenance()
+			await _shot("61_entretien")
+			_close_modals(main)
+			main._select_tab(1)
+			if main._window.collapsed:
+				main._window.toggle_collapsed()
+			await _frames(30)
+			await _shot("62_colonie")
+			_close_modals(main)
+			for i in engine.state.buildings.size():
+				if engine.state.buildings[i].id == "kiln":
+					if not main._window.collapsed:
+						main._window.toggle_collapsed()
+					main._world.rig.focus(main._world.footprint_center(engine.cell_of(i), Vector2i(2, 2)), 0.0)
+					await _frames(30)
+					await _shot("63_four")
+					break
 		"interaction":
 			main = await _open_main()
 			_close_modals(main)

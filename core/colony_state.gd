@@ -29,6 +29,8 @@ var next_storm: float = 12.0
 var storm_until: float = -1.0
 var next_resupply: float = 8.0
 var resupply_count: int = 0
+## Prochain tourbillon de poussière (il nettoie quelques panneaux).
+var next_dust_devil: float = 7.0
 var recruits_sent: int = 0
 var evacuated: int = 0
 ## Sols consécutifs sans déficit vital (objectif « Autonomie »).
@@ -79,6 +81,7 @@ func to_dict() -> Dictionary:
 		"storm_until": storm_until,
 		"next_resupply": next_resupply,
 		"resupply_count": resupply_count,
+		"next_dust_devil": next_dust_devil,
 		"recruits_sent": recruits_sent,
 		"evacuated": evacuated,
 		"autonomy_streak": autonomy_streak,
@@ -102,8 +105,13 @@ static func from_dict(data: Dictionary) -> ColonyState:
 	if list is Array:
 		for item: Variant in list:
 			if item is Dictionary and item.get("id") is String:
-				state.buildings.append({ "id": item.id, "x": int(_num(item.get("x"), 0)), "y": int(_num(item.get("y"), 0)),
-						"level": clampi(int(_num(item.get("level"), 1)), 1, 3) })
+				var building := { "id": item.id, "x": int(_num(item.get("x"), 0)), "y": int(_num(item.get("y"), 0)),
+						"level": clampi(int(_num(item.get("level"), 1)), 1, 3) }
+				if item.has("dust"):
+					building.dust = clampf(_num(item.dust, 0.0), 0.0, 1.0)
+				if item.get("broken") == true:
+					building.broken = true
+				state.buildings.append(building)
 	list = data.get("colonists")
 	if list is Array:
 		for item: Variant in list:
@@ -127,6 +135,7 @@ static func from_dict(data: Dictionary) -> ColonyState:
 	state.storm_until = _num(data.get("storm_until"), -1.0)
 	state.next_resupply = _num(data.get("next_resupply"), state.next_resupply)
 	state.resupply_count = int(_num(data.get("resupply_count"), 0))
+	state.next_dust_devil = _num(data.get("next_dust_devil"), state.next_dust_devil)
 	state.recruits_sent = int(_num(data.get("recruits_sent"), 0))
 	state.evacuated = int(_num(data.get("evacuated"), 0))
 	state.autonomy_streak = maxf(0.0, _num(data.get("autonomy_streak"), 0.0))

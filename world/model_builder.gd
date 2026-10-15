@@ -169,6 +169,7 @@ static func building(building_id: String) -> Node3D:
 		"extractor": _extractor(root)
 		"greenhouse": _greenhouse(root)
 		"electrolyser": _electrolyser(root)
+		"kiln": _kiln(root)
 	return root
 
 
@@ -291,6 +292,30 @@ static func _moxie(r: Node3D) -> void:
 	cylinder(r, Vector3(0.14, 0.99, 0.1), 0.06, 0.03, DARK, Vector3.ZERO, -1.0, 12)
 	strut(r, Vector3(-0.2, 0.45, -0.28), Vector3(-0.2, 0.15, -0.46), 0.03, WHITE)
 	light(r, Vector3(-0.18, 0.69, 0.2), LIGHT, 0.03, 2.0)
+
+
+## Four à régolithe : four, concentrateur solaire sur mât, tapis et piles de briques.
+static func _kiln(r: Node3D) -> void:
+	_pad(r, 1.9)
+	var brick := Color("#b5643a")
+	box(r, Vector3(-0.3, 0.38, -0.2), Vector3(0.9, 0.62, 0.72), Color("#6b5a4c"))
+	box(r, Vector3(-0.3, 0.71, -0.2), Vector3(0.96, 0.05, 0.78), DARK)
+	box(r, Vector3(-0.3, 0.3, 0.165), Vector3(0.5, 0.12, 0.02), ORANGE, Vector3.ZERO, 2.4)
+	for k in 4:
+		box(r, Vector3(-0.72, 0.25 + k * 0.1, -0.2), Vector3(0.012, 0.06, 0.6), GREY)
+	cylinder(r, Vector3(-0.55, 1.05, -0.4), 0.07, 0.7, GREY, Vector3.ZERO, -1.0, 12)
+	cylinder(r, Vector3(-0.55, 1.42, -0.4), 0.085, 0.05, DARK, Vector3.ZERO, -1.0, 12)
+	# Concentrateur : un réflecteur incliné vers le four.
+	strut(r, Vector3(0.5, 0.08, 0.4), Vector3(0.5, 0.78, 0.4), 0.035, GREY)
+	cylinder(r, Vector3(0.5, 0.86, 0.4), 0.06, 0.1, Color("#dfe8ef"), Vector3(-35, 0, 25), 0.44, 24)
+	light(r, Vector3(0.2, 0.62, 0.1), WARM_LIGHT, 0.03, 2.0)
+	# Tapis de sortie et briques empilées.
+	box(r, Vector3(0.2, 0.12, -0.45), Vector3(0.7, 0.05, 0.22), DARK)
+	for k in 3:
+		for h in 2 - (k % 2):
+			box(r, Vector3(0.25 + k * 0.2, 0.18 + h * 0.08, -0.45), Vector3(0.16, 0.07, 0.1), brick)
+	for k in 2:
+		box(r, Vector3(0.62, 0.12 + k * 0.08, 0.0), Vector3(0.2, 0.07, 0.12), brick)
 
 
 static func _battery(r: Node3D) -> void:

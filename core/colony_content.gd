@@ -36,21 +36,31 @@ const RESOURCE_HELP := {
 	OXYGEN: "Fabriqué à partir du CO₂ de l'air martien (électrolyseur de CO₂) ou de l'eau (électrolyseur d'eau). Chaque colon en respire 0,84 kg par sol.",
 	WATER: "Extraite de la glace du sous-sol. Les colons la boivent, les serres et l'électrolyseur d'eau en consomment.",
 	FOOD: "Livrée par la Terre au début, mais les ravitaillements diminuent : il faut cultiver sous serre.",
-	MATERIALS: "Envoyés par la Terre à chaque ravitaillement. Ils servent à construire ; démolir un module en rend la moitié.",
+	MATERIALS: "Envoyés par la Terre lors des six premiers ravitaillements, puis fabriqués sur place par le four à régolithe. Ils servent à construire, améliorer et réparer ; démolir un module en rend la moitié.",
 	DATA: "Produites par le laboratoire de l'atterrisseur et par chaque colon. Elles financent la recherche.",
 }
 
 ## Besoins d'un colon par sol.
-const COLONIST_NEEDS := { OXYGEN: 0.84, WATER: 2.5, FOOD: 1.0 }
+const COLONIST_NEEDS := { OXYGEN: 0.84, WATER: 2.5, FOOD: 1.0, ENERGY: 0.5 }
 ## Données scientifiques produites par chaque colon par sol.
 const COLONIST_DATA := 1.0
+## Modules qui peuvent tomber en panne (les machines).
+const BREAKABLE := ["moxie", "extractor", "greenhouse", "electrolyser", "kiln"]
+## Ce que racontent les colons quand une machine lâche.
+const BREAKDOWN_LINES := {
+	"moxie": "L'électrolyseur de CO₂ a surchauffé. Il sent le grille-pain.",
+	"extractor": "La foreuse de l'extracteur est coincée dans la glace. Elle boude.",
+	"greenhouse": "Une pompe d'arrosage de la serre a lâché. Les radis s'inquiètent.",
+	"electrolyser": "Une fuite sur l'électrolyseur d'eau ! Le sifflement est très désagréable.",
+	"kiln": "Le four à régolithe s'est arrêté net. Il y a de la poussière partout. Encore plus que d'habitude.",
+}
 
 
 static func buildings() -> Array[Defs.Building]:
 	return [
 		Defs.Building.new({
 			"id": "lander", "name": "Atterrisseur", "size": Vector2i(2, 2), "fixed": true,
-			"outputs": { ENERGY: 8.0, DATA: 3.0 }, "solar": true, "housing": 4,
+			"outputs": { ENERGY: 10.0, DATA: 3.0 }, "solar": true, "housing": 4,
 			"storage": { ENERGY: 40.0, OXYGEN: 60.0, WATER: 120.0, FOOD: 80.0, MATERIALS: 400.0 },
 			"card": "atmosphere",
 			"description": "Votre vaisseau, devenu base : quelques panneaux, un labo, des réserves.",
@@ -90,6 +100,11 @@ static func buildings() -> Array[Defs.Building]:
 			"research": "greenhouse", "inputs": { ENERGY: 6.0, WATER: 3.0 },
 			"outputs": { FOOD: 3.0, OXYGEN: 0.4 }, "storage": { FOOD: 40.0 }, "card": "greenhouse",
 			"description": "Radis, cresson, tomates... La photosynthèse rend un peu d'oxygène.",
+		}),
+		Defs.Building.new({
+			"id": "kiln", "name": "Four à régolithe", "size": Vector2i(2, 2), "cost": 60.0, "research": "regolith",
+			"inputs": { ENERGY: 14.0 }, "outputs": { MATERIALS: 8.0 }, "card": "regolith",
+			"description": "Chauffe la poussière martienne jusqu'à la souder en briques. Très gourmand en énergie.",
 		}),
 		Defs.Building.new({
 			"id": "electrolyser", "name": "Électrolyseur d'eau", "cost": 35.0, "research": "electrolysis",
@@ -151,6 +166,14 @@ const UPGRADES := {
 			"outputs": { FOOD: 1.2 }, "inputs": { WATER: 0.6 },
 			"why": "Les racines baignent dans une solution nutritive qui circule en boucle : il faut bien moins d'eau qu'en pleine terre." },
 	],
+	"kiln": [
+		{ "name": "Concentrateur solaire", "effect": "−30 % d'énergie",
+			"inputs": { ENERGY: 0.7 },
+			"why": "Des miroirs concentrent la lumière du Soleil sur la poussière : une partie de la chaleur ne coûte plus d'électricité. C'est ainsi que l'ESA a cuit ses briques de régolithe en 2017." },
+		{ "name": "Impression 3D", "effect": "+30 % de matériaux",
+			"outputs": { MATERIALS: 1.3 },
+			"why": "Une imprimante dépose la poussière en couches fines, chauffées une à une : moins de pertes, des pièces directement à la bonne forme." },
+	],
 	"electrolyser": [
 		{ "name": "Membrane échangeuse de protons", "effect": "+25 % de débit sans plus d'énergie",
 			"outputs": { OXYGEN: 1.25 }, "inputs": { WATER: 1.25 },
@@ -201,7 +224,7 @@ static func research() -> Array[Defs.Research]:
 		Defs.Research.new({ "id": "electrolysis", "name": "Électrolyse de l'eau", "cost": 25.0, "duration": 1.5,
 				"requires": ["ice"], "card": "electrolysis", "summary": "Débloque l'électrolyseur d'eau." }),
 		Defs.Research.new({ "id": "cleaning", "name": "Nettoyage des panneaux", "cost": 25.0, "duration": 1.0,
-				"requires": ["batteries"], "effects": { "solar": 1.25, "storm_solar": 1.5 }, "card": "cleaning",
+				"requires": ["batteries"], "effects": { "solar": 1.25, "storm_solar": 1.5, "dust": 0.5 }, "card": "cleaning",
 				"summary": "Panneaux solaires +25 %, mieux protégés des tempêtes." }),
 		Defs.Research.new({ "id": "perchlorate", "name": "Lavage des perchlorates", "cost": 35.0, "duration": 2.0,
 				"requires": ["greenhouse"], "effects": { "food": 2.0 }, "card": "perchlorate",
@@ -209,6 +232,9 @@ static func research() -> Array[Defs.Research]:
 		Defs.Research.new({ "id": "recycling", "name": "Recyclage de l'eau", "cost": 40.0, "duration": 2.0,
 				"requires": ["ice"], "effects": { "colonist_water": 0.4 }, "card": "recycling",
 				"summary": "Les colons consomment 60 % d'eau en moins." }),
+		Defs.Research.new({ "id": "regolith", "name": "Frittage du régolithe", "cost": 25.0, "duration": 1.5,
+				"requires": ["perchlorate"], "card": "regolith",
+				"summary": "Débloque le four à régolithe : fabriquer ses propres matériaux de construction." }),
 	]
 
 
@@ -306,6 +332,13 @@ static func cards() -> Array[Defs.Card]:
 			"fact": "En juin 2018, une tempête de poussière a recouvert toute la planète. Le rover solaire Opportunity, prévu pour 90 jours, avait roulé plus de 45 km en 15 ans : privé de lumière, il s'est tu. Le rover nucléaire Curiosity, lui, n'a pas été affecté.",
 			"in_game": "Pendant une tempête, les panneaux produisent beaucoup moins. Batteries et réserves sont vitales.",
 			"sources": [["Sky & Telescope", "https://skyandtelescope.org/astronomy-news/opportunity-end-long-road/"]] }),
+		Defs.Card.new({ "id": "regolith", "figure": "1 000 °C", "figure_label": "pour souder la poussière en brique", "visual": "kiln",
+			"quiz": "Qu'a utilisé l'ESA pour chauffer la poussière ?", "choices": ["Un laser", "La lumière du Soleil concentrée", "Un four à bois"], "answer": 1,
+			"title": "Des briques de poussière", "status": "Expérimenté",
+			"fact": "En 2017, des ingénieurs de l'ESA ont imprimé en 3D une brique de 20 × 10 × 3 cm avec un simulant de sol lunaire : 147 miroirs concentraient la lumière du Soleil pour chauffer chaque fine couche vers 1 000 °C. Il a fallu environ cinq heures. La brique est à peu près aussi solide que du plâtre.",
+			"in_game": "Le four à régolithe transforme la poussière martienne en matériaux de construction, en échange de beaucoup d'énergie.",
+			"sources": [["ESA (vidéo, 2017)", "https://www.esa.int/ESA_Multimedia/Videos/2017/03/3D-printing_moondust_bricks_with_focused_solar_heat"],
+				["Space.com", "https://www.space.com/36943-make-lunar-soil-bricks-solar-heat.html"]] }),
 	]
 
 
