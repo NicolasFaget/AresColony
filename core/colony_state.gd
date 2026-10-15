@@ -102,7 +102,8 @@ static func from_dict(data: Dictionary) -> ColonyState:
 	if list is Array:
 		for item: Variant in list:
 			if item is Dictionary and item.get("id") is String:
-				state.buildings.append({ "id": item.id, "x": int(_num(item.get("x"), 0)), "y": int(_num(item.get("y"), 0)) })
+				state.buildings.append({ "id": item.id, "x": int(_num(item.get("x"), 0)), "y": int(_num(item.get("y"), 0)),
+						"level": clampi(int(_num(item.get("level"), 1)), 1, 3) })
 	list = data.get("colonists")
 	if list is Array:
 		for item: Variant in list:

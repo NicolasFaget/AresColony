@@ -100,6 +100,67 @@ static func buildings() -> Array[Defs.Building]:
 	]
 
 
+## Améliorations de chaque module : niveau 2 puis niveau 3, chacune fondée sur une vraie technologie.
+## Multiplicateurs (outputs, inputs, storage) et places supplémentaires (housing), cumulés par niveau.
+const UPGRADES := {
+	"solar": [
+		{ "name": "Cellules à triple jonction", "effect": "+30 % d'énergie",
+			"outputs": { ENERGY: 1.3 },
+			"why": "Trois couches de semi-conducteurs captent chacune une partie du spectre solaire. Les rovers Spirit et Opportunity utilisaient ce type de cellules." },
+		{ "name": "Suivi du soleil", "effect": "+20 % d'énergie",
+			"outputs": { ENERGY: 1.2 },
+			"why": "Un moteur tourne le panneau face au soleil au fil de la journée : il capte davantage de lumière le matin et le soir, comme les « trackers » des centrales solaires sur Terre." },
+	],
+	"habitat": [
+		{ "name": "Isolation multicouche", "effect": "−30 % d'énergie de chauffage",
+			"inputs": { ENERGY: 0.7 },
+			"why": "De nombreuses feuilles fines et réfléchissantes, séparées par du vide, limitent les pertes de chaleur. Les satellites et les sondes en sont enveloppés." },
+		{ "name": "Module d'extension gonflable", "effect": "+2 colons, +50 % de stockage",
+			"housing": 2, "storage": { OXYGEN: 1.5, FOOD: 1.5 },
+			"why": "Un module gonflable voyage plié puis se déploie sur place. Le module BEAM a été gonflé sur la Station spatiale en 2016." },
+	],
+	"moxie": [
+		{ "name": "Empilement de cellules", "effect": "+40 % d'oxygène, +20 % d'énergie",
+			"outputs": { OXYGEN: 1.4 }, "inputs": { ENERGY: 1.2 },
+			"why": "MOXIE empilait 10 cellules d'électrolyse. Plus de cellules dans la pile, c'est plus d'oxygène, pour un peu plus d'énergie." },
+		{ "name": "Récupération de chaleur", "effect": "−25 % d'énergie",
+			"inputs": { ENERGY: 0.75 },
+			"why": "Les gaz qui sortent vers 800 °C réchauffent le CO₂ qui entre : il faut moins d'électricité pour atteindre la température de fonctionnement." },
+	],
+	"battery": [
+		{ "name": "Cellules haute densité", "effect": "+50 % de stockage",
+			"storage": { ENERGY: 1.5 },
+			"why": "Depuis leur commercialisation en 1991, les batteries lithium-ion stockent toujours plus d'énergie dans le même volume." },
+		{ "name": "Gestion thermique", "effect": "+30 % de stockage",
+			"storage": { ENERGY: 1.3 },
+			"why": "Le froid réduit la capacité des batteries : les rovers martiens gardent les leurs au chaud grâce à des radiateurs." },
+	],
+	"extractor": [
+		{ "name": "Foreuse chauffée", "effect": "+30 % d'eau, +15 % d'énergie",
+			"outputs": { WATER: 1.3 }, "inputs": { ENERGY: 1.15 },
+			"why": "La glace doit être chauffée pour libérer son eau : plus de puissance de chauffe, plus d'eau récupérée." },
+		{ "name": "Puits Rodwell", "effect": "+30 % d'eau",
+			"outputs": { WATER: 1.3 },
+			"why": "On fait fondre la glace en profondeur et on pompe l'eau liquide : la poche s'agrandit d'elle-même. Les bases polaires, au pôle Sud notamment, s'alimentent ainsi en eau." },
+	],
+	"greenhouse": [
+		{ "name": "Éclairage LED rouge et bleu", "effect": "+30 % de nourriture, +10 % d'énergie",
+			"outputs": { FOOD: 1.3 }, "inputs": { ENERGY: 1.1 },
+			"why": "La chlorophylle absorbe surtout le rouge et le bleu. La serre Veggie de la Station spatiale éclaire ses plantes avec des LED rouges et bleues, plus un peu de vert." },
+		{ "name": "Hydroponie", "effect": "+20 % de nourriture, −40 % d'eau",
+			"outputs": { FOOD: 1.2 }, "inputs": { WATER: 0.6 },
+			"why": "Les racines baignent dans une solution nutritive qui circule en boucle : il faut bien moins d'eau qu'en pleine terre." },
+	],
+	"electrolyser": [
+		{ "name": "Membrane échangeuse de protons", "effect": "+25 % de débit sans plus d'énergie",
+			"outputs": { OXYGEN: 1.25 }, "inputs": { WATER: 1.25 },
+			"why": "Les électrolyseurs à membrane (PEM) sont compacts et efficaces. Le générateur d'oxygène de la Station spatiale utilise cette technologie." },
+		{ "name": "Production sous pression", "effect": "+25 % de débit sans plus d'énergie",
+			"outputs": { OXYGEN: 1.25 }, "inputs": { WATER: 1.25 },
+			"why": "Produire les gaz directement sous pression évite d'avoir à les comprimer ensuite, ce qui coûte de l'énergie." },
+	],
+}
+
 ## Synergies entre modules voisins (qui se touchent directement, sans conduite entre eux).
 ## `building` reçoit le bonus quand au moins un `neighbor` le touche. Les effets ne se cumulent pas.
 ## outputs / inputs : multiplicateurs par ressource.
@@ -166,6 +227,9 @@ static func objectives() -> Array[Defs.Objective]:
 		Defs.Objective.new({ "id": "synergies", "title": "Ingénierie fine",
 				"description": "Activer 4 synergies entre modules voisins (onglet Construire › Synergies).",
 				"reward": { DATA: 15.0 } }),
+		Defs.Objective.new({ "id": "model", "title": "Colonie modèle",
+				"description": "Avec au moins 12 modules, atteindre la note d'efficacité B (70 / 100) : onglet Colonie.",
+				"reward": { MATERIALS: 60.0, DATA: 20.0 } }),
 		Defs.Objective.new({ "id": "autonomy", "title": "Autonomie",
 				"description": "Avec au moins 8 colons, tenir 10 sols d'affilée sans déficit d'oxygène, d'eau ni de nourriture.",
 				"reward": { MATERIALS: 100.0 } }),

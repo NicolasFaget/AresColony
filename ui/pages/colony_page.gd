@@ -9,10 +9,17 @@ var _objectives_done: Label
 var _crew_title: Label
 var _crew: VBoxContainer
 var _info: Label
+var _grade: Label
+var _score: Label
+var _rating_bars: Array[ProgressBar] = []
+var _rating_values: Array[Label] = []
+var _rating_tip: Label
 
 
 func _ready() -> void:
 	add_subtitle("Ère 1 · Survie : tenir sans dépendre de la Terre.")
+
+	list.add_child(_rating_panel())
 
 	_objective_title = UiFx.label("", "HeadingLabel")
 	_objective_text = UiFx.paragraph("", "BodyLabel")
@@ -40,6 +47,7 @@ func _ready() -> void:
 
 func refresh() -> void:
 	var engine := GameManager.engine
+	_refresh_rating()
 	var objective := engine.current_objective()
 	if objective == null:
 		_objective_title.text = "Ère « Survie » accomplie !"
@@ -77,6 +85,54 @@ func refresh() -> void:
 		NumberFormatter.format(next), "s" if next >= 2.0 else "",
 		"Places libres : des recrues arriveront." if housing_left > 0 else "Aucune place libre : construisez un habitat pour accueillir des recrues.",
 		engine.state.evacuated]
+
+
+## Note d'efficacité : grande lettre, score, quatre jauges et le conseil le plus utile.
+func _rating_panel() -> Control:
+	_grade = UiFx.label("", "TitleLabel", HORIZONTAL_ALIGNMENT_CENTER)
+	_grade.add_theme_font_size_override("font_size", 64)
+	_grade.custom_minimum_size.x = 84
+	_score = UiFx.label("", "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER)
+	var left := UiFx.vbox(0, [_grade, _score])
+	left.alignment = BoxContainer.ALIGNMENT_CENTER
+	var bars := UiFx.vbox(4)
+	bars.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for part in ["Fonctionnement", "Raccordement", "Synergies", "Améliorations"]:
+		var name := UiFx.label(part, "SmallLabel")
+		name.custom_minimum_size.x = 150
+		var bar := ProgressBar.new()
+		bar.show_percentage = false
+		bar.custom_minimum_size = Vector2(0, 10)
+		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var value := UiFx.label("", "CaptionLabel", HORIZONTAL_ALIGNMENT_RIGHT)
+		value.custom_minimum_size.x = 52
+		_rating_bars.append(bar)
+		_rating_values.append(value)
+		bars.add_child(UiFx.hbox(8, [name, bar, value]))
+	_rating_tip = UiFx.paragraph("", "SmallLabel")
+	_rating_tip.add_theme_color_override("font_color", Palette.ACCENT)
+	var panel := UiFx.panel("Row", UiFx.vbox(8, [
+		UiFx.label("Efficacité de la colonie", "CaptionLabel"),
+		UiFx.hbox(12, [left, bars]), _rating_tip,
+	]))
+	panel.mouse_filter = Control.MOUSE_FILTER_PASS
+	return panel
+
+
+func _refresh_rating() -> void:
+	var rating := GameManager.engine.colony_rating()
+	_grade.text = rating.grade
+	_grade.add_theme_color_override("font_color", { "A": Palette.SUCCESS, "B": Palette.ACCENT, "C": Palette.MONEY,
+			"D": Palette.WARNING, "E": Palette.DANGER }[rating.grade])
+	_score.text = "%d / 100" % roundi(rating.score)
+	for i in rating.parts.size():
+		var part: Dictionary = rating.parts[i]
+		_rating_bars[i].max_value = part.max
+		_rating_bars[i].value = part.value
+		_rating_values[i].text = "%d/%d" % [roundi(part.value), roundi(part.max)]
+	_rating_tip.text = ("Conseil : " + rating.tip) if not rating.tip.is_empty() else "Colonie exemplaire, rien à redire !"
 
 
 func _colonist_line() -> Control:

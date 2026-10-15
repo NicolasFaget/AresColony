@@ -483,9 +483,9 @@ func _show_building(index: int) -> void:
 	var status := _engine.building_status(index)
 	var lines: Array[String] = []
 	for r: String in def.outputs:
-		lines.append("+%s %s %s/sol" % [NumberFormatter.format(def.outputs[r] * _engine.synergy_factor(index, r, true)), ColonyContent.RESOURCE_UNITS[r], ColonyContent.RESOURCE_NAMES[r].to_lower()])
+		lines.append("+%s %s %s/sol" % [NumberFormatter.format(def.outputs[r] * _engine.rate_factor(index, r, true)), ColonyContent.RESOURCE_UNITS[r], ColonyContent.RESOURCE_NAMES[r].to_lower()])
 	for r: String in def.inputs:
-		lines.append("−%s %s %s/sol" % [NumberFormatter.format(def.inputs[r] * _engine.synergy_factor(index, r, false)), ColonyContent.RESOURCE_UNITS[r], ColonyContent.RESOURCE_NAMES[r].to_lower()])
+		lines.append("−%s %s %s/sol" % [NumberFormatter.format(def.inputs[r] * _engine.rate_factor(index, r, false)), ColonyContent.RESOURCE_UNITS[r], ColonyContent.RESOURCE_NAMES[r].to_lower()])
 	for r: String in def.storage:
 		lines.append("Stockage : +%s %s %s" % [NumberFormatter.format(def.storage[r]), ColonyContent.RESOURCE_UNITS[r], ColonyContent.RESOURCE_NAMES[r].to_lower()])
 	if def.housing > 0:
@@ -496,6 +496,8 @@ func _show_building(index: int) -> void:
 			UiFx.paragraph("\n".join(lines), "BodyLabel", HORIZONTAL_ALIGNMENT_CENTER)])
 	(extra.get_child(0) as Control).size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	extra.add_child(_synergy_block(index))
+	var holder: Array[Modal] = []
+	extra.add_child(_upgrade_block(index, holder))
 	if not def.card.is_empty() and _engine.state.cards_unlocked.has(def.card):
 		var learn := Button.new()
 		learn.text = "En savoir plus : " + _engine.cards[def.card].title
@@ -509,11 +511,72 @@ func _show_building(index: int) -> void:
 	if not def.fixed:
 		options.cancel_text = "Démolir (+%s)" % NumberFormatter.format(def.cost * ColonyEngine.DEMOLISH_REFUND)
 		options.cancel_style = "Button"
+	if _engine.max_level(index) > 1:
+		# Fiche longue (améliorations) : elle défile.
+		var scroll := ScrollContainer.new()
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll.custom_minimum_size.y = minf(860.0, size.y * 0.62)
+		extra.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		scroll.add_child(extra)
+		options.extra = scroll
 	var modal := Modal.open(_modal_layer, options)
+	holder.append(modal)
 	if not def.fixed:
 		modal.cancelled.connect(func() -> void:
 			if _engine.demolish(index):
 				AudioManager.play("whoosh"))
+
+
+## Niveau d'un module, améliorations faites et prochaine amélioration (avec son pourquoi).
+func _upgrade_block(index: int, holder: Array[Modal]) -> Control:
+	var box := UiFx.vbox(6)
+	var top := _engine.max_level(index)
+	if top <= 1:
+		return box
+	var level := _engine.level_of(index)
+	var caption := UiFx.label("NIVEAU %d / %d   %s" % [level, top, "★".repeat(level) + "☆".repeat(top - level)], "CaptionLabel")
+	caption.add_theme_color_override("font_color", Palette.MONEY)
+	box.add_child(caption)
+	var upgrades: Array = ColonyContent.UPGRADES[_engine.state.buildings[index].id]
+	for i in level - 1:
+		var done := UiFx.paragraph("✓ %s : %s" % [upgrades[i].name, upgrades[i].effect], "SmallLabel")
+		done.add_theme_color_override("font_color", Palette.SUCCESS)
+		box.add_child(done)
+	var next := _engine.next_upgrade(index)
+	if next.is_empty():
+		return box
+	var title := UiFx.label("Amélioration : " + next.name, "HeadingLabel")
+	var effect := UiFx.label(next.effect, "BodyLabel")
+	effect.add_theme_color_override("font_color", Palette.ACCENT)
+	box.add_child(title)
+	box.add_child(effect)
+	box.add_child(UiFx.paragraph(next.why, "SmallLabel"))
+	var cost := _engine.upgrade_cost(index)
+	var problem := _engine.upgrade_problem(index)
+	var button := Button.new()
+	button.theme_type_variation = "GoldButton"
+	button.text = "Améliorer · %s matériaux · %s données" % [NumberFormatter.format(cost[ColonyContent.MATERIALS]),
+			NumberFormatter.format(cost[ColonyContent.DATA])]
+	button.custom_minimum_size = Vector2(0, 64)
+	button.focus_mode = Control.FOCUS_NONE
+	button.disabled = not problem.is_empty()
+	button.pressed.connect(func() -> void:
+		if not _engine.upgrade(index):
+			AudioManager.play("fail")
+			UiFx.shake(button)
+			return
+		AudioManager.play("upgrade")
+		GameManager.vibrate(30)
+		UiFx.float_text("Niveau %d !" % _engine.level_of(index), button.get_global_rect().get_center(), Palette.MONEY)
+		if not holder.is_empty():
+			holder[0].close()
+		_show_building.call_deferred(index))
+	box.add_child(button)
+	if not problem.is_empty():
+		var reason := UiFx.label(problem, "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
+		reason.add_theme_color_override("font_color", Palette.WARNING)
+		box.add_child(reason)
+	return box
 
 
 ## Synergies d'un module dans sa fiche : actives (dorées, avec le pourquoi) ou possibles.

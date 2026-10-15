@@ -70,6 +70,10 @@ de vie de l'application.
 - Synergies (`ColonyContent.SYNERGIES`) : un module qui touche directement un voisin du bon type
   gagne un multiplicateur sur ses entrées ou sorties (une fois par type de synergie). Calculées dans
   `_rebuild()` ; `preview_synergies()` alimente l'aperçu au placement ; jonctions dorées dans le monde.
+- Améliorations (`ColonyContent.UPGRADES`) : deux niveaux par module, chacun une vraie technologie ;
+  coût = 0,8 puis 1,2 × le prix du module en matériaux, et 15 puis 30 données.
+- Note d'efficacité (`colony_rating()`) sur 100 : fonctionnement 40 (rendement lissé des modules
+  consommateurs), raccordement 10, synergies 25, améliorations 25. A ≥ 85, B ≥ 70, C ≥ 55, D ≥ 40.
 - Fiches : chacune a un chiffre clé, une illustration et un quiz à trois choix, tirés uniquement de
   son texte sourcé. Déblocage = écran plein « Nouvelle découverte » ; première lecture +5 données,
   bonne réponse au quiz +10 (une seule tentative).
@@ -86,7 +90,8 @@ de vie de l'application.
 | Main verte (serre) | 8 |
 | Équipage complet (8 colons) | 40 |
 | Nuits sereines (150 kWh de stockage) | 24,5 |
-| Ingénierie fine (4 synergies actives) | 31 |
+| Ingénierie fine (4 synergies actives) | 32 |
+| Colonie modèle (note B, 12 modules) | 49 |
 | Autonomie (10 sols sans déficit, 8 colons) | 50 |
 
 Sans évacuation pour un joueur raisonnable. Un joueur qui ne fait rien perd son premier colon au
@@ -103,8 +108,7 @@ fourchettes.
 
 ## Prochaines étapes
 
-1. Améliorations de modules et note d'efficacité ; difficulté (poussière, pannes, fin des
-   ravitaillements).
+1. Difficulté : poussière sur les panneaux, pannes, besoins qui grandissent, fin des ravitaillements.
 2. Rovers d'exploration et sites à découvrir ; quiz facultatifs.
 3. Ère 2 « Autonomie » : Sabatier, briques de régolithe, recyclage, deuxième région.
 4. Tutoriel guidé, traduction anglaise.

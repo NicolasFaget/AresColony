@@ -67,7 +67,10 @@ static func build(engine: ColonyEngine) -> void:
 		want = "habitat"
 	elif engine.capacity(R.ENERGY) < 150.0 and engine.is_unlocked(engine.building_defs["battery"]):
 		want = "battery"
-	if want.is_empty() or not engine.is_unlocked(engine.building_defs[want]):
+	if want.is_empty():
+		upgrade(engine)
+		return
+	if not engine.is_unlocked(engine.building_defs[want]):
 		return
 	# Confort (habitat, batteries) : seulement si une réserve reste pour les urgences vitales.
 	if want in ["habitat", "battery"] and engine.state.amount(R.MATERIALS) < engine.building_defs[want].cost + 50.0:
@@ -78,6 +81,23 @@ static func build(engine: ColonyEngine) -> void:
 	var spot := connected_spot(engine, want)
 	if spot.x >= 0:
 		engine.place(want, spot)
+
+
+## Améliore le module le moins cher, en gardant une réserve de matériaux et de données pour la recherche.
+static func upgrade(engine: ColonyEngine) -> void:
+	var best := -1
+	var best_cost := INF
+	for i in engine.state.buildings.size():
+		if not engine.upgrade_problem(i).is_empty():
+			continue
+		var cost: Dictionary = engine.upgrade_cost(i)
+		if engine.state.amount(R.MATERIALS) < cost[R.MATERIALS] + 80.0 or engine.state.amount(R.DATA) < cost[R.DATA] + 20.0:
+			continue
+		if cost[R.MATERIALS] < best_cost:
+			best_cost = cost[R.MATERIALS]
+			best = i
+	if best >= 0:
+		engine.upgrade(best)
 
 
 ## Pose l'extracteur sur la glace si possible, sinon prolonge les conduites vers la glace.

@@ -37,6 +37,12 @@ const DEMOLISH_REFUND := 0.5
 ## Données gagnées à la première lecture d'une fiche, et pour une bonne réponse à son quiz.
 const CARD_READ_REWARD := 5.0
 const QUIZ_REWARD := 10.0
+## Coût d'une amélioration (niveau 2, puis 3) : part du coût du module en matériaux, et données.
+const UPGRADE_MATERIALS: Array[float] = [0.8, 1.2]
+const UPGRADE_DATA: Array[float] = [15.0, 30.0]
+## Objectif « Colonie modèle » : note B avec au moins autant de modules (hors conduites).
+const MODEL_MODULES := 12
+const RATING_GRADES := [[85.0, "A"], [70.0, "B"], [55.0, "C"], [40.0, "D"], [0.0, "E"]]
 const AUTONOMY_GOAL := 10.0
 const AUTONOMY_CREW := 8
 
@@ -63,6 +69,8 @@ var _connected: Array[bool] = []
 ## Synergies actives de chaque module (identifiants de ColonyContent.SYNERGIES).
 var _synergies: Array = []
 var _efficiency: Array[float] = []
+## Rendement moyen récent de chaque module (lissé sur environ un demi-sol, pour la note).
+var _efficiency_avg: Array[float] = []
 var _occupied := {}
 var _rng := RandomNumberGenerator.new()
 var _storm_warned := false
@@ -88,7 +96,7 @@ func _init(p_state: ColonyState) -> void:
 
 
 func _new_game() -> void:
-	state.buildings = [{ "id": "lander", "x": map.lander_cell.x, "y": map.lander_cell.y }] as Array[Dictionary]
+	state.buildings = [{ "id": "lander", "x": map.lander_cell.x, "y": map.lander_cell.y, "level": 1 }] as Array[Dictionary]
 	state.resources = START_RESOURCES.duplicate()
 	for member: Array in ColonyContent.CREW:
 		state.colonists.append({ "name": member[0], "role": member[1], "health": 1.0 })
@@ -125,7 +133,10 @@ func capacity(resource: String) -> float:
 	var total := 0.0
 	for i in state.buildings.size():
 		if _connected[i]:
-			total += def_of(i).storage.get(resource, 0.0)
+			var amount: float = def_of(i).storage.get(resource, 0.0)
+			for upgrade: Dictionary in _upgrades_of(i):
+				amount *= upgrade.get("storage", {}).get(resource, 1.0)
+			total += amount
 	return total
 
 
@@ -134,6 +145,8 @@ func housing() -> int:
 	for i in state.buildings.size():
 		if _connected[i]:
 			total += def_of(i).housing
+			for upgrade: Dictionary in _upgrades_of(i):
+				total += upgrade.get("housing", 0)
 	return total
 
 
@@ -229,6 +242,113 @@ func building_status(index: int) -> Dictionary:
 		if is_night():
 			return { "ok": true, "text": "Nuit : aucune production solaire." }
 	return { "ok": true, "text": "En service." }
+
+
+# ---------- Améliorations ----------
+
+func level_of(index: int) -> int:
+	return int(state.buildings[index].get("level", 1))
+
+
+## Améliorations déjà faites sur un module.
+func _upgrades_of(index: int) -> Array:
+	var list: Array = ColonyContent.UPGRADES.get(state.buildings[index].id, [])
+	return list.slice(0, level_of(index) - 1)
+
+
+func max_level(index: int) -> int:
+	return 1 + ColonyContent.UPGRADES.get(state.buildings[index].id, []).size()
+
+
+## Prochaine amélioration d'un module ({} au niveau maximal).
+func next_upgrade(index: int) -> Dictionary:
+	var list: Array = ColonyContent.UPGRADES.get(state.buildings[index].id, [])
+	var level := level_of(index)
+	return list[level - 1] if level - 1 < list.size() else {}
+
+
+func upgrade_cost(index: int) -> Dictionary:
+	var step := level_of(index) - 1
+	if next_upgrade(index).is_empty():
+		return {}
+	return { ColonyContent.MATERIALS: roundf(def_of(index).cost * UPGRADE_MATERIALS[step]),
+			ColonyContent.DATA: UPGRADE_DATA[step] }
+
+
+## Raison pour laquelle l'amélioration est impossible ("" si possible).
+func upgrade_problem(index: int) -> String:
+	if next_upgrade(index).is_empty():
+		return "Niveau maximal atteint."
+	if not _connected[index]:
+		return "Raccordez d'abord ce module."
+	var cost := upgrade_cost(index)
+	for r: String in cost:
+		if state.amount(r) < cost[r]:
+			return "Pas assez %s." % ColonyContent.RESOURCE_PARTITIVE[r]
+	return ""
+
+
+func upgrade(index: int) -> bool:
+	if not upgrade_problem(index).is_empty():
+		return false
+	var cost := upgrade_cost(index)
+	for r: String in cost:
+		_add(r, -cost[r])
+	state.buildings[index].level = level_of(index) + 1
+	_check_objectives()
+	changed.emit()
+	return true
+
+
+# ---------- Note d'efficacité ----------
+
+## Note de la colonie sur 100, sa lettre et le détail : fonctionnement, raccordement, synergies,
+## améliorations. Chaque partie porte un conseil pour progresser.
+func colony_rating() -> Dictionary:
+	var modules := 0
+	var consumers := 0
+	var running := 0.0
+	var isolated := 0
+	var upgradable := 0
+	var levels := 0
+	for i in state.buildings.size():
+		var def := def_of(i)
+		if def.fixed or def.id == "link":
+			continue
+		modules += 1
+		if not _connected[i]:
+			isolated += 1
+			continue
+		if not def.inputs.is_empty():
+			consumers += 1
+			running += _efficiency_avg[i]
+		if max_level(i) > 1:
+			upgradable += 1
+			levels += level_of(i) - 1
+	var synergy_target := clampf(modules / 3.0, 2.0, 8.0)
+	var parts: Array[Dictionary] = [
+		{ "name": "Fonctionnement", "max": 40.0, "value": 40.0 * (running / consumers if consumers > 0 else 1.0),
+			"tip": "Des modules tournent au ralenti faute d'énergie ou d'eau : ajoutez de la production ou des batteries." },
+		{ "name": "Raccordement", "max": 10.0, "value": maxf(0.0, 10.0 - 5.0 * isolated),
+			"tip": "Des modules sont isolés : reliez-les à l'atterrisseur par des conduites." },
+		{ "name": "Synergies", "max": 25.0, "value": 25.0 * minf(1.0, active_synergy_count() / synergy_target),
+			"tip": "Collez les bons modules entre eux : Construire › Synergies." },
+		{ "name": "Améliorations", "max": 25.0, "value": 25.0 * (levels / (2.0 * upgradable) if upgradable > 0 else 0.0),
+			"tip": "Touchez un module pour l'améliorer (matériaux et données)." },
+	]
+	var score := 0.0
+	var weakest: Dictionary = parts[0]
+	for part in parts:
+		score += part.value
+		if part.value / part.max < weakest.value / weakest.max:
+			weakest = part
+	var grade := "E"
+	for step: Array in RATING_GRADES:
+		if score >= step[0]:
+			grade = step[1]
+			break
+	return { "score": score, "grade": grade, "parts": parts, "modules": modules,
+			"tip": "" if weakest.value >= weakest.max - 0.01 else weakest.tip }
 
 
 ## Synergies actives d'un module (dictionnaires de ColonyContent.SYNERGIES).
@@ -342,7 +462,7 @@ func place(def_id: String, cell: Vector2i) -> bool:
 		return false
 	var def: Defs.Building = building_defs[def_id]
 	_add(ColonyContent.MATERIALS, -def.cost)
-	state.buildings.append({ "id": def_id, "x": cell.x, "y": cell.y })
+	state.buildings.append({ "id": def_id, "x": cell.x, "y": cell.y, "level": 1 })
 	_rebuild()
 	building_placed.emit(state.buildings.size() - 1)
 	_check_objectives()
@@ -495,6 +615,7 @@ func _step(ds: float) -> void:
 			for r: String in def.outputs:
 				delta[r] = delta.get(r, 0.0) + _output_rate(i, r, sun) * e * ds
 		_efficiency[i] = e
+		_efficiency_avg[i] = lerpf(_efficiency_avg[i], e, minf(1.0, ds * 2.0))
 	for r: String in needs:
 		delta[r] = delta.get(r, 0.0) - needs[r] * count * ds * satisfied.get(r, 1.0)
 	delta[ColonyContent.DATA] = delta.get(ColonyContent.DATA, 0.0) + ColonyContent.COLONIST_DATA * count * ds
@@ -511,26 +632,21 @@ func _step(ds: float) -> void:
 	_check_objectives()
 
 
-## Multiplicateur dû aux synergies sur une entrée ou une sortie d'un module.
-func synergy_factor(index: int, resource: String, output: bool) -> float:
+## Multiplicateur dû aux synergies et aux améliorations sur une entrée ou une sortie d'un module.
+func rate_factor(index: int, resource: String, output: bool) -> float:
 	var factor := 1.0
-	for synergy: Dictionary in _synergies[index]:
-		factor *= (synergy.outputs if output else synergy.inputs).get(resource, 1.0)
+	for mod: Dictionary in _synergies[index] + _upgrades_of(index):
+		factor *= mod.get("outputs" if output else "inputs", {}).get(resource, 1.0)
 	return factor
 
 
 func _input_rate(index: int, resource: String) -> float:
-	var rate: float = def_of(index).inputs[resource]
-	for synergy: Dictionary in _synergies[index]:
-		rate *= synergy.inputs.get(resource, 1.0)
-	return rate
+	return def_of(index).inputs[resource] * rate_factor(index, resource, false)
 
 
 func _output_rate(index: int, resource: String, sun: float) -> float:
 	var def := def_of(index)
-	var rate: float = def.outputs[resource]
-	for synergy: Dictionary in _synergies[index]:
-		rate *= synergy.outputs.get(resource, 1.0)
+	var rate: float = def.outputs[resource] * rate_factor(index, resource, true)
 	if def.solar and resource == ColonyContent.ENERGY:
 		rate *= sun
 	if resource == ColonyContent.FOOD:
@@ -650,6 +766,9 @@ func _objective_met(objective_id: String) -> bool:
 			return capacity(ColonyContent.ENERGY) >= 150.0
 		"synergies":
 			return active_synergy_count() >= 4
+		"model":
+			var rating := colony_rating()
+			return rating.score >= 70.0 and rating.modules >= MODEL_MODULES
 		"crew":
 			return state.colonists.size() >= 8
 		"autonomy":
@@ -666,6 +785,9 @@ func objective_progress(objective_id: String) -> float:
 			return clampf(capacity(ColonyContent.ENERGY) / 150.0, 0.0, 1.0)
 		"synergies":
 			return clampf(active_synergy_count() / 4.0, 0.0, 1.0)
+		"model":
+			var rating := colony_rating()
+			return clampf(minf(rating.score / 70.0, float(rating.modules) / MODEL_MODULES), 0.0, 1.0)
 		"crew":
 			return clampf(state.colonists.size() / 8.0, 0.0, 1.0)
 		"autonomy":
@@ -770,6 +892,10 @@ func _rebuild() -> void:
 	_connected.resize(n)
 	_connected.fill(false)
 	_efficiency.resize(n)
+	var old := _efficiency_avg.size()
+	_efficiency_avg.resize(n)
+	for i in range(old, n):
+		_efficiency_avg[i] = 1.0
 	# Synergies : chaque module, une fois par type de synergie, si un voisin direct convient.
 	_synergies.resize(n)
 	for i in n:

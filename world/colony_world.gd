@@ -132,6 +132,10 @@ func _rebuild_buildings() -> void:
 			light = ModelBuilder.sphere(node, Vector3(def.size.x * 0.32, _model_height(node) + 0.08, def.size.y * 0.32), 0.045, Color.GREEN, Vector3.ONE, 1.2)
 			light.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_lights.append(light)
+		for k in _engine.level_of(i) - 1:
+			var mark := ModelBuilder.box(node, Vector3(-def.size.x * 0.32 + k * 0.16, _model_height(node) + 0.1, def.size.y * 0.32),
+					Vector3(0.09, 0.09, 0.09), SYNERGY_GOLD, Vector3(45, 45, 0), 1.6)
+			mark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_rebuild_connectors()
 	_rebuild_walk_cells()
 	# Un module vient d'être posé : il tombe en place avec un nuage de poussière.

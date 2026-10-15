@@ -177,6 +177,29 @@ func _run() -> void:
 			scroll = main._modal_layer.get_child(-1).find_children("*", "ScrollContainer", true, false)[0]
 			scroll.scroll_vertical = 420
 			await _shot("43_quiz_repondu")
+		"ameliorations":
+			ColonyBot.play(engine, 30.0)
+			engine.state.speed = 0
+			engine.state.resources[ColonyContent.DATA] = 80.0
+			main = await _open_main()
+			_close_modals(main)
+			main._select_tab(1)
+			await _frames(30)
+			await _shot("50_note")
+			var target := -1
+			for i in engine.state.buildings.size():
+				if engine.state.buildings[i].id == "greenhouse":
+					target = i
+			engine.upgrade(target)
+			main._show_building(target)
+			await _shot("51_amelioration")
+			_close_modals(main)
+			if not main._window.collapsed:
+				main._window.toggle_collapsed()
+			main._world.rig.focus(main._world.footprint_center(engine.cell_of(target), Vector2i(2, 2)), 0.0)
+			main._world.rig.zoom(0.7)
+			await _frames(30)
+			await _shot("52_niveaux")
 		"interaction":
 			main = await _open_main()
 			_close_modals(main)

@@ -18,6 +18,7 @@ func _init() -> void:
 	_test_production()
 	_test_synergies()
 	_test_cards()
+	_test_upgrades()
 	_test_night_and_batteries()
 	_test_colonists()
 	_test_research()
@@ -66,6 +67,43 @@ func _rich_engine() -> ColonyEngine:
 		engine.state.research_done.append(r.id)
 	engine.state.resources[R.MATERIALS] = 400.0
 	return engine
+
+
+# ---------- Améliorations et note ----------
+
+func _test_upgrades() -> void:
+	var engine := _rich_engine()
+	engine.state.resources[R.DATA] = 100.0
+	var lander := engine.map.lander_cell
+	for id: String in R.UPGRADES:
+		_check(engine.building_defs.has(id) and R.UPGRADES[id].size() == 2, "améliorations d'un module connu : %s" % id)
+	_check(engine.max_level(0) == 1 and engine.upgrade_problem(0) != "", "l'atterrisseur ne s'améliore pas")
+	_check(engine.place("solar", lander + Vector2i(2, 0)), "pose d'un panneau")
+	var panel := engine.state.buildings.size() - 1
+	var cost := engine.upgrade_cost(panel)
+	_check(_near(cost[R.MATERIALS], 12.0) and _near(cost[R.DATA], 15.0), "coût du niveau 2")
+	var materials := engine.state.amount(R.MATERIALS)
+	_check(engine.upgrade(panel) and engine.level_of(panel) == 2, "amélioration au niveau 2")
+	_check(_near(engine.state.amount(R.MATERIALS), materials - 12.0) and _near(engine.state.amount(R.DATA), 85.0), "amélioration payée")
+	_check(_near(engine._output_rate(panel, R.ENERGY, 1.0), 10.0 * 1.3), "triple jonction : +30 %")
+	_check(engine.upgrade(panel) and engine.level_of(panel) == 3, "amélioration au niveau 3")
+	_check(_near(engine._output_rate(panel, R.ENERGY, 1.0), 10.0 * 1.3 * 1.2), "suivi du soleil : +20 % de plus")
+	_check(not engine.upgrade(panel) and engine.upgrade_problem(panel) == "Niveau maximal atteint.", "niveau maximal")
+	var housing := engine.housing()
+	_check(engine.place("habitat", lander + Vector2i(3, 0)), "pose d'un habitat")
+	var home := engine.state.buildings.size() - 1
+	engine.state.resources[R.DATA] = 100.0
+	engine.upgrade(home)
+	engine.upgrade(home)
+	_check(engine.housing() == housing + 4 + 2, "extension gonflable : +2 places")
+	engine.state.resources[R.DATA] = 0.0
+	engine.place("battery", lander + Vector2i(5, 0))
+	_check(engine.upgrade_problem(engine.state.buildings.size() - 1).begins_with("Pas assez"), "données insuffisantes")
+	var rating := engine.colony_rating()
+	_check(rating.score > 0.0 and rating.score <= 100.0 and rating.grade in ["A", "B", "C", "D", "E"], "note de la colonie")
+	_check(rating.parts.size() == 4, "note détaillée")
+	var copy := ColonyState.from_dict(JSON.parse_string(JSON.stringify(engine.state.to_dict())))
+	_check(int(copy.buildings[panel].level) == 3, "niveau sauvegardé")
 
 
 # ---------- Fiches ----------
