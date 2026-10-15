@@ -66,6 +66,7 @@ func refresh() -> void:
 
 	var flows := engine.average_flows()
 	var days := ColonyAdvisor.forecast(engine)
+	_chips[ColonyContent.METHANE].visible = engine.state.era >= 2
 	for r in ColonyContent.RESOURCES:
 		_values[r].text = NumberFormatter.format(engine.state.amount(r))
 		var flow: float = flows[r]

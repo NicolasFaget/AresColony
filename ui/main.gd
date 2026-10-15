@@ -123,6 +123,7 @@ func _build_layout() -> void:
 	build.synergies_requested.connect(_show_synergies)
 	var colony := ColonyPage.new()
 	colony.maintenance_requested.connect(_show_maintenance)
+	colony.expeditions_requested.connect(_show_expeditions)
 	_research_page = ResearchPage.new()
 	var knowledge := KnowledgePage.new()
 	knowledge.open_card.connect(_show_card)
@@ -204,6 +205,10 @@ func _connect_engine() -> void:
 		AudioManager.play("alert")
 		GameManager.vibrate(60)
 		_news.post("Panne ! " + ColonyContent.BREAKDOWN_LINES.get(_engine.state.buildings[i].id, "Une machine s'est arrêtée.")))
+	_engine.era_started.connect(_on_era_started)
+	_engine.expedition_returned.connect(func(site: Dictionary) -> void:
+		AudioManager.play("milestone")
+		_news.post("Le rover est rentré : %s. Butin : %s." % [site.name, ColonyPage._reward_text(site.reward)]))
 	_engine.dust_devil.connect(func(count: int) -> void:
 		_news.post("Un tourbillon de poussière a balayé %d panneau%s. Merci le vent !" % [count, "x" if count > 1 else ""]))
 
@@ -440,12 +445,12 @@ func _on_objective_completed(objective_id: String) -> void:
 			AudioManager.play("milestone")
 			GameManager.vibrate(30)
 			_news.post("Objectif atteint : %s ! Récompense : %s" % [o.title, ColonyPage._reward_text(o.reward)])
-			if objective_id == "autonomy":
+			if objective_id == "return":
 				Modal.open(_modal_layer, {
-					"icon": "check", "title": "Ère « Survie » accomplie !",
-					"body": "Votre colonie tient seule : oxygène, eau et nourriture sont produits sur place.\n"
-							+ "C'est exactement le défi que la NASA et l'ESA préparent pour les premières missions habitées.\n\n"
-							+ "Les ères suivantes (Autonomie, Expansion, Terraformation) arrivent dans une prochaine version.",
+					"icon": "rocket", "title": "Retour assuré !",
+					"body": "Les réservoirs du véhicule de retour sont pleins de méthane fabriqué sur Mars, comme dans le plan "
+							+ "Mars Direct. Votre colonie est autonome, explore Jezero, et peut rentrer quand elle le veut.\n\n"
+							+ "Bravo, commandant ! La suite arrivera dans une prochaine version.",
 					"confirm_text": "Continuer à jouer",
 				})
 
@@ -522,6 +527,16 @@ func _show_building(index: int) -> void:
 			UiFx.paragraph("\n".join(lines), "BodyLabel", HORIZONTAL_ALIGNMENT_CENTER)])
 	(extra.get_child(0) as Control).size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var holder: Array[Modal] = []
+	if def.id == "garage":
+		var trips := Button.new()
+		trips.theme_type_variation = "PurpleButton"
+		trips.text = "Expéditions…"
+		trips.custom_minimum_size = Vector2(0, 60)
+		trips.focus_mode = Control.FOCUS_NONE
+		trips.pressed.connect(func() -> void:
+			holder[0].close()
+			_show_expeditions.call_deferred())
+		extra.add_child(trips)
 	if _engine.is_broken(index) or def.solar:
 		var care := Button.new()
 		care.theme_type_variation = "GoldButton" if _engine.is_broken(index) else "Button"
@@ -561,6 +576,79 @@ func _show_building(index: int) -> void:
 		modal.cancelled.connect(func() -> void:
 			if _engine.demolish(index):
 				AudioManager.play("whoosh"))
+
+
+## Début d'une nouvelle ère : ce qui change et ce qu'il faut viser.
+func _on_era_started(era: int) -> void:
+	if era != 2:
+		return
+	AudioManager.play("milestone")
+	GameManager.vibrate(40)
+	Modal.open(_modal_layer, {
+		"icon": "rocket", "title": "Ère 2 · Expansion",
+		"body": "Votre colonie tient seule sur Mars, bravo ! Place à l'expansion :\n\n"
+				+ "• Fabriquer du méthane avec la réaction de Sabatier (onglet Recherche).\n"
+				+ "• Explorer Jezero en rover pressurisé et découvrir de vrais sites.\n"
+				+ "• Accueillir de nouveaux volontaires.\n"
+				+ "• Construire le véhicule de retour et remplir ses réservoirs, comme dans le plan Mars Direct.",
+		"confirm_text": "En route !",
+	})
+
+
+## Expéditions en rover : sites découverts, sites à découvrir, départ.
+func _show_expeditions() -> void:
+	var holder: Array[Modal] = []
+	var box := UiFx.vbox(10)
+	box.add_child(UiFx.paragraph("Le rover pressurisé roule au méthane. Chaque expédition dure %s sols et coûte %s kg de méthane ; "
+			% [NumberFormatter.format(ColonyEngine.EXPEDITION_SOLS), NumberFormatter.format(ColonyEngine.EXPEDITION_METHANE)]
+			+ "elle rapporte des données ou des matériaux, et une fiche de découverte.", "SmallLabel"))
+	for site: Dictionary in ColonyContent.SITES:
+		var found := _engine.state.sites_done.has(site.id)
+		var title := UiFx.label(("✓ " + site.name) if found else "Site inconnu", "BodyLabel")
+		title.add_theme_color_override("font_color", Palette.SUCCESS if found else Palette.TEXT_DIM)
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var row := UiFx.hbox(8, [UiFx.image(UiFx.icon("rover" if found else "target"), 24, Palette.FAME if found else Palette.TEXT_DIM), title])
+		if found and not site.card.is_empty():
+			var read := Button.new()
+			read.text = "Fiche"
+			read.custom_minimum_size = Vector2(96, 48)
+			read.focus_mode = Control.FOCUS_NONE
+			read.pressed.connect(func() -> void:
+				holder[0].close()
+				_show_card.call_deferred(site.card))
+			row.add_child(read)
+		box.add_child(row)
+	if not _engine.state.expedition.is_empty():
+		var left: float = _engine.state.expedition.until - _engine.state.sol
+		var away := UiFx.paragraph("Le rover est en route vers « %s ». Retour dans %s sol%s." % [
+				_engine.site_by_id(_engine.state.expedition.site).name, NumberFormatter.format(maxf(0.0, left)),
+				"s" if left >= 2.0 else ""], "BodyLabel")
+		away.add_theme_color_override("font_color", Palette.FAME)
+		box.add_child(away)
+	else:
+		var next := _engine.next_site()
+		var problem := _engine.expedition_problem()
+		var go := Button.new()
+		go.theme_type_variation = "PurpleButton"
+		go.text = "Partir : %s · %s kg de méthane" % ["site inconnu" if next.id != "prospect" else next.name,
+				NumberFormatter.format(ColonyEngine.EXPEDITION_METHANE)]
+		go.custom_minimum_size = Vector2(0, 64)
+		go.focus_mode = Control.FOCUS_NONE
+		go.disabled = not problem.is_empty()
+		go.pressed.connect(func() -> void:
+			if _engine.start_expedition():
+				AudioManager.play("whoosh")
+				GameManager.vibrate(25)
+				_news.post("Le rover quitte la colonie. Les colons font coucou par le hublot.")
+				holder[0].close())
+		box.add_child(go)
+		if not problem.is_empty():
+			var reason := UiFx.label(problem, "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
+			reason.add_theme_color_override("font_color", Palette.WARNING)
+			box.add_child(reason)
+	holder.append(Modal.open(_modal_layer, {
+		"icon": "rover", "title": "Expéditions", "extra": box, "confirm_text": "Fermer",
+	}))
 
 
 ## Entretien : poussière des panneaux (sortie de nettoyage) et machines en panne (réparations).

@@ -106,6 +106,7 @@ func sync_with_game() -> void:
 	var parts: Array[String] = []
 	for b in _engine.state.buildings:
 		parts.append("%s:%d:%d:%d" % [b.id, b.x, b.y, b.get("level", 1)])
+	parts.append("exp" if not _engine.state.expedition.is_empty() else "")
 	var signature := ",".join(parts)
 	if signature != _signature:
 		_signature = signature
@@ -126,7 +127,8 @@ func _rebuild_buildings() -> void:
 	_lights.clear()
 	for i in _engine.state.buildings.size():
 		var def := _engine.def_of(i)
-		var node := ModelBuilder.bake(_corridor(i) if def.id == "link" else ModelBuilder.building(def.id))
+		var model_id := "garage_empty" if def.id == "garage" and not _engine.state.expedition.is_empty() else def.id
+		var node := ModelBuilder.bake(_corridor(i) if def.id == "link" else ModelBuilder.building(model_id))
 		node.position = footprint_center(_engine.cell_of(i), def.size)
 		add_child(node)
 		_building_nodes.append(node)

@@ -242,6 +242,33 @@ func _run() -> void:
 					await _frames(30)
 					await _shot("63_four")
 					break
+		"ere2":
+			ColonyBot.play(engine, 104.0)
+			engine.state.speed = 0
+			engine.state.sol = floorf(engine.state.sol) + 1.45
+			engine.advance(0.05)
+			main = await _open_main()
+			_close_modals(main)
+			main._on_era_started(2)
+			await _shot("70_ere2")
+			_close_modals(main)
+			main._select_tab(1)
+			if main._window.collapsed:
+				main._window.toggle_collapsed()
+			await _frames(30)
+			await _shot("71_colonie_ere2")
+			main._show_expeditions()
+			await _shot("72_expeditions")
+			_close_modals(main)
+			if not main._window.collapsed:
+				main._window.toggle_collapsed()
+			for id in ["erv", "sabatier", "garage"]:
+				for i in engine.state.buildings.size():
+					if engine.state.buildings[i].id == id:
+						main._world.rig.focus(main._world.footprint_center(engine.cell_of(i), Vector2i(2, 2)), 0.0)
+						await _frames(30)
+						await _shot("73_" + id)
+						break
 		"interaction":
 			main = await _open_main()
 			_close_modals(main)

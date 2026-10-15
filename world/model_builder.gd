@@ -170,6 +170,11 @@ static func building(building_id: String) -> Node3D:
 		"greenhouse": _greenhouse(root)
 		"electrolyser": _electrolyser(root)
 		"kiln": _kiln(root)
+		"sabatier": _sabatier(root)
+		"tank": _tank(root)
+		"garage": _garage(root, true)
+		"garage_empty": _garage(root, false)
+		"erv": _erv(root)
 	return root
 
 
@@ -292,6 +297,74 @@ static func _moxie(r: Node3D) -> void:
 	cylinder(r, Vector3(0.14, 0.99, 0.1), 0.06, 0.03, DARK, Vector3.ZERO, -1.0, 12)
 	strut(r, Vector3(-0.2, 0.45, -0.28), Vector3(-0.2, 0.15, -0.46), 0.03, WHITE)
 	light(r, Vector3(-0.18, 0.69, 0.2), LIGHT, 0.03, 2.0)
+
+
+## Réacteur Sabatier : colonne de réaction, électrolyseur, réservoirs de méthane et tuyauterie.
+static func _sabatier(r: Node3D) -> void:
+	_pad(r, 1.9)
+	var methane := Color("#e98a5a")
+	cylinder(r, Vector3(-0.35, 0.6, -0.3), 0.2, 1.05, WHITE, Vector3.ZERO, -1.0, 20)
+	sphere(r, Vector3(-0.35, 1.12, -0.3), 0.2, WHITE, Vector3.ONE, 0.0, true, 20)
+	for y in [0.3, 0.6, 0.9]:
+		cylinder(r, Vector3(-0.35, y, -0.3), 0.205, 0.03, GREY, Vector3.ZERO, -1.0, 20)
+	box(r, Vector3(0.3, 0.28, -0.35), Vector3(0.6, 0.4, 0.4), DARK)
+	light(r, Vector3(0.3, 0.42, -0.14), LIGHT, 0.03, 2.0)
+	for k in 2:
+		var at := Vector3(-0.3 + k * 0.6, 0.0, 0.45)
+		cylinder(r, at + Vector3(0, 0.3, 0), 0.04, 0.44, GREY, Vector3.ZERO, -1.0, 8)
+		sphere(r, at + Vector3(0, 0.62, 0), 0.24, methane, Vector3.ONE, 0.0, false, 20)
+		cylinder(r, at + Vector3(0, 0.62, 0), 0.245, 0.04, WHITE, Vector3.ZERO, -1.0, 20)
+	strut(r, Vector3(-0.15, 0.9, -0.3), Vector3(0.3, 0.5, -0.35), 0.03, GREY)
+	strut(r, Vector3(-0.35, 0.3, -0.1), Vector3(-0.3, 0.45, 0.25), 0.03, GREY)
+	strut(r, Vector3(0.3, 0.2, -0.15), Vector3(0.3, 0.45, 0.25), 0.03, GREY)
+
+
+## Réservoir de méthane : sphère isolée sur pieds.
+static func _tank(r: Node3D) -> void:
+	_pad(r, 0.95)
+	for angle in [45.0, 135.0, 225.0, 315.0]:
+		var dir := Vector3(cos(deg_to_rad(angle)), 0, sin(deg_to_rad(angle)))
+		strut(r, dir * 0.3 + Vector3(0, 0.07, 0), dir * 0.18 + Vector3(0, 0.4, 0), 0.025, GREY)
+	sphere(r, Vector3(0, 0.55, 0), 0.3, Color("#e98a5a"), Vector3.ONE, 0.0, false, 24)
+	cylinder(r, Vector3(0, 0.55, 0), 0.305, 0.05, WHITE, Vector3.ZERO, -1.0, 24)
+	light(r, Vector3(0, 0.88, 0), LIGHT, 0.025, 2.0)
+
+
+## Garage à rovers : hangar à toit voûté ; le rover est garé devant, sauf pendant une expédition.
+static func _garage(r: Node3D, with_rover: bool) -> void:
+	_pad(r, 1.9)
+	box(r, Vector3(0, 0.35, -0.35), Vector3(1.5, 0.6, 0.9), WHITE)
+	cylinder(r, Vector3(0, 0.65, -0.35), 0.45, 1.5, LIGHT.darkened(0.6), Vector3(0, 0, 90), -1.0, 16)
+	box(r, Vector3(0, 0.3, 0.105), Vector3(0.8, 0.5, 0.02), DARK)
+	for k in 4:
+		box(r, Vector3(0, 0.12 + k * 0.12, 0.118), Vector3(0.78, 0.015, 0.01), GREY)
+	light(r, Vector3(0.5, 0.58, 0.11), WARM_LIGHT, 0.03, 2.0)
+	if with_rover:
+		var at := Vector3(0.1, 0.0, 0.5)
+		box(r, at + Vector3(0, 0.28, 0), Vector3(0.7, 0.22, 0.34), WHITE)
+		box(r, at + Vector3(0.28, 0.33, 0), Vector3(0.14, 0.14, 0.3), Color(0.35, 0.6, 0.7))
+		for x in [-0.25, 0.0, 0.25]:
+			for z in [-0.19, 0.19]:
+				cylinder(r, at + Vector3(x, 0.11, z), 0.09, 0.07, DARK, Vector3(90, 0, 0), -1.0, 12)
+		cylinder(r, at + Vector3(-0.2, 0.5, 0), 0.015, 0.25, GREY, Vector3.ZERO, -1.0, 6)
+		box(r, at + Vector3(-0.2, 0.63, 0), Vector3(0.08, 0.05, 0.12), DARK)
+
+
+## Véhicule de retour : la fusée sur son pas de tir, avec bras de remplissage.
+static func _erv(r: Node3D) -> void:
+	_pad(r, 1.9)
+	cylinder(r, Vector3(0, 0.12, 0), 0.62, 0.1, CONCRETE.darkened(0.15), Vector3.ZERO, -1.0, 24)
+	var ship := rocket()
+	ship.scale = Vector3.ONE * 1.5
+	ship.position = Vector3(0, 0.38, 0)
+	ship.get_child(ship.get_child_count() - 1).name = "Flame"
+	r.add_child(ship)
+	# Tour de service et bras de remplissage.
+	strut(r, Vector3(0.62, 0.1, -0.5), Vector3(0.62, 2.1, -0.5), 0.05, ORANGE)
+	for y in [0.6, 1.1, 1.6]:
+		strut(r, Vector3(0.62, y, -0.5), Vector3(0.2, y + 0.1, -0.15), 0.025, ORANGE)
+	cylinder(r, Vector3(-0.6, 0.35, 0.55), 0.18, 0.5, Color("#e98a5a"), Vector3.ZERO, -1.0, 16)
+	strut(r, Vector3(-0.5, 0.5, 0.45), Vector3(-0.15, 0.7, 0.1), 0.03, GREY)
 
 
 ## Four à régolithe : four, concentrateur solaire sur mât, tapis et piles de briques.

@@ -17,10 +17,14 @@ var _rating_tip: Label
 var _care: Button
 
 signal maintenance_requested
+signal expeditions_requested
+
+var _era: Label
+var _trips: Button
 
 
 func _ready() -> void:
-	add_subtitle("Ère 1 · Survie : tenir sans dépendre de la Terre.")
+	_era = add_subtitle("")
 
 	list.add_child(_rating_panel())
 
@@ -45,6 +49,14 @@ func _ready() -> void:
 		AudioManager.play("click")
 		maintenance_requested.emit())
 	list.add_child(_care)
+	_trips = Button.new()
+	_trips.theme_type_variation = "PurpleButton"
+	_trips.custom_minimum_size = Vector2(0, 60)
+	_trips.focus_mode = Control.FOCUS_NONE
+	_trips.pressed.connect(func() -> void:
+		AudioManager.play("click")
+		expeditions_requested.emit())
+	list.add_child(_trips)
 
 	_crew_title = UiFx.label("", "HeadingLabel")
 	_crew = UiFx.vbox(8)
@@ -58,11 +70,18 @@ func _ready() -> void:
 
 func refresh() -> void:
 	var engine := GameManager.engine
+	_era.text = ColonyContent.ERAS[engine.state.era]
+	_trips.visible = engine.state.era >= 2
+	if engine.state.expedition.is_empty():
+		_trips.text = "Expéditions en rover · %d site%s découvert%s" % [engine.state.sites_done.size(),
+				"s" if engine.state.sites_done.size() > 1 else "", "s" if engine.state.sites_done.size() > 1 else ""]
+	else:
+		_trips.text = "Rover en route : %s" % engine.site_by_id(engine.state.expedition.site).name
 	_refresh_rating()
 	var objective := engine.current_objective()
 	if objective == null:
-		_objective_title.text = "Ère « Survie » accomplie !"
-		_objective_text.text = "La colonie tient seule. Les prochaines ères arrivent bientôt."
+		_objective_title.text = "Mission accomplie !"
+		_objective_text.text = "La colonie est autonome et son retour est assuré. La suite arrive dans une prochaine version."
 		_objective_bar.value = 100.0
 	else:
 		_objective_title.text = objective.title
@@ -70,7 +89,7 @@ func refresh() -> void:
 		_objective_bar.value = engine.objective_progress(objective.id) * 100.0
 	var done: Array[String] = []
 	for o in engine.objectives:
-		if engine.state.objectives_done.has(o.id):
+		if o.era == engine.state.era and engine.state.objectives_done.has(o.id):
 			done.append("✓ " + o.title)
 	_objectives_done.text = "  ".join(done)
 	_objectives_done.visible = not done.is_empty()

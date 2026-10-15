@@ -17,6 +17,12 @@ var research_active: String = ""
 var research_progress: float = 0.0
 var objectives_done: Array[String] = []
 var cards_unlocked: Array[String] = []
+## Ère en cours (1 : Survie, 2 : Expansion).
+var era: int = 1
+## Expédition en cours : { "site": identifiant, "until": sol du retour } ou {}.
+var expedition: Dictionary = {}
+var sites_done: Array[String] = []
+var expeditions: int = 0
 ## Fiches déjà lues (la première lecture rapporte des données).
 var cards_read: Array[String] = []
 ## Quiz répondus : identifiant de fiche -> vrai si bonne réponse (une seule tentative).
@@ -73,6 +79,10 @@ func to_dict() -> Dictionary:
 		"research_progress": research_progress,
 		"objectives_done": objectives_done.duplicate(),
 		"cards_unlocked": cards_unlocked.duplicate(),
+		"era": era,
+		"expedition": expedition.duplicate(),
+		"sites_done": sites_done.duplicate(),
+		"expeditions": expeditions,
 		"cards_read": cards_read.duplicate(),
 		"quiz_answers": quiz_answers.duplicate(),
 		"map_seed": map_seed,
@@ -123,6 +133,12 @@ static func from_dict(data: Dictionary) -> ColonyState:
 	state.research_progress = clampf(_num(data.get("research_progress"), 0.0), 0.0, 1.0)
 	state.objectives_done = _ids(data.get("objectives_done"))
 	state.cards_unlocked = _ids(data.get("cards_unlocked"))
+	state.era = clampi(int(_num(data.get("era"), 1)), 1, 2)
+	var trip: Variant = data.get("expedition")
+	if trip is Dictionary and trip.get("site") is String:
+		state.expedition = { "site": trip.site, "until": _num(trip.get("until"), 0.0) }
+	state.sites_done = _ids(data.get("sites_done"))
+	state.expeditions = int(_num(data.get("expeditions"), 0))
 	state.cards_read = _ids(data.get("cards_read"))
 	var answers: Variant = data.get("quiz_answers")
 	if answers is Dictionary:

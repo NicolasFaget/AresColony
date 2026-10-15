@@ -5,7 +5,7 @@ extends RefCounted
 ## construit ce qui manque le plus, garde une réserve de matériaux, étend ses conduites vers la glace.
 
 const R = preload("res://core/colony_content.gd")
-const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate", "regolith"]
+const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate", "regolith", "sabatier", "rovers", "erv"]
 
 
 ## Lance la prochaine recherche disponible, dans l'ordre conseillé.
@@ -56,19 +56,30 @@ static func build(engine: ColonyEngine) -> void:
 			if days < shortest and engine.is_unlocked(engine.building_defs[producer]):
 				shortest = days
 				urgent = r
-	if flows[R.ENERGY] < 4.0:
+	if flows[R.ENERGY] < 4.0 and not engine.is_storm():
 		want = "solar"
 	elif urgent == R.OXYGEN:
 		want = "electrolyser" if engine.is_unlocked(engine.building_defs["electrolyser"]) and flows[R.WATER] > 4.0 else "moxie"
 	elif urgent == R.WATER:
 		want = "extractor"
+		for i in engine.state.buildings.size():
+			if engine.state.buildings[i].id == "extractor" and engine.upgrade_problem(i).is_empty():
+				engine.upgrade(i)
+				return
 	elif urgent == R.FOOD:
 		want = "greenhouse"
 	elif engine.is_unlocked(engine.building_defs["kiln"]) and engine.resupplies_left() <= 2 \
-			and _count(engine, "kiln") < 1 + engine.state.colonists.size() / 6:
+			and _count(engine, "kiln") < 1 + engine.state.colonists.size() / 4:
 		want = "kiln"
 	elif engine.state.colonists.size() >= engine.housing() - 1 and engine.state.recruits_sent < R.RECRUITS.size() 			and flows[R.OXYGEN] >= margin[R.OXYGEN] and flows[R.FOOD] >= margin[R.FOOD]:
 		want = "habitat"
+	elif engine.is_unlocked(engine.building_defs["garage"]) and _count(engine, "garage") == 0:
+		want = "garage"
+	elif engine.is_unlocked(engine.building_defs["sabatier"]) and _count(engine, "sabatier") < 3 \
+			and flows[R.WATER] > 5.0:
+		want = "sabatier"
+	elif engine.is_unlocked(engine.building_defs["erv"]) and _count(engine, "erv") == 0:
+		want = "erv"
 	elif engine.capacity(R.ENERGY) < 150.0 and engine.is_unlocked(engine.building_defs["battery"]):
 		want = "battery"
 	if want.is_empty():
@@ -77,7 +88,7 @@ static func build(engine: ColonyEngine) -> void:
 	if not engine.is_unlocked(engine.building_defs[want]):
 		return
 	# Confort (habitat, batteries) : seulement si une réserve reste pour les urgences vitales.
-	if want in ["habitat", "battery"] and engine.state.amount(R.MATERIALS) < engine.building_defs[want].cost + 50.0:
+	if want in ["habitat", "battery", "garage", "erv", "sabatier"] and engine.state.amount(R.MATERIALS) < engine.building_defs[want].cost + 50.0:
 		return
 	if want == "extractor":
 		reach_ice(engine)
@@ -94,6 +105,8 @@ static func maintain(engine: ColonyEngine) -> void:
 			engine.repair(i)
 	if engine.average_dust() > 0.3:
 		engine.clean_panels()
+	if engine.state.amount(R.METHANE) >= 30.0 and engine.state.expeditions < 4:
+		engine.start_expedition()
 
 
 static func _count(engine: ColonyEngine, def_id: String) -> int:
@@ -130,6 +143,12 @@ static func reach_ice(engine: ColonyEngine) -> void:
 		if engine.placement_problem("extractor", cell).is_empty() and engine.would_connect("extractor", cell):
 			engine.place("extractor", cell)
 			return
-	var spot := connected_spot(engine, "link", ice[0])
-	if spot.x >= 0:
-		engine.place("link", spot)
+	# Conduites vers la plaque de glace libre la plus proche (et pas de réseau sans fin).
+	if _count(engine, "link") >= 30:
+		return
+	for cell in ice:
+		if engine.placement_problem("extractor", cell).is_empty():
+			var spot := connected_spot(engine, "link", cell)
+			if spot.x >= 0:
+				engine.place("link", spot)
+			return

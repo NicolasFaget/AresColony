@@ -80,6 +80,10 @@ de vie de l'application.
   en pilote automatique) ; chaque colon consomme 0,5 kWh/sol ; six ravitaillements avec matériaux,
   ensuite seulement des volontaires : le four à régolithe (recherche « Frittage du régolithe »)
   fabrique les matériaux. Les tests coupent poussière et pannes (`dust_rate`, `breakdown_rate`).
+- Ère 2 « Expansion » (dès que l'ère 1 est accomplie) : méthane (7ᵉ ressource), réacteur Sabatier
+  (4,5 kg d'eau → 2 kg de CH₄ + 8 kg d'O₂, proportions réelles 36:16:64), réservoirs, garage et
+  expéditions (20 kg de méthane, 2 sols, 4 sites réels autour de Jezero puis des prospections),
+  véhicule de retour (Mars Direct) à remplir de 200 kg de méthane. Joueur simulé : ère 2 vers le sol 120.
 - Fiches : chacune a un chiffre clé, une illustration et un quiz à trois choix, tirés uniquement de
   son texte sourcé. Déblocage = écran plein « Nouvelle découverte » ; première lecture +5 données,
   bonne réponse au quiz +10 (une seule tentative).
@@ -114,7 +118,7 @@ fourchettes.
 
 ## Prochaines étapes
 
-1. Ère 2 « Autonomie » : Sabatier, recyclage poussé, deuxième région.
+1. Ère 3 (terraformation légère ? deuxième région ?), traduction anglaise, rovers animés.
 2. Rovers d'exploration et sites à découvrir ; quiz facultatifs.
 3. Ère 2 « Autonomie » : Sabatier, briques de régolithe, recyclage, deuxième région.
 4. Tutoriel guidé, traduction anglaise.

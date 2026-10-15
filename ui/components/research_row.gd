@@ -59,6 +59,9 @@ func refresh() -> void:
 			_status.text = "En cours… (%d %%)" % roundi(engine.state.research_progress * 100.0)
 			_status.add_theme_color_override("font_color", Palette.FAME)
 			_bar.value = engine.state.research_progress * 100.0
+		"locked" when research.era > engine.state.era:
+			_status.text = "Ère %d : accomplissez d'abord l'ère en cours." % research.era
+			_status.add_theme_color_override("font_color", Palette.TEXT_DIM)
 		"locked":
 			var names: Array[String] = []
 			for req: String in research.requires:

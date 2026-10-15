@@ -20,6 +20,7 @@ func _init() -> void:
 	_test_cards()
 	_test_upgrades()
 	_test_hazards()
+	_test_era2()
 	_test_night_and_batteries()
 	_test_colonists()
 	_test_research()
@@ -71,6 +72,50 @@ func _rich_engine() -> ColonyEngine:
 		engine.state.research_done.append(r.id)
 	engine.state.resources[R.MATERIALS] = 400.0
 	return engine
+
+
+# ---------- Ère 2 ----------
+
+func _test_era2() -> void:
+	var engine := _rich_engine()
+	engine.state.research_done.erase("sabatier")
+	engine.state.research_done.erase("rovers")
+	engine.state.research_done.erase("erv")
+	_check(engine.research_state("sabatier") == "locked", "recherche de l'ère 2 verrouillée en ère 1")
+	_check(engine.current_objective().era == 1, "objectif de l'ère 1")
+	var eras: Array[int] = []
+	engine.era_started.connect(func(era: int) -> void: eras.append(era))
+	for objective in engine.objectives:
+		if objective.era == 1 and objective.id != "autonomy":
+			engine.state.objectives_done.append(objective.id)
+	engine.state.autonomy_streak = ColonyEngine.AUTONOMY_GOAL
+	engine._check_objectives()
+	_check(engine.state.era == 2 and eras == [2], "l'ère 2 commence quand l'ère 1 est accomplie")
+	_check(engine.current_objective().id == "methane", "premier objectif de l'ère 2")
+	_check(engine.research_state("sabatier") == "available", "recherche de l'ère 2 disponible")
+	for id in ["sabatier", "rovers", "erv"]:
+		engine.state.research_done.append(id)
+	engine.state.resources[R.MATERIALS] = 400.0
+	var lander := engine.map.lander_cell
+	_check(engine.expedition_problem().begins_with("Construisez"), "expédition : il faut un garage")
+	_check(engine.place("garage", lander + Vector2i(2, 0)), "pose du garage")
+	_check(engine.place("sabatier", lander + Vector2i(4, 0)), "pose d'un réacteur Sabatier")
+	_check("methane" in engine.state.objectives_done, "objectif « Carburant martien »")
+	engine.state.resources[R.METHANE] = 40.0
+	var data := engine.state.amount(R.DATA)
+	_check(engine.start_expedition() and engine.state.expedition.site == "delta", "départ vers le delta de Jezero")
+	_check(not engine.start_expedition(), "une expédition à la fois")
+	engine.state.sol = engine.state.expedition.until
+	engine._finish_expedition()
+	_check(engine.state.expeditions == 1 and "delta" in engine.state.sites_done, "retour d'expédition")
+	_check(engine.state.cards_unlocked.has("jezero") and engine.state.amount(R.DATA) >= data + 30.0, "fiche et données rapportées")
+	_check(engine.next_site().id == "meteorite", "site suivant")
+	engine.state.resources[R.MATERIALS] = 400.0
+	_check(engine.place("erv", lander + Vector2i(2, 2)), "pose du véhicule de retour")
+	_check(engine.placement_problem("erv", lander + Vector2i(6, 0)).begins_with("Un seul"), "un seul véhicule de retour")
+	_check(engine.capacity(R.METHANE) >= ColonyEngine.RETURN_METHANE, "le véhicule stocke le méthane du retour")
+	var copy := ColonyState.from_dict(JSON.parse_string(JSON.stringify(engine.state.to_dict())))
+	_check(copy.era == 2 and copy.sites_done == engine.state.sites_done and copy.expeditions == 1, "ère et expéditions sauvegardées")
 
 
 # ---------- Poussière, pannes, fin des ravitaillements ----------
@@ -556,7 +601,7 @@ func _simulate_campaign() -> void:
 		var flows := engine.average_flows()
 		print("  évacuation de %s au sol %.1f (O₂ %.1f, eau %.1f, nourriture %.1f, énergie %.1f/sol, matériaux %.0f, O₂ stock %.1f) : %s" % [
 			n, engine.state.sol, flows[R.OXYGEN], flows[R.WATER], flows[R.FOOD], flows[R.ENERGY], engine.state.amount(R.MATERIALS), engine.state.amount(R.OXYGEN), c.left(20)]))
-	while engine.state.sol < 90.0 and done.size() < engine.objectives.size():
+	while engine.state.sol < 170.0 and done.size() < engine.objectives.size():
 		ColonyBot.research(engine)
 		ColonyBot.maintain(engine)
 		ColonyBot.build(engine)
@@ -569,7 +614,12 @@ func _simulate_campaign() -> void:
 	_check(done.get("first_breath", INF) <= 3.0, "premier oxygène avant le sol 3")
 	_check(done.get("water", INF) <= 10.0, "eau avant le sol 10")
 	_check(done.get("autonomy", INF) >= 20.0 and done.get("autonomy", INF) <= 70.0, "autonomie entre les sols 20 et 70")
-	_check(done.size() == engine.objectives.size() and done.values().max() <= 80.0, "tous les objectifs avant le sol 80")
+	var era1 := 0.0
+	for objective in engine.objectives:
+		if objective.era == 1:
+			era1 = maxf(era1, done.get(objective.id, INF))
+	_check(era1 <= 80.0, "ère 1 accomplie avant le sol 80")
+	_check(done.size() == engine.objectives.size() and done.values().max() <= 160.0, "ère 2 accomplie avant le sol 160")
 	_check(evacuations[0] == 0, "un joueur raisonnable ne perd aucun colon")
 
 	# Un joueur qui ne fait rien finit par mettre la colonie en danger, mais pas tout de suite.

@@ -61,10 +61,13 @@ class Research:
 	## Fiche débloquée à la fin.
 	var card: String
 	var summary: String
+	## Ère à partir de laquelle la recherche est possible.
+	var era: int
 
 	func _init(p: Dictionary) -> void:
 		id = p.id
 		name = p.name
+		era = p.get("era", 1)
 		cost = p.cost
 		duration = p.get("duration", 1.0)
 		requires = p.get("requires", [])
@@ -115,8 +118,10 @@ class Objective:
 	var description: String
 	## Récompense : ressource -> quantité.
 	var reward: Dictionary
+	var era: int
 
 	func _init(p: Dictionary) -> void:
+		era = p.get("era", 1)
 		id = p.id
 		title = p.title
 		description = p.description

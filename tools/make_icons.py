@@ -67,6 +67,11 @@ icons["person"] = ui(f'<circle cx="32" cy="16" r="11" fill="{W}"/><path d="M12 5
 icons["trash"] = ui(stroke("M10 16 H54 M24 16 V8 H40 V16", 5) + f'<path d="M16 20 H48 L45 58 H19 Z" fill="{W}"/>')
 icons["target"] = ui(f'<circle cx="32" cy="32" r="24" stroke="{W}" stroke-width="5" fill="none"/>'
                      f'<circle cx="32" cy="32" r="12" stroke="{W}" stroke-width="5" fill="none"/><circle cx="32" cy="32" r="4" fill="{W}"/>')
+icons["methane"] = ui(f'<path d="M32 4 C40 18 52 26 52 42 a20 20 0 0 1 -40 0 C12 32 18 26 22 18 C24 26 28 30 32 30 C30 22 28 14 32 4 Z" fill="{W}"/>'
+                      f'<path d="M32 58 a9 9 0 0 1 -9 -9 C23 42 28 38 32 34 C36 38 41 42 41 49 a9 9 0 0 1 -9 9 Z" fill="#000" opacity=".35"/>')
+icons["rover"] = ui(f'<rect x="10" y="20" width="44" height="20" rx="5" fill="{W}"/>'
+                    f'<circle cx="16" cy="48" r="7" fill="{W}"/><circle cx="32" cy="48" r="7" fill="{W}"/><circle cx="48" cy="48" r="7" fill="{W}"/>'
+                    + stroke("M44 20 V8 M38 8 H50", 4))
 icons["link"] = ui(stroke("M26 38 L38 26", 6) + stroke("M22 30 L16 36 a8 8 0 0 0 12 12 L34 42 M42 34 L48 28 a8 8 0 0 0 -12 -12 L30 22", 5))
 
 

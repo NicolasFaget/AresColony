@@ -12,22 +12,24 @@ const WATER := "water"
 const FOOD := "food"
 const MATERIALS := "materials"
 const DATA := "data"
+## Ère 2 : carburant des rovers et de la fusée de retour.
+const METHANE := "methane"
 
-const RESOURCES := [ENERGY, OXYGEN, WATER, FOOD, MATERIALS, DATA]
+const RESOURCES := [ENERGY, OXYGEN, WATER, FOOD, MATERIALS, DATA, METHANE]
 ## Ressources dont le manque met les colons en danger.
 const VITAL := [OXYGEN, WATER, FOOD]
 
 const RESOURCE_NAMES := {
 	ENERGY: "Énergie", OXYGEN: "Oxygène", WATER: "Eau", FOOD: "Nourriture",
-	MATERIALS: "Matériaux", DATA: "Données",
+	MATERIALS: "Matériaux", DATA: "Données", METHANE: "Méthane",
 }
 ## « manque d'énergie », « manque de nourriture »...
 const RESOURCE_PARTITIVE := {
 	ENERGY: "d'énergie", OXYGEN: "d'oxygène", WATER: "d'eau", FOOD: "de nourriture",
-	MATERIALS: "de matériaux", DATA: "de données",
+	MATERIALS: "de matériaux", DATA: "de données", METHANE: "de méthane",
 }
 const RESOURCE_UNITS := {
-	ENERGY: "kWh", OXYGEN: "kg", WATER: "kg", FOOD: "rations", MATERIALS: "u", DATA: "",
+	ENERGY: "kWh", OXYGEN: "kg", WATER: "kg", FOOD: "rations", MATERIALS: "u", DATA: "", METHANE: "kg",
 }
 
 ## Explications affichées quand on touche une ressource.
@@ -38,6 +40,7 @@ const RESOURCE_HELP := {
 	FOOD: "Livrée par la Terre au début, mais les ravitaillements diminuent : il faut cultiver sous serre.",
 	MATERIALS: "Envoyés par la Terre lors des six premiers ravitaillements, puis fabriqués sur place par le four à régolithe. Ils servent à construire, améliorer et réparer ; démolir un module en rend la moitié.",
 	DATA: "Produites par le laboratoire de l'atterrisseur et par chaque colon. Elles financent la recherche.",
+	METHANE: "Fabriqué par le réacteur Sabatier à partir du CO₂ martien et de l'hydrogène de l'eau. Il fait rouler les rovers et remplira la fusée de retour.",
 }
 
 ## Besoins d'un colon par sol.
@@ -45,13 +48,14 @@ const COLONIST_NEEDS := { OXYGEN: 0.84, WATER: 2.5, FOOD: 1.0, ENERGY: 0.5 }
 ## Données scientifiques produites par chaque colon par sol.
 const COLONIST_DATA := 1.0
 ## Modules qui peuvent tomber en panne (les machines).
-const BREAKABLE := ["moxie", "extractor", "greenhouse", "electrolyser", "kiln"]
+const BREAKABLE := ["moxie", "extractor", "greenhouse", "electrolyser", "kiln", "sabatier"]
 ## Ce que racontent les colons quand une machine lâche.
 const BREAKDOWN_LINES := {
 	"moxie": "L'électrolyseur de CO₂ a surchauffé. Il sent le grille-pain.",
 	"extractor": "La foreuse de l'extracteur est coincée dans la glace. Elle boude.",
 	"greenhouse": "Une pompe d'arrosage de la serre a lâché. Les radis s'inquiètent.",
 	"electrolyser": "Une fuite sur l'électrolyseur d'eau ! Le sifflement est très désagréable.",
+	"sabatier": "Le réacteur Sabatier a perdu la pression. Il boude à 400 °C.",
 	"kiln": "Le four à régolithe s'est arrêté net. Il y a de la poussière partout. Encore plus que d'habitude.",
 }
 
@@ -112,8 +116,44 @@ static func buildings() -> Array[Defs.Building]:
 			"card": "electrolysis",
 			"description": "Sépare l'eau en oxygène et hydrogène : plus efficace que le CO₂.",
 		}),
+		Defs.Building.new({
+			"id": "sabatier", "name": "Réacteur Sabatier", "size": Vector2i(2, 2), "cost": 90.0, "research": "sabatier",
+			"inputs": { ENERGY: 18.0, WATER: 4.5 }, "outputs": { METHANE: 2.0, OXYGEN: 8.0 }, "storage": { METHANE: 40.0 },
+			"card": "sabatier",
+			"description": "Casse l'eau, puis combine l'hydrogène au CO₂ martien : CO₂ + 4 H₂ → CH₄ + 2 H₂O. Pour 4,5 kg d'eau : 2 kg de méthane et 8 kg d'oxygène.",
+		}),
+		Defs.Building.new({
+			"id": "tank", "name": "Réservoir de méthane", "cost": 35.0, "research": "sabatier",
+			"storage": { METHANE: 150.0 },
+			"description": "Garde le méthane liquide, à −162 °C.",
+		}),
+		Defs.Building.new({
+			"id": "garage", "name": "Garage à rovers", "size": Vector2i(2, 2), "cost": 80.0, "research": "rovers",
+			"description": "Abrite un rover pressurisé qui roule au méthane. Lancez les expéditions depuis sa fiche ou l'onglet Colonie.",
+		}),
+		Defs.Building.new({
+			"id": "erv", "name": "Véhicule de retour", "size": Vector2i(2, 2), "cost": 250.0, "research": "erv",
+			"storage": { METHANE: 200.0 }, "card": "mars_direct",
+			"description": "La fusée qui ramènera un jour l'équipage. Ses réservoirs se remplissent avec le méthane fabriqué sur Mars.",
+		}),
 	]
 
+
+## Ères : titre et but affichés dans l'onglet Colonie.
+const ERAS := {
+	1: "Ère 1 · Survie : tenir sans dépendre de la Terre.",
+	2: "Ère 2 · Expansion : explorer Jezero et préparer le retour.",
+}
+
+## Expéditions en rover (ère 2) : sites réels autour de Jezero, découverts dans l'ordre ; ensuite,
+## des prospections qui rapportent des matériaux.
+const SITES := [
+	{ "id": "delta", "name": "Le delta de Jezero", "card": "jezero", "reward": { DATA: 30.0 } },
+	{ "id": "meteorite", "name": "Un caillou métallique", "card": "meteorite", "reward": { MATERIALS: 60.0 } },
+	{ "id": "rochette", "name": "Le rocher « Rochette »", "card": "sample", "reward": { DATA: 40.0 } },
+	{ "id": "nili", "name": "Les fractures de Nili Fossae", "card": "nili", "reward": { DATA: 40.0, MATERIALS: 40.0 } },
+]
+const PROSPECTION := { "id": "prospect", "name": "Prospection de minerais", "card": "", "reward": { MATERIALS: 50.0 } }
 
 ## Améliorations de chaque module : niveau 2 puis niveau 3, chacune fondée sur une vraie technologie.
 ## Multiplicateurs (outputs, inputs, storage) et places supplémentaires (housing), cumulés par niveau.
@@ -166,6 +206,14 @@ const UPGRADES := {
 			"outputs": { FOOD: 1.2 }, "inputs": { WATER: 0.6 },
 			"why": "Les racines baignent dans une solution nutritive qui circule en boucle : il faut bien moins d'eau qu'en pleine terre." },
 	],
+	"sabatier": [
+		{ "name": "Catalyseur plus actif", "effect": "+25 % de méthane et d'oxygène (+25 % d'eau)",
+			"outputs": { METHANE: 1.25, OXYGEN: 1.25 }, "inputs": { WATER: 1.25 },
+			"why": "La réaction se fait au contact d'un catalyseur métallique, comme le nickel : plus il est actif, plus le réacteur traite de gaz." },
+		{ "name": "Récupération de chaleur", "effect": "−30 % d'énergie",
+			"inputs": { ENERGY: 0.7 },
+			"why": "La réaction de Sabatier dégage de la chaleur : on la récupère pour préchauffer les gaz au lieu de la perdre." },
+	],
 	"kiln": [
 		{ "name": "Concentrateur solaire", "effect": "−30 % d'énergie",
 			"inputs": { ENERGY: 0.7 },
@@ -188,6 +236,10 @@ const UPGRADES := {
 ## `building` reçoit le bonus quand au moins un `neighbor` le touche. Les effets ne se cumulent pas.
 ## outputs / inputs : multiplicateurs par ressource.
 const SYNERGIES := [
+	{ "id": "sabatier_electrolyser", "building": "sabatier", "neighbor": "electrolyser",
+		"name": "Boucle de l'hydrogène", "effect": "−25 % d'eau pour le réacteur",
+		"outputs": {}, "inputs": { WATER: 0.75 },
+		"why": "L'électrolyseur fournit l'hydrogène dont le réacteur a besoin, et le réacteur lui rend de l'eau : c'est le couple qui fonctionne à bord de la Station spatiale." },
 	{ "id": "greenhouse_habitat", "building": "greenhouse", "neighbor": "habitat",
 		"name": "Échange CO₂ / O₂", "effect": "+25 % de nourriture",
 		"outputs": { FOOD: 1.25 }, "inputs": {},
@@ -235,6 +287,15 @@ static func research() -> Array[Defs.Research]:
 		Defs.Research.new({ "id": "regolith", "name": "Frittage du régolithe", "cost": 25.0, "duration": 1.5,
 				"requires": ["perchlorate"], "card": "regolith",
 				"summary": "Débloque le four à régolithe : fabriquer ses propres matériaux de construction." }),
+		Defs.Research.new({ "id": "sabatier", "name": "Réaction de Sabatier", "cost": 40.0, "duration": 2.0, "era": 2,
+				"requires": ["electrolysis"], "card": "sabatier",
+				"summary": "Débloque le réacteur Sabatier et les réservoirs : du méthane et de l'oxygène." }),
+		Defs.Research.new({ "id": "rovers", "name": "Rovers pressurisés", "cost": 50.0, "duration": 2.0, "era": 2,
+				"requires": ["sabatier"],
+				"summary": "Débloque le garage à rovers : partez en expédition autour de Jezero." }),
+		Defs.Research.new({ "id": "erv", "name": "Mars Direct", "cost": 80.0, "duration": 3.0, "era": 2,
+				"requires": ["sabatier"], "card": "mars_direct",
+				"summary": "Débloque le véhicule de retour, à remplir de méthane fabriqué sur Mars." }),
 	]
 
 
@@ -259,6 +320,18 @@ static func objectives() -> Array[Defs.Objective]:
 		Defs.Objective.new({ "id": "autonomy", "title": "Autonomie",
 				"description": "Avec au moins 8 colons, tenir 10 sols d'affilée sans déficit d'oxygène, d'eau ni de nourriture.",
 				"reward": { MATERIALS: 100.0 } }),
+		Defs.Objective.new({ "id": "methane", "title": "Carburant martien", "era": 2,
+				"description": "Construire un réacteur Sabatier (recherche « Réaction de Sabatier »).",
+				"reward": { DATA: 25.0 } }),
+		Defs.Objective.new({ "id": "explorer", "title": "Explorateurs", "era": 2,
+				"description": "Mener 3 expéditions en rover autour de Jezero.",
+				"reward": { MATERIALS: 100.0 } }),
+		Defs.Objective.new({ "id": "city", "title": "Petite ville", "era": 2,
+				"description": "Accueillir 14 colons.",
+				"reward": { DATA: 40.0 } }),
+		Defs.Objective.new({ "id": "return", "title": "Retour assuré", "era": 2,
+				"description": "Construire le véhicule de retour et réunir 200 kg de méthane.",
+				"reward": { DATA: 50.0 } }),
 	]
 
 
@@ -339,6 +412,48 @@ static func cards() -> Array[Defs.Card]:
 			"in_game": "Le four à régolithe transforme la poussière martienne en matériaux de construction, en échange de beaucoup d'énergie.",
 			"sources": [["ESA (vidéo, 2017)", "https://www.esa.int/ESA_Multimedia/Videos/2017/03/3D-printing_moondust_bricks_with_focused_solar_heat"],
 				["Space.com", "https://www.space.com/36943-make-lunar-soil-bricks-solar-heat.html"]] }),
+		Defs.Card.new({ "id": "sabatier", "figure": "CO₂ + 4 H₂", "figure_label": "→ CH₄ + 2 H₂O : du méthane et de l'eau", "visual": "sabatier",
+			"quiz": "Avant le réacteur Sabatier, que devenait l'hydrogène de la Station spatiale ?", "choices": ["Il était rejeté dans l'espace", "Il était brûlé", "Il était renvoyé sur Terre"], "answer": 0,
+			"title": "La réaction de Sabatier", "status": "Expérimenté",
+			"fact": "Sur la Station spatiale, fabriquer de l'oxygène par électrolyse laisse de l'hydrogène, longtemps rejeté dans l'espace. Depuis 2010, un réacteur Sabatier le combine au CO₂ expiré par l'équipage : CO₂ + 4 H₂ → CH₄ + 2 H₂O. L'eau est recyclée ; le méthane, lui, est rejeté.",
+			"in_game": "Le réacteur Sabatier réunit électrolyse et réaction de Sabatier : il consomme de l'eau et de l'énergie, et produit du méthane et de l'oxygène.",
+			"sources": [["NASA – Technical Reports Server", "https://ntrs.nasa.gov/citations/20100036570"],
+				["Solar Daily", "https://www.solardaily.com/reports/The_Sabatier_System_Producing_Water_on_the_ISS_999.html"]] }),
+		Defs.Card.new({ "id": "mars_direct", "figure": "18 pour 1", "figure_label": "kg de carburant fabriqués sur Mars par kg d'hydrogène apporté", "visual": "erv",
+			"quiz": "Dans le plan Mars Direct, d'où vient le carburant du retour ?", "choices": ["Il est apporté de la Terre", "Il est fabriqué sur Mars", "Il n'y a pas de retour prévu"], "answer": 1,
+			"title": "Mars Direct", "status": "Hypothèse",
+			"fact": "En 1990, les ingénieurs Robert Zubrin et David Baker proposent « Mars Direct » : envoyer d'abord un véhicule de retour aux réservoirs vides. Sur place, il fabrique son carburant, du méthane et de l'oxygène, avec l'air martien et un peu d'hydrogène apporté de la Terre : environ 18 kg pour 1 kg d'hydrogène. L'équipage ne part qu'une fois les réservoirs pleins.",
+			"in_game": "Le véhicule de retour se remplit avec le méthane de vos réacteurs Sabatier : 200 kg pour assurer le retour.",
+			"sources": [["MIT News (1997)", "https://news.mit.edu/1997/mars-1119"],
+				["National Space Society", "https://nss.org/the-promise-of-mars-by-robert-zubrin/"]] }),
+		Defs.Card.new({ "id": "jezero", "figure": "40 km", "figure_label": "de large pour l'ancien lac de Jezero", "visual": "extractor",
+			"quiz": "Quand le rover Perseverance s'est-il posé dans Jezero ?", "choices": ["En 2012", "En 2021", "En 2004"], "answer": 1,
+			"title": "Un lac disparu", "status": "Mesuré",
+			"fact": "Le rover Perseverance s'est posé le 18 février 2021 dans le cratère Jezero. Ses images ont confirmé qu'une rivière s'y jetait dans un lac en formant un delta, il y a environ 3,6 à 3,8 milliards d'années. Ce lac aurait pu atteindre 40 km de large.",
+			"in_game": "Votre colonie est installée dans Jezero : l'expédition au delta rapporte des données.",
+			"sources": [["EarthSky", "https://earthsky.org/space/ancient-martian-lake-delta-floods-perseverance/"],
+				["Astronomy", "https://www.astronomy.com/science/martian-floods-filled-jezero-crater-perseverance-finds/"]] }),
+		Defs.Card.new({ "id": "meteorite", "figure": "1ʳᵉ", "figure_label": "météorite identifiée sur une autre planète", "visual": "garage",
+			"quiz": "De quoi est surtout faite la météorite « Heat Shield Rock » ?", "choices": ["De glace", "De fer et de nickel", "De basalte"], "answer": 1,
+			"title": "Une météorite sur Mars", "status": "Mesuré",
+			"fact": "En janvier 2005, le rover Opportunity identifie « Heat Shield Rock », un caillou de la taille d'un ballon de basket, fait surtout de fer et de nickel : la première météorite identifiée sur une autre planète. Elle gisait près des débris de son propre bouclier thermique.",
+			"in_game": "Votre rover a trouvé une météorite métallique : du fer et du nickel pour vos matériaux.",
+			"sources": [["NASA JPL", "https://www.jpl.nasa.gov/news/opportunity-rover-finds-an-iron-meteorite-on-mars/"],
+				["Space.com", "https://www.space.com/700-mars-opportunity-rover-finds-meteorite.html"]] }),
+		Defs.Card.new({ "id": "sample", "figure": "1er sept. 2021", "figure_label": "première carotte de roche martienne", "visual": "garage",
+			"quiz": "Où est rangé l'échantillon de « Rochette » ?", "choices": ["Dans un tube en titane scellé", "Dans un sac plastique", "Il est déjà revenu sur Terre"], "answer": 0,
+			"title": "Le rocher Rochette", "status": "Mesuré",
+			"fact": "Le 1er septembre 2021, Perseverance prélève sa première carotte de roche martienne, à peine plus épaisse qu'un crayon, sur un rocher surnommé « Rochette ». Un premier essai, en août, avait échoué : la roche s'était effritée en poudre. Scellé dans un tube en titane, l'échantillon attend une future mission de retour vers la Terre.",
+			"in_game": "Votre rover a étudié le rocher Rochette : des données précieuses pour la recherche.",
+			"sources": [["Scientific American", "https://www.scientificamerican.com/article/success-perseverance-mars-rover-finally-collects-its-first-rock-core"],
+				["EarthSky", "https://earthsky.org/space/1st-martian-rock-cored-rochette-perseverance-mars/"]] }),
+		Defs.Card.new({ "id": "nili", "figure": "≈ 4 milliards", "figure_label": "d'années : l'époque où l'eau a formé ces argiles", "visual": "extractor",
+			"quiz": "Que nous apprennent les argiles de Nili Fossae ?", "choices": ["L'eau y a longtemps altéré les roches", "Il y a des volcans actifs", "Il y pleut encore"], "answer": 0,
+			"title": "Les argiles de Nili Fossae", "status": "Mesuré",
+			"fact": "Non loin de Jezero, la région de Nili Fossae est riche en argiles, cartographiées depuis l'orbite par la sonde Mars Reconnaissance Orbiter. Ces minéraux se forment quand l'eau altère longuement des roches volcaniques : la région était humide il y a près de 4 milliards d'années. Elle a été candidate pour accueillir le rover Curiosity.",
+			"in_game": "L'expédition à Nili Fossae rapporte des données et des minerais.",
+			"sources": [["HiRISE (Université d'Arizona)", "https://www.uahirise.org/PSP_007358_2015"],
+				["Science News", "https://www.sciencenews.org/article/craft-reveals-martian-site-ancient-water"]] }),
 	]
 
 
@@ -346,7 +461,9 @@ static func cards() -> Array[Defs.Card]:
 const CREW := [["Ada", "ingénieure"], ["Malik", "botaniste"], ["Inès", "géologue"], ["Tom", "médecin"]]
 ## Renforts envoyés par la Terre.
 const RECRUITS := [["Yuki", "chimiste"], ["Léo", "pilote"], ["Sofia", "ingénieure"], ["Omar", "biologiste"],
-		["Nina", "géologue"], ["Paul", "médecin"], ["Zoé", "botaniste"], ["Kofi", "électricien"]]
+		["Nina", "géologue"], ["Paul", "médecin"], ["Zoé", "botaniste"], ["Kofi", "électricien"],
+		["Hana", "astrophysicienne"], ["Diego", "mécanicien"], ["Lina", "cheffe cuisinière"], ["Arjun", "géophysicien"],
+		["Maëlle", "pilote de rover"], ["Tariq", "chimiste"]]
 
 ## Messages d'ambiance du bandeau (avec une touche d'humour).
 const CHATTER := [

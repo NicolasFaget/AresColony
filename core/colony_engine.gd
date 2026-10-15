@@ -19,6 +19,8 @@ signal resupply_arrived(report: Dictionary)
 ## Une ressource vitale vient d'être épuisée.
 signal shortage(resource: String)
 signal breakdown(index: int)
+signal era_started(era: int)
+signal expedition_returned(site: Dictionary)
 signal dust_devil(cleaned: int)
 
 ## Durée d'un sol en jeu, à vitesse ×1 (secondes réelles).
@@ -58,6 +60,12 @@ const BREAKDOWN_START := 6.0
 const REPAIR_SHARE := 0.3
 ## Nombre de ravitaillements qui apportent des matériaux et de la nourriture.
 const RESUPPLY_LIMIT := 6
+## Expédition en rover : méthane consommé et durée en sols.
+const EXPEDITION_METHANE := 20.0
+const EXPEDITION_SOLS := 2.0
+## Ère 2 : colons visés et méthane à réunir pour le retour.
+const CITY_CREW := 14
+const RETURN_METHANE := 200.0
 const AUTONOMY_CREW := 8
 
 const START_RESOURCES := {
@@ -431,6 +439,8 @@ func research_state(research_id: String) -> String:
 	if state.research_active == research_id:
 		return "active"
 	var r: Defs.Research = research_defs[research_id]
+	if r.era > state.era:
+		return "locked"
 	for req: String in r.requires:
 		if not state.research_done.has(req):
 			return "locked"
@@ -458,6 +468,8 @@ func placement_problem(def_id: String, cell: Vector2i) -> String:
 			ice += 1
 	if def.requires_tile == ColonyMap.Tile.ICE and ice < 2:
 		return "À poser sur une plaque de glace (au moins 2 cases)."
+	if def.id == "erv" and _count_of("erv") > 0:
+		return "Un seul véhicule de retour suffit."
 	if state.amount(ColonyContent.MATERIALS) < def.cost:
 		return "Matériaux insuffisants (%s nécessaires)." % NumberFormatter.format(def.cost)
 	return ""
@@ -748,6 +760,7 @@ func _events() -> void:
 
 	_dust_devils()
 	_breakdowns()
+	_finish_expedition()
 
 
 # ---------- Poussière et pannes ----------
@@ -878,6 +891,67 @@ func _breakdowns() -> void:
 		state.event_seed = _rng.state
 
 
+# ---------- Expéditions (ère 2) ----------
+
+func _count_of(def_id: String) -> int:
+	var count := 0
+	for building in state.buildings:
+		if building.id == def_id:
+			count += 1
+	return count
+
+
+## Prochain site à découvrir (ou une prospection une fois tous les sites visités).
+func next_site() -> Dictionary:
+	for site: Dictionary in ColonyContent.SITES:
+		if not state.sites_done.has(site.id):
+			return site
+	return ColonyContent.PROSPECTION
+
+
+func site_by_id(site_id: String) -> Dictionary:
+	for site: Dictionary in ColonyContent.SITES:
+		if site.id == site_id:
+			return site
+	return ColonyContent.PROSPECTION
+
+
+func expedition_problem() -> String:
+	if not _has_connected("garage"):
+		return "Construisez un garage à rovers, relié à la colonie."
+	if not state.expedition.is_empty():
+		return "Le rover est déjà en expédition."
+	if is_storm():
+		return "Pas d'expédition pendant une tempête."
+	if state.amount(ColonyContent.METHANE) < EXPEDITION_METHANE:
+		return "Pas assez de méthane (%s kg)." % NumberFormatter.format(EXPEDITION_METHANE)
+	return ""
+
+
+func start_expedition() -> bool:
+	if not expedition_problem().is_empty():
+		return false
+	_add(ColonyContent.METHANE, -EXPEDITION_METHANE)
+	state.expedition = { "site": next_site().id, "until": state.sol + EXPEDITION_SOLS }
+	changed.emit()
+	return true
+
+
+func _finish_expedition() -> void:
+	if state.expedition.is_empty() or state.sol < state.expedition.until:
+		return
+	var site := site_by_id(state.expedition.site)
+	state.expedition = {}
+	state.expeditions += 1
+	if site.id != ColonyContent.PROSPECTION.id and not state.sites_done.has(site.id):
+		state.sites_done.append(site.id)
+	for r: String in site.reward:
+		_add(r, site.reward[r])
+	expedition_returned.emit(site)
+	unlock_card(site.card)
+	_check_objectives()
+
+
 func resupplies_left() -> int:
 	return maxi(0, RESUPPLY_LIMIT - state.resupply_count)
 
@@ -902,12 +976,19 @@ func _update_autonomy(ds: float) -> void:
 
 func _check_objectives() -> void:
 	for objective in objectives:
-		if state.objectives_done.has(objective.id) or not _objective_met(objective.id):
+		if objective.era > state.era or state.objectives_done.has(objective.id) or not _objective_met(objective.id):
 			continue
 		state.objectives_done.append(objective.id)
 		for r: String in objective.reward:
 			_add(r, objective.reward[r])
 		objective_completed.emit(objective.id)
+	# Toute l'ère accomplie : la suivante commence.
+	if state.era < ColonyContent.ERAS.size():
+		for objective in objectives:
+			if objective.era == state.era and not state.objectives_done.has(objective.id):
+				return
+		state.era += 1
+		era_started.emit(state.era)
 
 
 func _objective_met(objective_id: String) -> bool:
@@ -932,6 +1013,14 @@ func _objective_met(objective_id: String) -> bool:
 			return state.colonists.size() >= 8
 		"autonomy":
 			return state.autonomy_streak >= AUTONOMY_GOAL
+		"methane":
+			return _has_connected("sabatier")
+		"explorer":
+			return state.expeditions >= 3
+		"city":
+			return state.colonists.size() >= CITY_CREW
+		"return":
+			return _has_connected("erv") and state.amount(ColonyContent.METHANE) >= RETURN_METHANE
 	return false
 
 
@@ -951,12 +1040,18 @@ func objective_progress(objective_id: String) -> float:
 			return clampf(state.colonists.size() / 8.0, 0.0, 1.0)
 		"autonomy":
 			return clampf(state.autonomy_streak / AUTONOMY_GOAL, 0.0, 1.0)
+		"explorer":
+			return clampf(state.expeditions / 3.0, 0.0, 1.0)
+		"city":
+			return clampf(float(state.colonists.size()) / CITY_CREW, 0.0, 1.0)
+		"return":
+			return clampf(state.amount(ColonyContent.METHANE) / RETURN_METHANE, 0.0, 1.0) if _has_connected("erv") else 0.0
 	return 0.0
 
 
 func current_objective() -> Defs.Objective:
 	for objective in objectives:
-		if not state.objectives_done.has(objective.id):
+		if objective.era == state.era and not state.objectives_done.has(objective.id):
 			return objective
 	return null
 
