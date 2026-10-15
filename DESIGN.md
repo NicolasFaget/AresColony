@@ -70,6 +70,9 @@ de vie de l'application.
 - Synergies (`ColonyContent.SYNERGIES`) : un module qui touche directement un voisin du bon type
   gagne un multiplicateur sur ses entrées ou sorties (une fois par type de synergie). Calculées dans
   `_rebuild()` ; `preview_synergies()` alimente l'aperçu au placement ; jonctions dorées dans le monde.
+- Fiches : chacune a un chiffre clé, une illustration et un quiz à trois choix, tirés uniquement de
+  son texte sourcé. Déblocage = écran plein « Nouvelle découverte » ; première lecture +5 données,
+  bonne réponse au quiz +10 (une seule tentative).
 - Hors-ligne (pilote automatique) : un sol toutes les 20 minutes d'absence, 8 h au plus, sans
   événement ni perte de santé ; veille sécurisée dès qu'une ressource vitale descend sous un quart
   de sol de consommation. Les échéances (tempêtes, ravitaillements) sont décalées d'autant.
@@ -100,8 +103,8 @@ fourchettes.
 
 ## Prochaines étapes
 
-1. Mettre en avant les fiches (découverte plein écran, encyclopédie, prime de données), améliorations
-   de modules, difficulté (poussière, pannes, fin des ravitaillements).
+1. Améliorations de modules et note d'efficacité ; difficulté (poussière, pannes, fin des
+   ravitaillements).
 2. Rovers d'exploration et sites à découvrir ; quiz facultatifs.
 3. Ère 2 « Autonomie » : Sabatier, briques de régolithe, recyclage, deuxième région.
 4. Tutoriel guidé, traduction anglaise.

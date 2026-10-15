@@ -17,6 +17,10 @@ var research_active: String = ""
 var research_progress: float = 0.0
 var objectives_done: Array[String] = []
 var cards_unlocked: Array[String] = []
+## Fiches déjà lues (la première lecture rapporte des données).
+var cards_read: Array[String] = []
+## Quiz répondus : identifiant de fiche -> vrai si bonne réponse (une seule tentative).
+var quiz_answers: Dictionary = {}
 
 var map_seed: int = 1
 ## Graine des événements, avancée à chaque tirage (parties reproductibles).
@@ -67,6 +71,8 @@ func to_dict() -> Dictionary:
 		"research_progress": research_progress,
 		"objectives_done": objectives_done.duplicate(),
 		"cards_unlocked": cards_unlocked.duplicate(),
+		"cards_read": cards_read.duplicate(),
+		"quiz_answers": quiz_answers.duplicate(),
 		"map_seed": map_seed,
 		"event_seed": event_seed,
 		"next_storm": next_storm,
@@ -108,6 +114,12 @@ static func from_dict(data: Dictionary) -> ColonyState:
 	state.research_progress = clampf(_num(data.get("research_progress"), 0.0), 0.0, 1.0)
 	state.objectives_done = _ids(data.get("objectives_done"))
 	state.cards_unlocked = _ids(data.get("cards_unlocked"))
+	state.cards_read = _ids(data.get("cards_read"))
+	var answers: Variant = data.get("quiz_answers")
+	if answers is Dictionary:
+		for key: Variant in answers:
+			if answers[key] is bool:
+				state.quiz_answers[str(key)] = answers[key]
 	state.map_seed = int(_num(data.get("map_seed"), 1))
 	state.event_seed = int(_num(data.get("event_seed"), 1))
 	state.next_storm = _num(data.get("next_storm"), state.next_storm)

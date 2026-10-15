@@ -34,6 +34,9 @@ const OFFLINE_SECONDS_PER_SOL := 1200.0
 const OFFLINE_CAP_SECONDS := 8.0 * 3600.0
 ## Démolition : une partie des matériaux est récupérée.
 const DEMOLISH_REFUND := 0.5
+## Données gagnées à la première lecture d'une fiche, et pour une bonne réponse à son quiz.
+const CARD_READ_REWARD := 5.0
+const QUIZ_REWARD := 10.0
 const AUTONOMY_GOAL := 10.0
 const AUTONOMY_CREW := 8
 
@@ -385,6 +388,42 @@ func _advance_research(ds: float) -> void:
 		research_completed.emit(r.id)
 		unlock_card(r.card)
 		changed.emit()
+
+
+## Première lecture d'une fiche : rapporte des données. Retourne la récompense (0 si déjà lue).
+func read_card(card_id: String) -> float:
+	if not state.cards_unlocked.has(card_id) or state.cards_read.has(card_id):
+		return 0.0
+	state.cards_read.append(card_id)
+	_add(ColonyContent.DATA, CARD_READ_REWARD)
+	changed.emit()
+	return CARD_READ_REWARD
+
+
+## Réponse au quiz d'une fiche (une seule tentative). Retourne vrai si la réponse est juste.
+func answer_quiz(card_id: String, choice: int) -> bool:
+	if state.quiz_answers.has(card_id):
+		return state.quiz_answers[card_id]
+	if not state.cards_unlocked.has(card_id):
+		return false
+	var correct: bool = choice == cards[card_id].answer
+	state.quiz_answers[card_id] = correct
+	if correct:
+		_add(ColonyContent.DATA, QUIZ_REWARD)
+	changed.emit()
+	return correct
+
+
+func unread_cards() -> int:
+	var count := 0
+	for id in state.cards_unlocked:
+		if not state.cards_read.has(id):
+			count += 1
+	return count
+
+
+func quiz_score() -> int:
+	return state.quiz_answers.values().count(true)
 
 
 func unlock_card(card_id: String) -> void:

@@ -28,6 +28,9 @@ var _placement_bar: PanelContainer
 var _placement_title: Label
 var _placement_reason: Label
 var _placement_synergy: Label
+## Fiches débloquées en attente de leur écran de découverte (une à la fois).
+var _discoveries: Array[String] = []
+var _discovery: DiscoveryScreen
 var _placement_confirm: Button
 var _placing := ""
 
@@ -147,6 +150,7 @@ func _build_layout() -> void:
 	_modal_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_modal_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_modal_layer)
+	move_child(fx, -1)
 
 
 func _build_placement_bar() -> Control:
@@ -178,9 +182,7 @@ func _build_placement_bar() -> Control:
 func _connect_engine() -> void:
 	_engine.research_completed.connect(_on_research_completed)
 	_engine.objective_completed.connect(_on_objective_completed)
-	_engine.card_unlocked.connect(func(id: String) -> void:
-		if id == "storm":
-			_news.post("Nouvelle fiche dans l'encyclopédie : %s" % _engine.cards[id].title))
+	_engine.card_unlocked.connect(_queue_discovery)
 	_engine.storm_warning.connect(func() -> void:
 		AudioManager.play("alert")
 		_news.post("Les satellites annoncent une tempête de poussière : remplissez les batteries !"))
@@ -235,6 +237,7 @@ func _refresh() -> void:
 		_world.refresh_ghost()
 		_refresh_placement()
 	_window.set_badge(2, _research_page.has_available_research())
+	_window.set_badge(3, _engine.unread_cards() > 0)
 	_refresh_guidance()
 	AudioManager.set_mood("storm" if _engine.is_storm() else ("night" if _engine.is_night() else "day"))
 	AudioManager.set_wind(1.0 if _engine.is_storm() else 0.0)
@@ -419,8 +422,6 @@ func _on_research_completed(research_id: String) -> void:
 	_news.post("Recherche terminée : %s" % r.name)
 	if research_id == "ice":
 		_news.post("Les relevés révèlent de la glace sous la poussière : regardez la carte !")
-	if not r.card.is_empty():
-		_show_card(r.card, true)
 
 
 func _on_objective_completed(objective_id: String) -> void:
@@ -557,27 +558,112 @@ func _show_synergies() -> void:
 	})
 
 
-func _show_card(card_id: String, discovered := false) -> void:
+## Écran de découverte plein écran, une fiche à la fois.
+func _queue_discovery(card_id: String) -> void:
+	if not _discoveries.has(card_id):
+		_discoveries.append(card_id)
+	_next_discovery.call_deferred()
+
+
+func _next_discovery() -> void:
+	if _discovery != null or _discoveries.is_empty():
+		return
+	var card: Defs.Card = _engine.cards[_discoveries.pop_front()]
+	_discovery = DiscoveryScreen.open(_modal_layer, card)
+	_discovery.read_requested.connect(_show_card)
+	_discovery.closed.connect(func() -> void:
+		_discovery = null
+		_next_discovery.call_deferred())
+
+
+func _show_card(card_id: String) -> void:
 	var card: Defs.Card = _engine.cards[card_id]
-	var status := UiFx.label(card.status, "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER)
+	var status := UiFx.label(card.status.to_upper(), "CaptionLabel")
 	status.add_theme_color_override("font_color", Palette.STATUS_COLORS.get(card.status, Palette.TEXT_MUTED))
+	var figure := UiFx.label(card.figure, "NumberLabel")
+	figure.add_theme_font_size_override("font_size", 40)
+	figure.add_theme_color_override("font_color", Palette.MONEY)
+	var figure_label := UiFx.paragraph(card.figure_label, "SmallLabel")
+	var head_text := UiFx.vbox(2, [status, figure, figure_label])
+	head_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head_text.alignment = BoxContainer.ALIGNMENT_CENTER
+	var head := UiFx.hbox(12, [UiFx.panel("Thumb", UiFx.building_icon(card.visual, Vector2(150, 120))), head_text])
+
 	var in_game := UiFx.paragraph("Dans le jeu : " + card.in_game, "SmallLabel")
 	in_game.add_theme_color_override("font_color", Palette.ACCENT)
-	var extra := UiFx.vbox(10, [status, UiFx.paragraph(card.fact, "BodyLabel"), in_game,
-			UiFx.label("Sources", "CaptionLabel")])
+	var content := UiFx.vbox(12, [head, UiFx.paragraph(card.fact, "BodyLabel"), in_game])
+	if not card.quiz.is_empty():
+		content.add_child(_quiz_block(card))
+	content.add_child(UiFx.label("Sources", "CaptionLabel"))
 	for source: Array in card.sources:
 		var link := LinkButton.new()
 		link.text = source[0]
 		link.uri = source[1]
 		link.add_theme_color_override("font_color", Palette.FAME)
 		link.add_theme_font_size_override("font_size", 18)
-		extra.add_child(link)
+		content.add_child(link)
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size.y = minf(820.0, size.y * 0.64)
+	scroll.add_child(content)
 	Modal.open(_modal_layer, {
-		"icon": "tab_knowledge",
-		"title": ("Découverte : " if discovered else "") + card.title,
-		"extra": extra,
-		"confirm_text": "Fermer",
+		"icon": "tab_knowledge", "title": card.title, "extra": scroll, "confirm_text": "Fermer",
 	})
+	var reward := _engine.read_card(card_id)
+	if reward > 0.0:
+		AudioManager.play("upgrade")
+		UiFx.float_text("+%d données" % int(reward), Vector2(size.x / 2.0, size.y * 0.5), Palette.resource_color(ColonyContent.DATA))
+
+
+## Quiz d'une fiche : trois choix, une seule tentative, des données pour la bonne réponse.
+func _quiz_block(card: Defs.Card) -> Control:
+	var caption := UiFx.label("QUIZ · +%d données" % int(ColonyEngine.QUIZ_REWARD), "CaptionLabel")
+	caption.add_theme_color_override("font_color", Palette.ACCENT)
+	var feedback := UiFx.paragraph("", "SmallLabel")
+	var box := UiFx.vbox(8, [caption, UiFx.paragraph(card.quiz, "HeadingLabel")])
+	var buttons: Array[Button] = []
+	for i in card.choices.size():
+		var choice := Button.new()
+		choice.text = card.choices[i]
+		choice.custom_minimum_size = Vector2(0, 56)
+		choice.focus_mode = Control.FOCUS_NONE
+		choice.clip_text = true
+		buttons.append(choice)
+		box.add_child(choice)
+	box.add_child(feedback)
+	var show_result := func(picked: int) -> void:
+		for i in buttons.size():
+			buttons[i].mouse_filter = Control.MOUSE_FILTER_IGNORE
+			if i == card.answer:
+				buttons[i].theme_type_variation = "GreenButton"
+				buttons[i].text = "✓  " + card.choices[i]
+			elif i == picked:
+				buttons[i].text = "✗  " + card.choices[i]
+				buttons[i].modulate = Color(1.0, 0.55, 0.5)
+			else:
+				buttons[i].modulate.a = 0.5
+		var good: bool = _engine.state.quiz_answers.get(card.id, false)
+		feedback.text = ("Bonne réponse ! +%d données." % int(ColonyEngine.QUIZ_REWARD) if good
+				else "Raté : la bonne réponse est « %s »." % card.choices[card.answer])
+		feedback.add_theme_color_override("font_color", Palette.SUCCESS if good else Palette.WARNING)
+	if _engine.state.quiz_answers.has(card.id):
+		show_result.call(-1)
+		if _engine.state.quiz_answers[card.id]:
+			feedback.text = "Quiz réussi ✓"
+	else:
+		for i in buttons.size():
+			buttons[i].pressed.connect(func() -> void:
+				var good := _engine.answer_quiz(card.id, i)
+				AudioManager.play("milestone" if good else "fail")
+				GameManager.vibrate(30 if good else 60)
+				show_result.call(i)
+				if good:
+					UiFx.float_text("+%d données" % int(ColonyEngine.QUIZ_REWARD), buttons[i].get_global_rect().get_center(),
+							Palette.resource_color(ColonyContent.DATA))
+				else:
+					UiFx.shake(buttons[i]))
+	return box
 
 
 func _show_resource(resource: String) -> void:

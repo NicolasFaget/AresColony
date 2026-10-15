@@ -17,6 +17,7 @@ func _init() -> void:
 	_test_sunlight()
 	_test_production()
 	_test_synergies()
+	_test_cards()
 	_test_night_and_batteries()
 	_test_colonists()
 	_test_research()
@@ -65,6 +66,29 @@ func _rich_engine() -> ColonyEngine:
 		engine.state.research_done.append(r.id)
 	engine.state.resources[R.MATERIALS] = 400.0
 	return engine
+
+
+# ---------- Fiches ----------
+
+func _test_cards() -> void:
+	var engine := _calm_engine()
+	for card: Defs.Card in engine.cards.values():
+		_check(not card.figure.is_empty() and engine.building_defs.has(card.visual), "fiche illustrée : %s" % card.id)
+		_check(card.choices.size() == 3 and card.answer >= 0 and card.answer < 3, "quiz valide : %s" % card.id)
+	var data := engine.state.amount(R.DATA)
+	_check(engine.unread_cards() == 2, "deux fiches de départ à lire")
+	_check(_near(engine.read_card("atmosphere"), ColonyEngine.CARD_READ_REWARD), "première lecture récompensée")
+	_check(engine.read_card("atmosphere") == 0.0, "relecture sans récompense")
+	_check(engine.read_card("moxie") == 0.0, "fiche verrouillée : pas de récompense")
+	_check(_near(engine.state.amount(R.DATA), data + ColonyEngine.CARD_READ_REWARD), "données de lecture créditées")
+	var card: Defs.Card = engine.cards["atmosphere"]
+	_check(engine.answer_quiz("atmosphere", card.answer), "bonne réponse au quiz")
+	_check(engine.answer_quiz("atmosphere", (card.answer + 1) % 3), "une seule tentative : la première compte")
+	_check(not engine.answer_quiz("oxygen_need", (engine.cards["oxygen_need"].answer + 1) % 3), "mauvaise réponse")
+	_check(engine.quiz_score() == 1, "score du quiz")
+	_check(_near(engine.state.amount(R.DATA), data + ColonyEngine.CARD_READ_REWARD + ColonyEngine.QUIZ_REWARD), "données du quiz créditées")
+	var copy := ColonyState.from_dict(JSON.parse_string(JSON.stringify(engine.state.to_dict())))
+	_check(copy.cards_read == engine.state.cards_read and copy.quiz_answers == engine.state.quiz_answers, "lectures et quiz sauvegardés")
 
 
 # ---------- Synergies ----------

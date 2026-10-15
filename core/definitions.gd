@@ -83,6 +83,15 @@ class Card:
 	var in_game: String
 	## [[libellé, url], ...]
 	var sources: Array
+	## Chiffre clé mis en avant et sa légende.
+	var figure: String
+	var figure_label: String
+	## Module qui illustre la fiche.
+	var visual: String
+	## Question de quiz, ses choix et l'index de la bonne réponse.
+	var quiz: String
+	var choices: Array
+	var answer: int
 
 	func _init(p: Dictionary) -> void:
 		id = p.id
@@ -91,6 +100,12 @@ class Card:
 		fact = p.fact
 		in_game = p.in_game
 		sources = p.sources
+		figure = p.get("figure", "")
+		figure_label = p.get("figure_label", "")
+		visual = p.get("visual", "lander")
+		quiz = p.get("quiz", "")
+		choices = p.get("choices", [])
+		answer = p.get("answer", 0)
 
 
 ## Objectif de l'ère en cours.

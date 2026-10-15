@@ -150,6 +150,33 @@ func _run() -> void:
 			_close_modals(main)
 			main._show_building(3)
 			await _shot("32_fiche_synergie")
+		"fiches":
+			ColonyBot.play(engine, 9.0)
+			engine.state.speed = 0
+			main = await _open_main()
+			_close_modals(main)
+			main._queue_discovery("storm")
+			engine.unlock_card("storm")
+			await _frames(40)
+			await _shot("40_decouverte")
+			_close_modals(main)
+			main._discovery = null
+			main._discoveries.clear()
+			main._select_tab(3)
+			await _frames(30)
+			await _shot("41_encyclopedie")
+			main._show_card("moxie")
+			await _frames(10)
+			var scroll: ScrollContainer = main._modal_layer.get_child(-1).find_children("*", "ScrollContainer", true, false)[0]
+			scroll.scroll_vertical = 420
+			await _shot("42_fiche_quiz")
+			engine.answer_quiz("moxie", 0)
+			_close_modals(main)
+			main._show_card("moxie")
+			await _frames(10)
+			scroll = main._modal_layer.get_child(-1).find_children("*", "ScrollContainer", true, false)[0]
+			scroll.scroll_vertical = 420
+			await _shot("43_quiz_repondu")
 		"interaction":
 			main = await _open_main()
 			_close_modals(main)
