@@ -29,6 +29,9 @@ var current_slot := ""
 var load_result: SaveService.LoadResult
 ## Réglages communs à toutes les parties.
 var settings := { "music": true, "sound": true, "haptics": true }
+## Langue de l'interface : "fr" ou "en" (par défaut, celle du téléphone).
+var locale := ""
+var _english_loaded := false
 
 var _save_service: SaveService
 var _since_last_save := 0.0
@@ -41,6 +44,7 @@ var _fps_timer := 0.0
 func _ready() -> void:
 	get_tree().auto_accept_quit = false
 	_load_settings()
+	_apply_locale()
 	# Outils (tests, captures) : `-- --save=nom` démarre directement une partie dans cet emplacement.
 	var slot := _cmdline_slot()
 	if not slot.is_empty():
@@ -179,9 +183,40 @@ func notify_changed() -> void:
 
 func set_setting(key: String, value: bool) -> void:
 	settings[key] = value
+	_save_settings()
+
+
+func _save_settings() -> void:
+	var data := settings.duplicate()
+	data.locale = locale
 	var file := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
 	if file != null:
-		file.store_string(JSON.stringify(settings))
+		file.store_string(JSON.stringify(data))
+
+
+## Change la langue, sauvegarde et recharge l'écran en cours pour l'afficher.
+func change_locale(code: String) -> void:
+	locale = code
+	_save_settings()
+	_apply_locale()
+	save()
+	load_result = SaveService.LoadResult.LOADED
+	get_tree().reload_current_scene()
+
+
+func _apply_locale() -> void:
+	if locale.is_empty():
+		locale = "fr" if OS.get_locale_language() == "fr" else "en"
+	if locale == "en" and not _english_loaded:
+		_english_loaded = true
+		var data: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://i18n/en.json"))
+		if data is Dictionary:
+			var translation := Translation.new()
+			translation.locale = "en"
+			for key: String in data:
+				translation.add_message(key, data[key])
+			TranslationServer.add_translation(translation)
+	TranslationServer.set_locale(locale)
 
 
 func vibrate(duration_ms := 12) -> void:
@@ -197,6 +232,8 @@ func _load_settings() -> void:
 		for key: String in settings:
 			if data.get(key) is bool:
 				settings[key] = data[key]
+		if data.get("locale") in ["fr", "en"]:
+			locale = data.locale
 
 
 # ---------- Interne ----------

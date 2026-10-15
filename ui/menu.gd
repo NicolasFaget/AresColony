@@ -55,16 +55,16 @@ func _build_layout() -> void:
 	margin.add_theme_constant_override("margin_bottom", 40)
 	add_child(margin)
 
-	var title := UiFx.label("ARES COLONY", "TitleLabel", HORIZONTAL_ALIGNMENT_CENTER)
+	var title := UiFx.label(Tr.t("ARES COLONY"), "TitleLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	title.add_theme_font_size_override("font_size", 64)
 	title.add_theme_color_override("font_outline_color", Color(0.05, 0.02, 0.0, 0.6))
 	title.add_theme_constant_override("outline_size", 10)
-	var subtitle := UiFx.label("Survivre sur Mars, une découverte à la fois", "BodyLabel", HORIZONTAL_ALIGNMENT_CENTER)
+	var subtitle := UiFx.label(Tr.t("Survivre sur Mars, une découverte à la fois"), "BodyLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	subtitle.add_theme_color_override("font_color", Palette.TEXT)
 	subtitle.add_theme_color_override("font_outline_color", Color(0.05, 0.02, 0.0, 0.6))
 	subtitle.add_theme_constant_override("outline_size", 6)
 
-	_continue = _menu_button("Continuer", "GreenButton", _on_continue)
+	_continue = _menu_button(Tr.t("Continuer"), "GreenButton", _on_continue)
 	_continue_info = UiFx.label("", "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	_continue_info.add_theme_color_override("font_color", Palette.ON_ACCENT)
 	_continue_info.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
@@ -74,9 +74,9 @@ func _build_layout() -> void:
 
 	var buttons := UiFx.vbox(12, [
 		_continue,
-		_menu_button("Nouvelle colonie", "GoldButton", _on_new_game),
-		_menu_button("Sauvegardes", "Button", _show_slots),
-		UiFx.hbox(12, [_menu_button("Réglages", "Button", _show_settings), _menu_button("À propos", "Button", _show_about)]),
+		_menu_button(Tr.t("Nouvelle colonie"), "GoldButton", _on_new_game),
+		_menu_button(Tr.t("Sauvegardes"), "Button", _show_slots),
+		UiFx.hbox(12, [_menu_button(Tr.t("Réglages"), "Button", _show_settings), _menu_button(Tr.t("À propos"), "Button", _show_about)]),
 	])
 	for row in buttons.get_children():
 		if row is HBoxContainer:
@@ -84,7 +84,7 @@ func _build_layout() -> void:
 				b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var card := UiFx.panel("WindowPanel", buttons)
 
-	var version := UiFx.label("v%s · Mars" % ProjectSettings.get_setting("application/config/version", "0.1"),
+	var version := UiFx.label(Tr.t("v%s · Mars") % ProjectSettings.get_setting("application/config/version", "0.1"),
 			"CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	var spacer := UiFx.spacer()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -115,21 +115,21 @@ func _refresh() -> void:
 	if not slot.is_empty():
 		_continue.custom_minimum_size.y = 96
 		_continue.add_theme_constant_override("content_margin_bottom", 26)
-		_continue_info.text = "%s · %s" % [SLOT_NAMES[slot], _summary_text(GameManager.slot_summary(slot))]
+		_continue_info.text = Tr.t("%s · %s") % [Tr.t(SLOT_NAMES[slot]), _summary_text(GameManager.slot_summary(slot))]
 
 
 static func _summary_text(summary: Dictionary) -> String:
 	if summary.is_empty():
-		return "Emplacement libre"
+		return Tr.t("Emplacement libre")
 	var region: String = ColonyContent.REGIONS.get(summary.get("region", "jezero"), ColonyContent.REGIONS.jezero).name
-	return "%s · Sol %d · %d colon%s · %d/%d objectifs · %s" % [region, summary.sol, summary.colonists,
+	return Tr.t("%s · Sol %d · %d colon%s · %d/%d objectifs · %s") % [Tr.t(region), summary.sol, summary.colonists,
 			"s" if summary.colonists > 1 else "", summary.objectives, ColonyContent.objectives().size(),
 			_ago(summary.last_saved_unix)]
 
 
 static func _ago(unix: int) -> String:
 	var seconds := SaveService.now_unix() - unix
-	return "à l'instant" if seconds < 60 else "il y a " + NumberFormatter.duration(seconds)
+	return Tr.t("à l'instant") if seconds < 60 else Tr.t("il y a %s") % NumberFormatter.duration(seconds)
 
 
 # ---------- Actions ----------
@@ -158,16 +158,16 @@ func _choose_region(slot: String) -> void:
 		var tagline := UiFx.paragraph(region.tagline, "SmallLabel")
 		var traits := UiFx.vbox(2)
 		for line: String in region.traits:
-			var point := UiFx.label("• " + line, "SmallLabel")
+			var point := UiFx.label("• " + Tr.t(line), "SmallLabel")
 			point.add_theme_color_override("font_color", Palette.ACCENT)
 			traits.add_child(point)
-		var go := _slot_button("Se poser ici", "GoldButton", func() -> void:
+		var go := _slot_button(Tr.t("Se poser ici"), "GoldButton", func() -> void:
 			modal.close()
 			GameManager.open_game(slot, true, id))
 		list.add_child(UiFx.panel("Row", UiFx.vbox(6, [title, tagline, traits, go])))
 	modal = Modal.open(_modal_layer, {
-		"icon": "rocket", "title": "Choisir le site d'atterrissage", "extra": list,
-		"confirm_text": "Retour", "confirm_style": "Button",
+		"icon": "rocket", "title": Tr.t("Choisir le site d'atterrissage"), "extra": list,
+		"confirm_text": Tr.t("Retour"), "confirm_style": "Button",
 	})
 
 
@@ -181,24 +181,24 @@ func _show_slots(replacing := false) -> void:
 		var info := UiFx.paragraph(_summary_text(summary), "SmallLabel")
 		var actions := UiFx.hbox(8)
 		if summary.is_empty():
-			actions.add_child(_slot_button("Commencer", "GoldButton", func() -> void:
+			actions.add_child(_slot_button(Tr.t("Commencer"), "GoldButton", func() -> void:
 				modal.close()
 				_choose_region(slot)))
 		else:
 			if not replacing:
-				actions.add_child(_slot_button("Charger", "GreenButton", func() -> void:
+				actions.add_child(_slot_button(Tr.t("Charger"), "GreenButton", func() -> void:
 					modal.close()
 					GameManager.open_game(slot)))
-			actions.add_child(_slot_button("Recommencer" if replacing else "Supprimer", "Button", func() -> void:
+			actions.add_child(_slot_button(Tr.t("Recommencer") if replacing else Tr.t("Supprimer"), "Button", func() -> void:
 				_confirm_erase(slot, replacing, modal)))
 		var row := UiFx.panel("Row", UiFx.vbox(6, [name, info, actions]))
 		list.add_child(row)
 	modal = Modal.open(_modal_layer, {
 		"icon": "tab_knowledge",
-		"title": "Choisir un emplacement à remplacer" if replacing else "Sauvegardes",
-		"body": "Les 3 emplacements sont occupés. Recommencer efface la colonie choisie." if replacing else "",
+		"title": Tr.t("Choisir un emplacement à remplacer") if replacing else Tr.t("Sauvegardes"),
+		"body": Tr.t("Les 3 emplacements sont occupés. Recommencer efface la colonie choisie.") if replacing else "",
 		"extra": list,
-		"confirm_text": "Fermer",
+		"confirm_text": Tr.t("Fermer"),
 	})
 
 
@@ -219,11 +219,11 @@ func _confirm_erase(slot: String, then_start: bool, list_modal: Modal) -> void:
 	var summary := GameManager.slot_summary(slot)
 	Modal.open(_modal_layer, {
 		"icon": "warning",
-		"title": ("Recommencer « %s » ?" if then_start else "Supprimer « %s » ?") % SLOT_NAMES[slot],
-		"body": "%s\nCette colonie sera effacée définitivement." % _summary_text(summary),
-		"confirm_text": "Recommencer" if then_start else "Supprimer",
+		"title": (Tr.t("Recommencer « %s » ?") if then_start else Tr.t("Supprimer « %s » ?")) % Tr.t(SLOT_NAMES[slot]),
+		"body": Tr.t("%s\nCette colonie sera effacée définitivement.") % _summary_text(summary),
+		"confirm_text": Tr.t("Recommencer") if then_start else Tr.t("Supprimer"),
 		"confirm_style": "GoldButton",
-		"cancel_text": "Annuler",
+		"cancel_text": Tr.t("Annuler"),
 		"on_confirm": func() -> void:
 			GameManager.delete_slot(slot)
 			list_modal.close()
@@ -237,16 +237,16 @@ func _confirm_erase(slot: String, then_start: bool, list_modal: Modal) -> void:
 
 
 func _show_settings() -> void:
-	Modal.open(_modal_layer, { "icon": "gear", "title": "Réglages", "extra": SettingsPanel.build(), "confirm_text": "Fermer" })
+	Modal.open(_modal_layer, { "icon": "gear", "title": Tr.t("Réglages"), "extra": SettingsPanel.build(), "confirm_text": Tr.t("Fermer") })
 
 
 func _show_about() -> void:
 	Modal.open(_modal_layer, {
-		"icon": "rocket", "title": "À propos",
-		"body": "Ares Colony — un tycoon de colonie martienne où la science est la règle du jeu.\n\n"
-				+ "Conception : Nicolas Faget.\n"
-				+ "Faits scientifiques : NASA (JPL, Perseverance, Phoenix, Curiosity), université de Wageningen, "
-				+ "université d'Arizona, Station spatiale internationale. Chaque fiche de l'encyclopédie cite ses sources.\n\n"
-				+ "Moteur : Godot Engine. Modèles, sons et musique générés par programme.",
-		"confirm_text": "Fermer",
+		"icon": "rocket", "title": Tr.t("À propos"),
+		"body": Tr.t("Ares Colony — un tycoon de colonie martienne où la science est la règle du jeu.\n\n")
+				+ Tr.t("Conception : Nicolas Faget.\n")
+				+ Tr.t("Faits scientifiques : NASA (JPL, Perseverance, Phoenix, Curiosity), université de Wageningen, ")
+				+ Tr.t("université d'Arizona, Station spatiale internationale. Chaque fiche de l'encyclopédie cite ses sources.\n\n")
+				+ Tr.t("Moteur : Godot Engine. Modèles, sons et musique générés par programme."),
+		"confirm_text": Tr.t("Fermer"),
 	})

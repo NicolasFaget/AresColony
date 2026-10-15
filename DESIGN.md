@@ -112,8 +112,17 @@ Sans évacuation pour un joueur raisonnable. Un joueur qui ne fait rien perd son
 sol 9 environ : le danger est réel mais laisse le temps d'apprendre. Les tests vérifient ces
 fourchettes.
 
+## Langues
+
+- Le français est la langue source ; `i18n/en.json` associe chaque texte français à l'anglais.
+  `Tr.t("…")` traduit un modèle (`Tr.t("Sol %d") % n`) et les noms de contenu insérés ; les
+  libellés et boutons se traduisent seuls quand leur texte correspond exactement à une clé.
+- Après un ajout de texte : `python tools/i18n_check.py` liste ce qui manque dans `en.json`.
+- La langue suit celle du téléphone, puis le réglage « Langue / Language ».
+
 ## Pièges
 
+- `trait` est un mot réservé de GDScript (ne pas l'utiliser comme nom de variable).
 - `is_connected` est une méthode native de `Object` : d'où `is_linked`.
 - Un script lancé par `-s` ne doit pas typer une classe qui utilise un autoload (`GameManager`).
 - Sauter dans le temps en test déclenche les ravitaillements en retard : utiliser `_calm_engine()`.
@@ -122,7 +131,7 @@ fourchettes.
 
 ## Prochaines étapes
 
-1. Traduction anglaise ; trajet du rover qui contourne les modules ; deuxième région.
+1. Troisième région ? Plus d'événements (météorites, aurores) ; sauvegarde dans le cloud.
 2. Rovers d'exploration et sites à découvrir ; quiz facultatifs.
 3. Ère 2 « Autonomie » : Sabatier, briques de régolithe, recyclage, deuxième région.
 4. Tutoriel guidé, traduction anglaise.

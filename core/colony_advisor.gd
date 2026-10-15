@@ -59,8 +59,8 @@ static func alerts(engine: ColonyEngine) -> Array[Dictionary]:
 			"level": "danger" if left <= DANGER_SOLS else "warning",
 			"resource": r,
 			"sols": left,
-			"title": "%s : épuisé %s" % [ColonyContent.RESOURCE_NAMES[r],
-					"maintenant" if left <= 0.01 else "dans %s sol%s" % [NumberFormatter.format(left), "s" if left >= 2.0 else ""]],
+			"title": Tr.t("%s : épuisé %s") % [Tr.t(ColonyContent.RESOURCE_NAMES[r]),
+					Tr.t("maintenant") if left <= 0.01 else Tr.t("dans %s sol%s") % [NumberFormatter.format(left), "s" if left >= 2.0 else ""]],
 			"advice": fix.text, "tab": fix.tab, "target": fix.target,
 		})
 	list.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.sols < b.sols)
@@ -71,8 +71,8 @@ static func alerts(engine: ColonyEngine) -> Array[Dictionary]:
 			isolated += 1
 	if isolated > 0:
 		list.append({ "level": "warning", "resource": "", "sols": INF,
-			"title": "%d module%s isolé%s" % [isolated, "s" if isolated > 1 else "", "s" if isolated > 1 else ""],
-			"advice": "Un module ne fonctionne que s'il est relié à l'atterrisseur. Posez des conduites.",
+			"title": (Tr.t("%d modules isolés") % isolated) if isolated > 1 else Tr.t("1 module isolé"),
+			"advice": Tr.t("Un module ne fonctionne que s'il est relié à l'atterrisseur. Posez des conduites."),
 			"tab": TAB_BUILD, "target": "link" })
 
 	if engine.state.era >= 3 and (engine.is_flare() or engine.flare_soon()):
@@ -80,30 +80,30 @@ static func alerts(engine: ColonyEngine) -> Array[Dictionary]:
 		if exposed > 0:
 			var researched := engine.state.research_done.has("shielding")
 			list.insert(0, { "level": "danger", "resource": "", "sols": 0.0,
-				"title": ("Éruption solaire ! %d colon%s sans abri" if engine.is_flare() else "Éruption solaire imminente : %d colon%s sans abri") % [
+				"title": (Tr.t("Éruption solaire ! %d colon%s sans abri") if engine.is_flare() else Tr.t("Éruption solaire imminente : %d colon%s sans abri")) % [
 						exposed, "s" if exposed > 1 else ""],
-				"advice": "Construisez des habitats enterrés : 4 places à l'abri chacun." if researched
-						else "Recherchez « Blindage en régolithe » pour construire des abris.",
+				"advice": Tr.t("Construisez des habitats enterrés : 4 places à l'abri chacun.") if researched
+						else Tr.t("Recherchez « Blindage en régolithe » pour construire des abris."),
 				"tab": TAB_BUILD if researched else TAB_RESEARCH, "target": "bunker" if researched else "shielding" })
 	var broken := engine.broken_count()
 	if broken > 0:
 		list.append({ "level": "warning", "resource": "", "sols": INF,
-			"title": "%d machine%s en panne" % [broken, "s" if broken > 1 else ""],
-			"advice": "Une machine en panne ne produit plus rien : réparez-la (matériaux).",
+			"title": Tr.t("%d machine%s en panne") % [broken, "s" if broken > 1 else ""],
+			"advice": Tr.t("Une machine en panne ne produit plus rien : réparez-la (matériaux)."),
 			"tab": TAB_COLONY, "target": "maintenance" })
 	var dust := engine.average_dust()
 	if dust >= DUST_ALERT:
 		list.append({ "level": "warning", "resource": ColonyContent.ENERGY, "sols": INF,
-			"title": "Panneaux poussiéreux : −%d %% d'énergie" % roundi(ColonyEngine.DUST_LOSS * dust * 100.0),
-			"advice": "Envoyez une sortie de nettoyage (elle coûte de l'oxygène), ou espérez un tourbillon de poussière.",
+			"title": Tr.t("Panneaux poussiéreux : −%d %% d'énergie") % roundi(ColonyEngine.DUST_LOSS * dust * 100.0),
+			"advice": Tr.t("Envoyez une sortie de nettoyage (elle coûte de l'oxygène), ou espérez un tourbillon de poussière."),
 			"tab": TAB_COLONY, "target": "maintenance" })
 	if engine.resupplies_left() <= 1 and not _has_linked(engine, "kiln"):
 		var researched := engine.state.research_done.has("regolith")
 		list.append({ "level": "warning", "resource": ColonyContent.MATERIALS, "sols": INF,
-			"title": "Dernier envoi de matériaux au prochain ravitaillement" if engine.resupplies_left() == 1
-					else "La Terre n'envoie plus de matériaux",
-			"advice": "Construisez un four à régolithe pour fabriquer vos matériaux." if researched
-					else "Recherchez « Frittage du régolithe » pour fabriquer vos propres matériaux.",
+			"title": Tr.t("Dernier envoi de matériaux au prochain ravitaillement") if engine.resupplies_left() == 1
+					else Tr.t("La Terre n'envoie plus de matériaux"),
+			"advice": Tr.t("Construisez un four à régolithe pour fabriquer vos matériaux.") if researched
+					else Tr.t("Recherchez « Frittage du régolithe » pour fabriquer vos propres matériaux."),
 			"tab": TAB_BUILD if researched else TAB_RESEARCH, "target": "kiln" if researched else "regolith" })
 	return list
 
@@ -114,23 +114,23 @@ static func _fix(engine: ColonyEngine, resource: String) -> Dictionary:
 	match resource:
 		ColonyContent.OXYGEN:
 			if not engine.state.research_done.has("moxie"):
-				return _step("Lancez la recherche « Électrolyse du CO₂ ».", TAB_RESEARCH, "moxie")
+				return _step(Tr.t("Lancez la recherche « Électrolyse du CO₂ »."), TAB_RESEARCH, "moxie")
 			if energy_short:
-				return _step("Vos électrolyseurs manquent d'énergie : ajoutez des panneaux solaires.", TAB_BUILD, "solar")
-			return _step("Construisez un électrolyseur de CO₂ de plus.", TAB_BUILD, "moxie")
+				return _step(Tr.t("Vos électrolyseurs manquent d'énergie : ajoutez des panneaux solaires."), TAB_BUILD, "solar")
+			return _step(Tr.t("Construisez un électrolyseur de CO₂ de plus."), TAB_BUILD, "moxie")
 		ColonyContent.WATER:
 			if not engine.state.research_done.has("ice"):
-				return _step("Lancez la recherche « Glace souterraine ».", TAB_RESEARCH, "ice")
+				return _step(Tr.t("Lancez la recherche « Glace souterraine »."), TAB_RESEARCH, "ice")
 			if energy_short:
-				return _step("Les extracteurs manquent d'énergie : ajoutez des panneaux solaires.", TAB_BUILD, "solar")
-			return _step("Posez un extracteur sur une plaque de glace, relié par des conduites.", TAB_BUILD, "extractor")
+				return _step(Tr.t("Les extracteurs manquent d'énergie : ajoutez des panneaux solaires."), TAB_BUILD, "solar")
+			return _step(Tr.t("Posez un extracteur sur une plaque de glace, relié par des conduites."), TAB_BUILD, "extractor")
 		_:
 			if not engine.state.research_done.has("greenhouse"):
-				return _step("Recherchez la serre pressurisée (après la glace).", TAB_RESEARCH,
+				return _step(Tr.t("Recherchez la serre pressurisée (après la glace)."), TAB_RESEARCH,
 						"greenhouse" if engine.state.research_done.has("ice") else "ice")
 			if not engine.state.research_done.has("perchlorate"):
-				return _step("Construisez une serre, et recherchez le lavage des perchlorates (récoltes ×2).", TAB_BUILD, "greenhouse")
-			return _step("Construisez une serre de plus.", TAB_BUILD, "greenhouse")
+				return _step(Tr.t("Construisez une serre, et recherchez le lavage des perchlorates (récoltes ×2)."), TAB_BUILD, "greenhouse")
+			return _step(Tr.t("Construisez une serre de plus."), TAB_BUILD, "greenhouse")
 
 
 static func _step(text: String, tab: int, target: String) -> Dictionary:

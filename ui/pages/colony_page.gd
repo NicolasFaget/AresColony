@@ -73,30 +73,31 @@ func refresh() -> void:
 	_era.text = ColonyContent.ERAS[engine.state.era]
 	_trips.visible = engine.state.era >= 2
 	if engine.state.expedition.is_empty():
-		_trips.text = "Expéditions en rover · %d site%s découvert%s" % [engine.state.sites_done.size(),
-				"s" if engine.state.sites_done.size() > 1 else "", "s" if engine.state.sites_done.size() > 1 else ""]
+		var found := engine.state.sites_done.size()
+		_trips.text = (Tr.t("Expéditions en rover · %d sites découverts") % found) if found > 1 \
+				else (Tr.t("Expéditions en rover · %d site découvert") % found)
 	else:
-		_trips.text = "Rover en route : %s" % engine.site_by_id(engine.state.expedition.site).name
+		_trips.text = Tr.t("Rover en route : %s") % Tr.t(engine.site_by_id(engine.state.expedition.site).name)
 	_refresh_rating()
 	var objective := engine.current_objective()
 	if objective == null:
-		_objective_title.text = "Mission accomplie !"
-		_objective_text.text = "La colonie est autonome et son retour est assuré. La suite arrive dans une prochaine version."
+		_objective_title.text = Tr.t("Mission accomplie !")
+		_objective_text.text = Tr.t("La colonie est autonome et son retour est assuré. La suite arrive dans une prochaine version.")
 		_objective_bar.value = 100.0
 	else:
 		_objective_title.text = objective.title
-		_objective_text.text = objective.description + "\nRécompense : " + _reward_text(objective.reward)
+		_objective_text.text = Tr.t(objective.description) + Tr.t("\nRécompense : ") + _reward_text(objective.reward)
 		_objective_bar.value = engine.objective_progress(objective.id) * 100.0
 	var done: Array[String] = []
 	for o in engine.objectives:
 		if o.era == engine.state.era and engine.state.objectives_done.has(o.id):
-			done.append("✓ " + o.title)
+			done.append("✓ " + Tr.t(o.title))
 	_objectives_done.text = "  ".join(done)
 	_objectives_done.visible = not done.is_empty()
 
-	_crew_title.text = "Équipage : %d colons · %d places" % [engine.state.colonists.size(), engine.housing()]
+	_crew_title.text = Tr.t("Équipage : %d colons · %d places") % [engine.state.colonists.size(), engine.housing()]
 	if engine.state.era >= 3:
-		_crew_title.text += " · %d à l'abri" % mini(engine.shelter_capacity(), engine.state.colonists.size())
+		_crew_title.text += Tr.t(" · %d à l'abri") % mini(engine.shelter_capacity(), engine.state.colonists.size())
 	while _crew.get_child_count() < engine.state.colonists.size():
 		_crew.add_child(_colonist_line())
 	while _crew.get_child_count() > engine.state.colonists.size():
@@ -106,23 +107,23 @@ func refresh() -> void:
 	for i in engine.state.colonists.size():
 		var colonist: Dictionary = engine.state.colonists[i]
 		var line := _crew.get_child(i)
-		(line.get_child(1) as Label).text = "%s, %s" % [colonist.name, colonist.role]
+		(line.get_child(1) as Label).text = Tr.t("%s, %s") % [colonist.name, Tr.t(colonist.role)]
 		var bar: ProgressBar = line.get_child(2)
 		bar.value = colonist.health * 100.0
 		bar.theme_type_variation = "ProgressBar" if colonist.health > 0.5 else "MilestoneBar"
 
 	var broken := engine.broken_count()
-	_care.text = "Entretien · poussière %d %% · %s" % [roundi(engine.average_dust() * 100.0),
-			"%d panne%s" % [broken, "s" if broken > 1 else ""] if broken > 0 else "aucune panne"]
+	_care.text = Tr.t("Entretien · poussière %d %% · %s") % [roundi(engine.average_dust() * 100.0),
+			Tr.t("%d panne%s") % [broken, "s" if broken > 1 else ""] if broken > 0 else Tr.t("aucune panne")]
 	_care.theme_type_variation = "GoldButton" if broken > 0 or engine.average_dust() >= ColonyAdvisor.DUST_ALERT else "Button"
 	var next := engine.state.next_resupply - engine.state.sol
 	var housing_left := engine.housing() - engine.state.colonists.size()
 	var left := engine.resupplies_left()
-	_info.text = "%s %s\nÉvacués vers la Terre : %d." % [
-		("Prochain ravitaillement de la Terre dans %s sol%s (%s)." % [NumberFormatter.format(next), "s" if next >= 2.0 else "",
-				"le dernier avec des matériaux" if left == 1 else "encore %d avec des matériaux" % left]) if left > 0
-				else "La Terre n'envoie plus de matériaux : fabriquez-les avec le four à régolithe.",
-		"Places libres : des recrues arriveront." if housing_left > 0 else "Aucune place libre : construisez un habitat pour accueillir des recrues.",
+	_info.text = Tr.t("%s %s\nÉvacués vers la Terre : %d.") % [
+		(Tr.t("Prochain ravitaillement de la Terre dans %s sol%s (%s).") % [NumberFormatter.format(next), "s" if next >= 2.0 else "",
+				Tr.t("le dernier avec des matériaux") if left == 1 else Tr.t("encore %d avec des matériaux") % left]) if left > 0
+				else Tr.t("La Terre n'envoie plus de matériaux : fabriquez-les avec le four à régolithe."),
+		Tr.t("Places libres : des recrues arriveront.") if housing_left > 0 else Tr.t("Aucune place libre : construisez un habitat pour accueillir des recrues."),
 		engine.state.evacuated]
 
 
@@ -136,7 +137,7 @@ func _rating_panel() -> Control:
 	left.alignment = BoxContainer.ALIGNMENT_CENTER
 	var bars := UiFx.vbox(4)
 	bars.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for part in ["Fonctionnement", "Raccordement", "Synergies", "Améliorations"]:
+	for part in ["Fonctionnement", "Raccordement", Tr.t("Synergies"), Tr.t("Améliorations")]:
 		var name := UiFx.label(part, "SmallLabel")
 		name.custom_minimum_size.x = 150
 		var bar := ProgressBar.new()
@@ -153,7 +154,7 @@ func _rating_panel() -> Control:
 	_rating_tip = UiFx.paragraph("", "SmallLabel")
 	_rating_tip.add_theme_color_override("font_color", Palette.ACCENT)
 	var panel := UiFx.panel("Row", UiFx.vbox(8, [
-		UiFx.label("Efficacité de la colonie", "CaptionLabel"),
+		UiFx.label(Tr.t("Efficacité de la colonie"), "CaptionLabel"),
 		UiFx.hbox(12, [left, bars]), _rating_tip,
 	]))
 	panel.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -165,13 +166,13 @@ func _refresh_rating() -> void:
 	_grade.text = rating.grade
 	_grade.add_theme_color_override("font_color", { "A": Palette.SUCCESS, "B": Palette.ACCENT, "C": Palette.MONEY,
 			"D": Palette.WARNING, "E": Palette.DANGER }[rating.grade])
-	_score.text = "%d / 100" % roundi(rating.score)
+	_score.text = Tr.t("%d / 100") % roundi(rating.score)
 	for i in rating.parts.size():
 		var part: Dictionary = rating.parts[i]
 		_rating_bars[i].max_value = part.max
 		_rating_bars[i].value = part.value
 		_rating_values[i].text = "%d/%d" % [roundi(part.value), roundi(part.max)]
-	_rating_tip.text = ("Conseil : " + rating.tip) if not rating.tip.is_empty() else "Colonie exemplaire, rien à redire !"
+	_rating_tip.text = (Tr.t("Conseil : ") + rating.tip) if not rating.tip.is_empty() else Tr.t("Colonie exemplaire, rien à redire !")
 
 
 func _colonist_line() -> Control:
@@ -188,5 +189,5 @@ func _colonist_line() -> Control:
 static func _reward_text(reward: Dictionary) -> String:
 	var parts: Array[String] = []
 	for r: String in reward:
-		parts.append("%s %s" % [NumberFormatter.format(reward[r]), ColonyContent.RESOURCE_NAMES[r].to_lower()])
+		parts.append(Tr.t("%s %s") % [NumberFormatter.format(reward[r]), Tr.t(ColonyContent.RESOURCE_NAMES[r]).to_lower()])
 	return ", ".join(parts)

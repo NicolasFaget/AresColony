@@ -33,14 +33,14 @@ static func format(value: float) -> String:
 static func duration(seconds: float) -> String:
 	var total := maxi(0, int(seconds))
 	if total < 60:
-		return "%d s" % total
+		return Tr.t("%d s") % total
 	var minutes := total / 60
 	if minutes < 60:
-		return "%d min" % minutes
+		return Tr.t("%d min") % minutes
 	var hours := minutes / 60
 	if hours < 24:
-		return "%d h" % hours if minutes % 60 == 0 else "%d h %02d" % [hours, minutes % 60]
-	return "%d j %02d h" % [hours / 24, hours % 24]
+		return Tr.t("%d h") % hours if minutes % 60 == 0 else Tr.t("%d h %02d") % [hours, minutes % 60]
+	return Tr.t("%d j %02d h") % [hours / 24, hours % 24]
 
 
 static func _decimals(scaled: float, tier: int) -> int:

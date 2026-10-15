@@ -23,7 +23,7 @@ func _ready() -> void:
 	_clip.add_child(_label)
 	add_child(UiFx.hbox(10, [UiFx.image(UiFx.icon("news"), 26, Palette.ACCENT), _clip]))
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_label.text = "Bienvenue sur Mars, commandant !"
+	_label.text = Tr.t("Bienvenue sur Mars, commandant !")
 	_showing = true
 	_timer = DISPLAY_SECONDS
 

@@ -44,10 +44,10 @@ func _ready() -> void:
 	_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_glow)
 
-	var caption := UiFx.label("✦  NOUVELLE DÉCOUVERTE  ✦", "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER)
+	var caption := UiFx.label(Tr.t("✦  NOUVELLE DÉCOUVERTE  ✦"), "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	caption.add_theme_color_override("font_color", Palette.MONEY)
 	caption.add_theme_font_size_override("font_size", 20)
-	var status := UiFx.label(_card.status.to_upper(), "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER)
+	var status := UiFx.label(Tr.t(_card.status).to_upper(), "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	status.add_theme_color_override("font_color", Palette.STATUS_COLORS.get(_card.status, Palette.TEXT_MUTED))
 	var picture := UiFx.building_icon(_card.visual, Vector2(340, 270))
 	picture.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -65,7 +65,7 @@ func _ready() -> void:
 
 	var read := Button.new()
 	read.theme_type_variation = "GoldButton"
-	read.text = "Lire la fiche  ·  +%d données" % int(ColonyEngine.CARD_READ_REWARD)
+	read.text = Tr.t("Lire la fiche  ·  +%d données") % int(ColonyEngine.CARD_READ_REWARD)
 	read.custom_minimum_size = Vector2(0, 78)
 	read.focus_mode = Control.FOCUS_NONE
 	read.pressed.connect(func() -> void:
@@ -73,7 +73,7 @@ func _ready() -> void:
 		_close()
 		read_requested.emit(_card.id))
 	var later := Button.new()
-	later.text = "Plus tard (onglet Savoir)"
+	later.text = Tr.t("Plus tard (onglet Savoir)")
 	later.custom_minimum_size = Vector2(0, 60)
 	later.focus_mode = Control.FOCUS_NONE
 	later.pressed.connect(func() -> void:

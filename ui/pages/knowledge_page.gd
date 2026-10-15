@@ -38,7 +38,7 @@ func refresh() -> void:
 				index += 1
 	for row in _rows:
 		row.refresh()
-	_subtitle.text = "%d / %d fiches découvertes · %d quiz réussis · faits réels et sourcés." % [
+	_subtitle.text = Tr.t("%d / %d fiches découvertes · %d quiz réussis · faits réels et sourcés.") % [
 		engine.state.cards_unlocked.size(), engine.cards.size(), engine.quiz_score()]
 
 

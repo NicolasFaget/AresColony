@@ -28,7 +28,7 @@ func _ready() -> void:
 	_text.add_theme_color_override("font_color", Palette.TEXT)
 	var show := Button.new()
 	show.theme_type_variation = "GreenButton"
-	show.text = "Montrer"
+	show.text = Tr.t("Montrer")
 	show.custom_minimum_size = Vector2(118, 48)
 	show.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	show.focus_mode = Control.FOCUS_NONE
@@ -38,7 +38,7 @@ func _ready() -> void:
 		show_requested.emit(step.tab, step.target))
 	var skip := Button.new()
 	skip.text = "✕"
-	skip.tooltip_text = "Passer le guide"
+	skip.tooltip_text = Tr.t("Passer le guide")
 	skip.custom_minimum_size = Vector2(48, 48)
 	skip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	skip.focus_mode = Control.FOCUS_NONE
@@ -59,7 +59,7 @@ func show_step(step: int) -> bool:
 	visible = step >= 0
 	if step < 0:
 		return changed
-	_counter.text = "GUIDE %d/%d" % [step + 1, ColonyAdvisor.TUTORIAL.size()]
+	_counter.text = Tr.t("GUIDE %d/%d") % [step + 1, ColonyAdvisor.TUTORIAL.size()]
 	_text.text = ColonyAdvisor.TUTORIAL[step].text
 	if changed:
 		UiFx.pop(self, 0.04)

@@ -26,7 +26,7 @@ func _ready() -> void:
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var button := Button.new()
 	button.theme_type_variation = "GoldButton"
-	button.text = "Que faire ?"
+	button.text = Tr.t("Que faire ?")
 	button.custom_minimum_size = Vector2(150, 56)
 	button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	button.focus_mode = Control.FOCUS_NONE
@@ -55,7 +55,7 @@ func show_alert(alert: Dictionary, others := 0) -> void:
 	add_theme_stylebox_override("panel", _danger_box if danger else _warning_box)
 	self_modulate = Color.WHITE
 	_icon.texture = UiFx.icon(alert.resource if not str(alert.resource).is_empty() else "warning")
-	_title.text = alert.title + ("   (+%d)" % others if others > 0 else "")
+	_title.text = alert.title + (Tr.t("   (+%d)") % others if others > 0 else "")
 	_advice.text = alert.advice
 
 

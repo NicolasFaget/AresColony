@@ -53,23 +53,23 @@ func refresh() -> void:
 	_button.visible = state == "available"
 	match state:
 		"done":
-			_status.text = "✓ Terminée"
+			_status.text = Tr.t("✓ Terminée")
 			_status.add_theme_color_override("font_color", Palette.SUCCESS)
 		"active":
-			_status.text = "En cours… (%d %%)" % roundi(engine.state.research_progress * 100.0)
+			_status.text = Tr.t("En cours… (%d %%)") % roundi(engine.state.research_progress * 100.0)
 			_status.add_theme_color_override("font_color", Palette.FAME)
 			_bar.value = engine.state.research_progress * 100.0
 		"locked" when research.era > engine.state.era:
-			_status.text = "Ère %d : accomplissez d'abord l'ère en cours." % research.era
+			_status.text = Tr.t("Ère %d : accomplissez d'abord l'ère en cours.") % research.era
 			_status.add_theme_color_override("font_color", Palette.TEXT_DIM)
 		"locked":
 			var names: Array[String] = []
 			for req: String in research.requires:
 				names.append(engine.research_defs[req].name)
-			_status.text = "Nécessite : %s" % ", ".join(names)
+			_status.text = Tr.t("Nécessite : %s") % ", ".join(names)
 			_status.add_theme_color_override("font_color", Palette.TEXT_DIM)
 		_:
-			_status.text = "Durée : %s sol" % NumberFormatter.format(research.duration)
+			_status.text = Tr.t("Durée : %s sol") % NumberFormatter.format(research.duration)
 			_status.add_theme_color_override("font_color", Palette.TEXT_MUTED)
 			var can := engine.state.research_active.is_empty() and engine.state.amount(ColonyContent.DATA) >= research.cost
 			_button.disabled = not can

@@ -25,7 +25,7 @@ func refresh() -> void:
 	for i in sorted.size():
 		list.move_child(sorted[i], i)
 		sorted[i].refresh()
-	_subtitle.text = "%d / %d terminées · les colons et l'atterrisseur produisent des données." % [
+	_subtitle.text = Tr.t("%d / %d terminées · les colons et l'atterrisseur produisent des données.") % [
 		engine.state.research_done.size(), engine.research_defs.size()]
 
 

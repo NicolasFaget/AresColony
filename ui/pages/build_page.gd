@@ -11,7 +11,7 @@ var _synergies: Button
 
 
 func _ready() -> void:
-	_hint = add_subtitle("Posez les modules contre un module déjà relié à l'atterrisseur.")
+	_hint = add_subtitle(Tr.t("Posez les modules contre un module déjà relié à l'atterrisseur."))
 	_synergies = Button.new()
 	_synergies.theme_type_variation = "GoldButton"
 	_synergies.custom_minimum_size = Vector2(0, 56)
@@ -46,4 +46,4 @@ func refresh() -> void:
 				index += 1
 	for row in _rows:
 		row.refresh()
-	_synergies.text = "✦ Synergies entre voisins (%d actives)" % engine.active_synergy_count()
+	_synergies.text = Tr.t("✦ Synergies entre voisins (%d actives)") % engine.active_synergy_count()

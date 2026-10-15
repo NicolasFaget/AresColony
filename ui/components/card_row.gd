@@ -36,7 +36,7 @@ func _ready() -> void:
 	_mystery.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_mystery.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
-	_new_badge = _badge("NOUVEAU · +%d" % int(ColonyEngine.CARD_READ_REWARD), Palette.MONEY)
+	_new_badge = _badge(Tr.t("NOUVEAU · +%d") % int(ColonyEngine.CARD_READ_REWARD), Palette.MONEY)
 	_quiz_badge = _badge("", Palette.ACCENT)
 	var badges := UiFx.hbox(4, [_new_badge, _quiz_badge])
 	badges.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -58,17 +58,17 @@ func refresh() -> void:
 	theme_type_variation = "Row" if unlocked else "RowLocked"
 	_picture.self_modulate = Color.WHITE if unlocked else Color(0.0, 0.0, 0.0, 0.45)
 	_mystery.visible = not unlocked
-	_title.text = card.title if unlocked else "Fiche à découvrir"
+	_title.text = card.title if unlocked else Tr.t("Fiche à découvrir")
 	_status.text = card.status if unlocked else _unlock_hint()
 	_status.add_theme_color_override("font_color", Palette.STATUS_COLORS.get(card.status, Palette.TEXT_DIM) if unlocked else Palette.TEXT_DIM)
 	_new_badge.visible = unlocked and not state.cards_read.has(card.id)
 	_quiz_badge.visible = unlocked and not card.quiz.is_empty()
 	if state.quiz_answers.has(card.id):
 		var good: bool = state.quiz_answers[card.id]
-		_quiz_badge.text = "QUIZ ✓" if good else "QUIZ ✗"
+		_quiz_badge.text = Tr.t("QUIZ ✓") if good else Tr.t("QUIZ ✗")
 		_quiz_badge.add_theme_color_override("font_color", Palette.SUCCESS if good else Palette.TEXT_DIM)
 	else:
-		_quiz_badge.text = "QUIZ · +%d" % int(ColonyEngine.QUIZ_REWARD)
+		_quiz_badge.text = Tr.t("QUIZ · +%d") % int(ColonyEngine.QUIZ_REWARD)
 		_quiz_badge.add_theme_color_override("font_color", Palette.ACCENT)
 
 
@@ -76,10 +76,10 @@ func _unlock_hint() -> String:
 	var engine := GameManager.engine
 	for r: Defs.Research in engine.research_defs.values():
 		if r.card == card.id:
-			return "Recherche : " + r.name
+			return Tr.t("Recherche : ") + Tr.t(r.name)
 	if card.id == "storm":
-		return "Survivez à une tempête de poussière"
-	return "À découvrir en jouant"
+		return Tr.t("Survivez à une tempête de poussière")
+	return Tr.t("À découvrir en jouant")
 
 
 func _badge(text: String, color: Color) -> Label:

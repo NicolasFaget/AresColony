@@ -49,7 +49,7 @@ func _ready() -> void:
 func refresh() -> void:
 	var engine := GameManager.engine
 	var minutes := int(engine.time_of_day() * (24.0 * 60.0 + 39.0))
-	_clock.text = "Sol %d · %02d:%02d" % [engine.sol_number(), minutes / 60, minutes % 60]
+	_clock.text = Tr.t("Sol %d · %02d:%02d") % [engine.sol_number(), minutes / 60, minutes % 60]
 	if engine.is_flare():
 		_weather_icon.texture = UiFx.icon("warning")
 		_weather_icon.modulate = Palette.DANGER
@@ -65,7 +65,7 @@ func refresh() -> void:
 	if engine.state.speed > 0:
 		_last_speed = engine.state.speed
 	_play.icon = UiFx.icon("pause" if engine.state.speed > 0 else "play")
-	_speed.text = "×%d" % _last_speed
+	_speed.text = Tr.t("×%d") % _last_speed
 
 	var flows := engine.average_flows()
 	var days := ColonyAdvisor.forecast(engine)

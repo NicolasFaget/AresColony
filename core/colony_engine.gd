@@ -267,22 +267,22 @@ func average_flows() -> Dictionary:
 func building_status(index: int) -> Dictionary:
 	var def := def_of(index)
 	if not _connected[index]:
-		return { "ok": false, "text": "Non raccordé : collez-le à un module relié à l'atterrisseur." }
+		return { "ok": false, "text": Tr.t("Non raccordé : collez-le à un module relié à l'atterrisseur.") }
 	if is_broken(index):
-		return { "ok": false, "text": "En panne : réparez-le (%s matériaux)." % NumberFormatter.format(repair_cost(index)[ColonyContent.MATERIALS]) }
+		return { "ok": false, "text": Tr.t("En panne : réparez-le (%s matériaux).") % NumberFormatter.format(repair_cost(index)[ColonyContent.MATERIALS]) }
 	if not def.inputs.is_empty():
 		var e := _efficiency[index]
 		if e < 0.999:
-			var missing: String = ColonyContent.RESOURCE_PARTITIVE[_scarcest_input(def)]
+			var missing: String = Tr.t(ColonyContent.RESOURCE_PARTITIVE[_scarcest_input(def)])
 			if e <= 0.001:
-				return { "ok": false, "text": "À l'arrêt : manque %s." % missing }
-			return { "ok": false, "text": "Ralenti à %d %% : manque %s." % [roundi(e * 100.0), missing] }
+				return { "ok": false, "text": Tr.t("À l'arrêt : manque %s.") % missing }
+			return { "ok": false, "text": Tr.t("Ralenti à %d %% : manque %s.") % [roundi(e * 100.0), missing] }
 	if def.solar:
 		if is_storm():
-			return { "ok": true, "text": "Tempête : la poussière masque le soleil." }
+			return { "ok": true, "text": Tr.t("Tempête : la poussière masque le soleil.") }
 		if is_night():
-			return { "ok": true, "text": "Nuit : aucune production solaire." }
-	return { "ok": true, "text": "En service." }
+			return { "ok": true, "text": Tr.t("Nuit : aucune production solaire.") }
+	return { "ok": true, "text": Tr.t("En service.") }
 
 
 # ---------- Améliorations ----------
@@ -319,13 +319,13 @@ func upgrade_cost(index: int) -> Dictionary:
 ## Raison pour laquelle l'amélioration est impossible ("" si possible).
 func upgrade_problem(index: int) -> String:
 	if next_upgrade(index).is_empty():
-		return "Niveau maximal atteint."
+		return Tr.t("Niveau maximal atteint.")
 	if not _connected[index]:
-		return "Raccordez d'abord ce module."
+		return Tr.t("Raccordez d'abord ce module.")
 	var cost := upgrade_cost(index)
 	for r: String in cost:
 		if state.amount(r) < cost[r]:
-			return "Pas assez %s." % ColonyContent.RESOURCE_PARTITIVE[r]
+			return Tr.t("Pas assez %s.") % Tr.t(ColonyContent.RESOURCE_PARTITIVE[r])
 	return ""
 
 
@@ -369,13 +369,13 @@ func colony_rating() -> Dictionary:
 	var synergy_target := clampf(modules / 3.0, 2.0, 8.0)
 	var parts: Array[Dictionary] = [
 		{ "name": "Fonctionnement", "max": 40.0, "value": 40.0 * (running / consumers if consumers > 0 else 1.0),
-			"tip": "Des modules tournent au ralenti faute d'énergie ou d'eau : ajoutez de la production ou des batteries." },
+			"tip": Tr.t("Des modules tournent au ralenti faute d'énergie ou d'eau : ajoutez de la production ou des batteries.") },
 		{ "name": "Raccordement", "max": 10.0, "value": maxf(0.0, 10.0 - 5.0 * isolated),
-			"tip": "Des modules sont isolés : reliez-les à l'atterrisseur par des conduites." },
-		{ "name": "Synergies", "max": 25.0, "value": 25.0 * minf(1.0, active_synergy_count() / synergy_target),
-			"tip": "Collez les bons modules entre eux : Construire › Synergies." },
-		{ "name": "Améliorations", "max": 25.0, "value": 25.0 * (levels / (2.0 * upgradable) if upgradable > 0 else 0.0),
-			"tip": "Touchez un module pour l'améliorer (matériaux et données)." },
+			"tip": Tr.t("Des modules sont isolés : reliez-les à l'atterrisseur par des conduites.") },
+		{ "name": Tr.t("Synergies"), "max": 25.0, "value": 25.0 * minf(1.0, active_synergy_count() / synergy_target),
+			"tip": Tr.t("Collez les bons modules entre eux : Construire › Synergies.") },
+		{ "name": Tr.t("Améliorations"), "max": 25.0, "value": 25.0 * (levels / (2.0 * upgradable) if upgradable > 0 else 0.0),
+			"tip": Tr.t("Touchez un module pour l'améliorer (matériaux et données).") },
 	]
 	var score := 0.0
 	var weakest: Dictionary = parts[0]
@@ -467,25 +467,25 @@ func research_state(research_id: String) -> String:
 func placement_problem(def_id: String, cell: Vector2i) -> String:
 	var def: Defs.Building = building_defs.get(def_id)
 	if def == null or def.fixed:
-		return "Module inconnu."
+		return Tr.t("Module inconnu.")
 	if not is_unlocked(def):
-		return "Recherche nécessaire : %s." % research_defs[def.research].name
+		return Tr.t("Recherche nécessaire : %s.") % Tr.t(research_defs[def.research].name)
 	var ice := 0
 	for c in _footprint(cell, def.size):
 		if not map.in_bounds(c):
-			return "Hors du cratère."
+			return Tr.t("Hors du cratère.")
 		if not map.is_buildable(c):
-			return "Terrain impossible : rochers ou rebord du cratère."
+			return Tr.t("Terrain impossible : rochers ou rebord du cratère.")
 		if _occupied.has(c):
-			return "Emplacement déjà occupé."
+			return Tr.t("Emplacement déjà occupé.")
 		if map.tile_at(c) == ColonyMap.Tile.ICE:
 			ice += 1
 	if def.requires_tile == ColonyMap.Tile.ICE and ice < 2:
-		return "À poser sur une plaque de glace (au moins 2 cases)."
+		return Tr.t("À poser sur une plaque de glace (au moins 2 cases).")
 	if def.id == "erv" and _count_of("erv") > 0:
-		return "Un seul véhicule de retour suffit."
+		return Tr.t("Un seul véhicule de retour suffit.")
 	if state.amount(ColonyContent.MATERIALS) < def.cost:
-		return "Matériaux insuffisants (%s nécessaires)." % NumberFormatter.format(def.cost)
+		return Tr.t("Matériaux insuffisants (%s nécessaires).") % NumberFormatter.format(def.cost)
 	return ""
 
 
@@ -847,11 +847,11 @@ func cleaning_cost() -> float:
 
 func cleaning_problem() -> String:
 	if _dirty_panels().is_empty():
-		return "Les panneaux sont propres."
+		return Tr.t("Les panneaux sont propres.")
 	if is_storm():
-		return "Sortie impossible pendant la tempête."
+		return Tr.t("Sortie impossible pendant la tempête.")
 	if state.amount(ColonyContent.OXYGEN) < cleaning_cost() + 1.0:
-		return "Pas assez d'oxygène pour les combinaisons."
+		return Tr.t("Pas assez d'oxygène pour les combinaisons.")
 	return ""
 
 
@@ -899,9 +899,9 @@ func repair_cost(index: int) -> Dictionary:
 
 func repair_problem(index: int) -> String:
 	if not is_broken(index):
-		return "Ce module fonctionne."
+		return Tr.t("Ce module fonctionne.")
 	if state.amount(ColonyContent.MATERIALS) < repair_cost(index)[ColonyContent.MATERIALS]:
-		return "Pas assez de matériaux."
+		return Tr.t("Pas assez de matériaux.")
 	return ""
 
 
@@ -956,13 +956,13 @@ func site_by_id(site_id: String) -> Dictionary:
 
 func expedition_problem() -> String:
 	if not _has_connected("garage"):
-		return "Construisez un garage à rovers, relié à la colonie."
+		return Tr.t("Construisez un garage à rovers, relié à la colonie.")
 	if not state.expedition.is_empty():
-		return "Le rover est déjà en expédition."
+		return Tr.t("Le rover est déjà en expédition.")
 	if is_storm():
-		return "Pas d'expédition pendant une tempête."
+		return Tr.t("Pas d'expédition pendant une tempête.")
 	if state.amount(ColonyContent.METHANE) < EXPEDITION_METHANE:
-		return "Pas assez de méthane (%s kg)." % NumberFormatter.format(EXPEDITION_METHANE)
+		return Tr.t("Pas assez de méthane (%s kg).") % NumberFormatter.format(EXPEDITION_METHANE)
 	return ""
 
 

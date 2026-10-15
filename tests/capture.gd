@@ -18,6 +18,10 @@ func _run() -> void:
 			_out = arg.trim_prefix("--out=")
 		elif arg.begins_with("--scenario="):
 			scenario = arg.trim_prefix("--scenario=")
+		elif arg.begins_with("--lang="):
+			var manager_node: Node = root.get_node("GameManager")
+			manager_node.locale = arg.trim_prefix("--lang=")
+			manager_node._apply_locale()
 	DirAccess.make_dir_recursive_absolute(_out)
 
 	var manager: Node = root.get_node("GameManager")

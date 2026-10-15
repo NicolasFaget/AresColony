@@ -107,7 +107,7 @@ func _build_layout() -> void:
 	_coach.show_requested.connect(_go_to)
 	_coach.skip_requested.connect(func() -> void:
 		_engine.state.tutorial_done = true
-		_news.post("Guide masqué. Les alertes restent là pour vous prévenir.")
+		_news.post(Tr.t("Guide masqué. Les alertes restent là pour vous prévenir."))
 		_refresh())
 	root.add_child(_coach)
 
@@ -161,7 +161,7 @@ func _build_placement_bar() -> Control:
 	_placement_synergy = UiFx.paragraph("", "SmallLabel")
 	_placement_synergy.add_theme_color_override("font_color", SYNERGY_COLOR)
 	var cancel := Button.new()
-	cancel.text = "Terminer"
+	cancel.text = Tr.t("Terminer")
 	cancel.custom_minimum_size = Vector2(0, 68)
 	cancel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cancel.focus_mode = Control.FOCUS_NONE
@@ -170,7 +170,7 @@ func _build_placement_bar() -> Control:
 		_stop_placement())
 	_placement_confirm = Button.new()
 	_placement_confirm.theme_type_variation = "GoldButton"
-	_placement_confirm.text = "Construire ici"
+	_placement_confirm.text = Tr.t("Construire ici")
 	_placement_confirm.custom_minimum_size = Vector2(0, 68)
 	_placement_confirm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_placement_confirm.focus_mode = Control.FOCUS_NONE
@@ -187,38 +187,39 @@ func _connect_engine() -> void:
 	_engine.card_unlocked.connect(_queue_discovery)
 	_engine.storm_warning.connect(func() -> void:
 		AudioManager.play("alert")
-		_news.post("Les satellites annoncent une tempête de poussière : remplissez les batteries !"))
+		_news.post(Tr.t("Les satellites annoncent une tempête de poussière : remplissez les batteries !")))
 	_engine.storm_started.connect(func() -> void:
 		AudioManager.play("alert")
 		GameManager.vibrate(40)
-		_news.post("Tempête de poussière ! Les panneaux solaires ne reçoivent plus que 20 % de la lumière."))
-	_engine.storm_ended.connect(func() -> void: _news.post("La tempête est passée. Le ciel redevient caramel."))
+		_news.post(Tr.t("Tempête de poussière ! Les panneaux solaires ne reçoivent plus que 20 % de la lumière.")))
+	_engine.storm_ended.connect(func() -> void: _news.post(Tr.t("La tempête est passée. Le ciel redevient caramel.")))
 	_engine.resupply_arrived.connect(_on_resupply)
 	_engine.colonist_evacuated.connect(_on_evacuation)
-	_engine.colonist_arrived.connect(func(n: String) -> void: _news.post("%s rejoint la colonie. Bienvenue !" % n))
+	_engine.colonist_arrived.connect(func(n: String) -> void: _news.post(Tr.t("%s rejoint la colonie. Bienvenue !") % n))
 	_engine.shortage.connect(func(r: String) -> void:
 		AudioManager.play("alert")
 		GameManager.vibrate(60)
-		_news.post("Alerte : plus %s ! Les colons puisent dans leurs réserves de secours." % ColonyContent.RESOURCE_PARTITIVE[r]))
+		_news.post(Tr.t("Alerte : plus %s ! Les colons puisent dans leurs réserves de secours.") % Tr.t(ColonyContent.RESOURCE_PARTITIVE[r])))
 	_engine.building_placed.connect(func(_i: int) -> void: _world.sync_with_game())
 	_engine.breakdown.connect(func(i: int) -> void:
 		AudioManager.play("alert")
 		GameManager.vibrate(60)
-		_news.post("Panne ! " + ColonyContent.BREAKDOWN_LINES.get(_engine.state.buildings[i].id, "Une machine s'est arrêtée.")))
+		_news.post(Tr.t("Panne ! ") + Tr.t(ColonyContent.BREAKDOWN_LINES.get(_engine.state.buildings[i].id, Tr.t("Une machine s'est arrêtée.")))))
 	_engine.era_started.connect(_on_era_started)
 	_engine.flare_warning.connect(func() -> void:
 		AudioManager.play("alert")
 		GameManager.vibrate(40)
-		_news.post("Les satellites détectent une éruption solaire : les particules arrivent dans quelques heures. Tout le monde aux abris !"))
+		_news.post(Tr.t("Les satellites détectent une éruption solaire : les particules arrivent dans quelques heures. Tout le monde aux abris !")))
 	_engine.flare_started.connect(func() -> void:
 		AudioManager.play("alert")
-		_news.post("Éruption solaire en cours. Les compteurs Geiger crépitent."))
-	_engine.flare_ended.connect(func() -> void: _news.post("L'éruption solaire est passée. On peut ressortir."))
+		_news.post(Tr.t("Éruption solaire en cours. Les compteurs Geiger crépitent.")))
+	_engine.flare_ended.connect(func() -> void: _news.post(Tr.t("L'éruption solaire est passée. On peut ressortir.")))
 	_engine.expedition_returned.connect(func(site: Dictionary) -> void:
 		AudioManager.play("milestone")
-		_news.post("Le rover est rentré : %s. Butin : %s." % [site.name, ColonyPage._reward_text(site.reward)]))
+		_news.post(Tr.t("Le rover est rentré : %s. Butin : %s.") % [Tr.t(site.name), ColonyPage._reward_text(site.reward)]))
 	_engine.dust_devil.connect(func(count: int) -> void:
-		_news.post("Un tourbillon de poussière a balayé %d panneau%s. Merci le vent !" % [count, "x" if count > 1 else ""]))
+		_news.post((Tr.t("Un tourbillon de poussière a balayé %d panneaux. Merci le vent !") % count) if count > 1
+				else Tr.t("Un tourbillon de poussière a balayé un panneau. Merci le vent !")))
 
 
 func _layout_changed() -> void:
@@ -280,7 +281,7 @@ func _refresh_guidance() -> void:
 	var coach_was_visible := _coach.visible
 	if _coach.show_step(step) and coach_was_visible and _placing.is_empty():
 		AudioManager.play("milestone")
-		_news.post("Étape du guide réussie !" if step >= 0 else "Guide terminé : votre colonie respire, boit et mange. Bravo !")
+		_news.post(Tr.t("Étape du guide réussie !") if step >= 0 else Tr.t("Guide terminé : votre colonie respire, boit et mange. Bravo !"))
 	if _alert.visible != was_visible or _coach.visible != coach_was_visible:
 		_layout_changed.call_deferred()
 
@@ -343,22 +344,22 @@ func _refresh_placement() -> void:
 		return
 	var def: Defs.Building = _engine.building_defs[_placing]
 	var cell := _world.ghost_cell()
-	_placement_title.text = "Placer : %s (%s matériaux)" % [def.name, NumberFormatter.format(def.cost)]
+	_placement_title.text = Tr.t("Placer : %s (%s matériaux)") % [Tr.t(def.name), NumberFormatter.format(def.cost)]
 	var problem := _engine.placement_problem(_placing, cell)
 	if not problem.is_empty():
 		_placement_reason.text = problem
 		_placement_reason.add_theme_color_override("font_color", Palette.DANGER)
 	elif not _engine.would_connect(_placing, cell):
-		_placement_reason.text = "Possible, mais isolé : il ne fonctionnera pas sans être relié (posez des conduites)."
+		_placement_reason.text = Tr.t("Possible, mais isolé : il ne fonctionnera pas sans être relié (posez des conduites).")
 		_placement_reason.add_theme_color_override("font_color", Palette.WARNING)
 	else:
-		_placement_reason.text = "Touchez le sol pour déplacer le module. Emplacement valide et raccordé."
+		_placement_reason.text = Tr.t("Touchez le sol pour déplacer le module. Emplacement valide et raccordé.")
 		_placement_reason.add_theme_color_override("font_color", Palette.SUCCESS)
 	_placement_confirm.disabled = not problem.is_empty()
 	var bonuses: Array[String] = []
 	if problem.is_empty():
 		for found: Dictionary in _engine.preview_synergies(_placing, cell):
-			bonuses.append("✦ %s : %s (%s)" % [found.synergy.name, found.synergy.effect, found.target])
+			bonuses.append(Tr.t("✦ %s : %s (%s)") % [Tr.t(found.synergy.name), Tr.t(found.synergy.effect), Tr.t(found.target)])
 	_placement_synergy.text = "\n".join(bonuses)
 	_placement_synergy.visible = not bonuses.is_empty()
 
@@ -427,14 +428,14 @@ func _on_cell_tapped(cell: Vector2i, index: int) -> void:
 		return
 	match _engine.map.tile_at(cell):
 		ColonyMap.Tile.ROCK:
-			_news.post("Des rochers basaltiques : impossible de construire ici.")
+			_news.post(Tr.t("Des rochers basaltiques : impossible de construire ici."))
 		ColonyMap.Tile.RIM:
 			_news.post(_engine.region().rim)
 		ColonyMap.Tile.ICE:
-			_news.post("De la glace d'eau, juste sous la poussière !" if _engine.state.research_done.has("ice")
-					else "Régolithe martien : poussière fine et sels de perchlorate.")
+			_news.post(Tr.t("De la glace d'eau, juste sous la poussière !") if _engine.state.research_done.has("ice")
+					else Tr.t("Régolithe martien : poussière fine et sels de perchlorate."))
 		_:
-			_news.post("Régolithe martien : poussière fine et sels de perchlorate.")
+			_news.post(Tr.t("Régolithe martien : poussière fine et sels de perchlorate."))
 
 
 # ---------- Événements ----------
@@ -442,9 +443,9 @@ func _on_cell_tapped(cell: Vector2i, index: int) -> void:
 func _on_research_completed(research_id: String) -> void:
 	var r: Defs.Research = _engine.research_defs[research_id]
 	AudioManager.play("upgrade")
-	_news.post("Recherche terminée : %s" % r.name)
+	_news.post(Tr.t("Recherche terminée : %s") % Tr.t(r.name))
 	if research_id == "ice":
-		_news.post("Les relevés révèlent de la glace sous la poussière : regardez la carte !")
+		_news.post(Tr.t("Les relevés révèlent de la glace sous la poussière : regardez la carte !"))
 
 
 func _on_objective_completed(objective_id: String) -> void:
@@ -452,22 +453,22 @@ func _on_objective_completed(objective_id: String) -> void:
 		if o.id == objective_id:
 			AudioManager.play("milestone")
 			GameManager.vibrate(30)
-			_news.post("Objectif atteint : %s ! Récompense : %s" % [o.title, ColonyPage._reward_text(o.reward)])
+			_news.post(Tr.t("Objectif atteint : %s ! Récompense : %s") % [Tr.t(o.title), ColonyPage._reward_text(o.reward)])
 			if objective_id == "rooted":
 				Modal.open(_modal_layer, {
-					"icon": "check", "title": "Colonie enracinée !",
-					"body": "Vingt colons vivent à l'abri des radiations, nourris par une serre sur un sol vivant et "
-							+ "alimentés jour et nuit. Votre colonie est durable : c'est exactement ce que préparent "
-							+ "les agences spatiales pour les premières bases martiennes.\n\nMerci d'avoir joué, commandant !",
-					"confirm_text": "Continuer à jouer",
+					"icon": "check", "title": Tr.t("Colonie enracinée !"),
+					"body": Tr.t("Vingt colons vivent à l'abri des radiations, nourris par une serre sur un sol vivant et ")
+							+ Tr.t("alimentés jour et nuit. Votre colonie est durable : c'est exactement ce que préparent ")
+							+ Tr.t("les agences spatiales pour les premières bases martiennes.\n\nMerci d'avoir joué, commandant !"),
+					"confirm_text": Tr.t("Continuer à jouer"),
 				})
 			if objective_id == "return":
 				Modal.open(_modal_layer, {
-					"icon": "rocket", "title": "Retour assuré !",
-					"body": "Les réservoirs du véhicule de retour sont pleins de méthane fabriqué sur Mars, comme dans le plan "
-							+ "Mars Direct. Votre colonie est autonome, explore les environs, et peut rentrer quand elle le veut.\n\n"
-							+ "Bravo, commandant ! La suite arrivera dans une prochaine version.",
-					"confirm_text": "Continuer à jouer",
+					"icon": "rocket", "title": Tr.t("Retour assuré !"),
+					"body": Tr.t("Les réservoirs du véhicule de retour sont pleins de méthane fabriqué sur Mars, comme dans le plan ")
+							+ Tr.t("Mars Direct. Votre colonie est autonome, explore les environs, et peut rentrer quand elle le veut.\n\n")
+							+ Tr.t("Bravo, commandant ! La suite arrivera dans une prochaine version."),
+					"confirm_text": Tr.t("Continuer à jouer"),
 				})
 
 
@@ -476,24 +477,24 @@ func _on_resupply(report: Dictionary) -> void:
 	AudioManager.play("landing")
 	var text := ""
 	if report.materials > 0.0:
-		text = "Ravitaillement de la Terre : +%s matériaux" % NumberFormatter.format(report.materials)
+		text = Tr.t("Ravitaillement de la Terre : +%s matériaux") % NumberFormatter.format(report.materials)
 		if report.food > 0.0:
-			text += ", +%s rations" % NumberFormatter.format(report.food)
+			text += Tr.t(", +%s rations") % NumberFormatter.format(report.food)
 		else:
-			text += ". Plus de nourriture : la Terre compte sur vos serres"
+			text += Tr.t(". Plus de nourriture : la Terre compte sur vos serres")
 		if not report.colonists.is_empty():
-			text += ". À bord : %s" % ", ".join(report.colonists)
+			text += Tr.t(". À bord : %s") % ", ".join(report.colonists)
 		text += "."
 	else:
-		text = "Une capsule de volontaires se pose : %s. Pas de matériaux à bord." % ", ".join(report.colonists)
+		text = Tr.t("Une capsule de volontaires se pose : %s. Pas de matériaux à bord.") % ", ".join(report.colonists)
 	_news.post(text)
 	if report.get("last", false):
 		Modal.open(_modal_layer, {
-			"icon": "materials", "title": "Dernier envoi de matériaux",
-			"body": "La Terre ne peut plus financer les envois de matériaux. Des volontaires viendront encore, mais "
-					+ "il faut désormais fabriquer vos matériaux sur place : recherchez « Frittage du régolithe » "
-					+ "et construisez des fours à régolithe.",
-			"confirm_text": "Compris",
+			"icon": "materials", "title": Tr.t("Dernier envoi de matériaux"),
+			"body": Tr.t("La Terre ne peut plus financer les envois de matériaux. Des volontaires viendront encore, mais ")
+					+ Tr.t("il faut désormais fabriquer vos matériaux sur place : recherchez « Frittage du régolithe » ")
+					+ Tr.t("et construisez des fours à régolithe."),
+			"confirm_text": Tr.t("Compris"),
 		})
 
 
@@ -501,12 +502,12 @@ func _on_evacuation(colonist_name: String, cause: String) -> void:
 	_world.launch_evacuation()
 	AudioManager.play("evacuation")
 	GameManager.vibrate(80)
-	_news.post("%s a été évacué vers la Terre." % colonist_name)
+	_news.post(Tr.t("%s a été évacué vers la Terre.") % colonist_name)
 	Modal.open(_modal_layer, {
-		"icon": "warning", "title": "%s évacué" % colonist_name,
-		"body": "Sa santé ne permettait plus de rester sur Mars. Une capsule l'a ramené vers la Terre.\n\n"
-				+ "Cause : " + cause,
-		"confirm_text": "Compris",
+		"icon": "warning", "title": Tr.t("%s évacué") % colonist_name,
+		"body": Tr.t("Sa santé ne permettait plus de rester sur Mars. Une capsule l'a ramené vers la Terre.\n\n")
+				+ Tr.t("Cause : ") + Tr.t(cause),
+		"confirm_text": Tr.t("Compris"),
 	})
 
 
@@ -514,11 +515,11 @@ func _on_evacuation(colonist_name: String, cause: String) -> void:
 
 func _show_welcome() -> void:
 	Modal.open(_modal_layer, {
-		"icon": "rocket", "title": "Bienvenue : " + _engine.region().name,
-		"body": "Votre équipage de 4 colons vient de se poser. Les réserves d'oxygène tiennent environ 9 sols.\n\n"
-				+ "Suivez le guide en bas de l'écran : il vous montre quoi faire, étape par étape.\n"
-				+ "Touchez une ressource en haut pour savoir d'où elle vient.",
-		"confirm_text": "C'est parti",
+		"icon": "rocket", "title": Tr.t("Bienvenue : ") + Tr.t(_engine.region().name),
+		"body": Tr.t("Votre équipage de 4 colons vient de se poser. Les réserves d'oxygène tiennent environ 9 sols.\n\n")
+				+ Tr.t("Suivez le guide en bas de l'écran : il vous montre quoi faire, étape par étape.\n")
+				+ Tr.t("Touchez une ressource en haut pour savoir d'où elle vient."),
+		"confirm_text": Tr.t("C'est parti"),
 	})
 
 
@@ -527,15 +528,15 @@ func _show_building(index: int) -> void:
 	var status := _engine.building_status(index)
 	var lines: Array[String] = []
 	for r: String in def.outputs:
-		lines.append("+%s %s %s/sol" % [NumberFormatter.format(def.outputs[r] * _engine.rate_factor(index, r, true)), ColonyContent.RESOURCE_UNITS[r], ColonyContent.RESOURCE_NAMES[r].to_lower()])
+		lines.append(Tr.t("+%s %s %s/sol") % [NumberFormatter.format(def.outputs[r] * _engine.rate_factor(index, r, true)), Tr.t(ColonyContent.RESOURCE_UNITS[r]), Tr.t(ColonyContent.RESOURCE_NAMES[r]).to_lower()])
 	for r: String in def.inputs:
-		lines.append("−%s %s %s/sol" % [NumberFormatter.format(def.inputs[r] * _engine.rate_factor(index, r, false)), ColonyContent.RESOURCE_UNITS[r], ColonyContent.RESOURCE_NAMES[r].to_lower()])
+		lines.append(Tr.t("−%s %s %s/sol") % [NumberFormatter.format(def.inputs[r] * _engine.rate_factor(index, r, false)), Tr.t(ColonyContent.RESOURCE_UNITS[r]), Tr.t(ColonyContent.RESOURCE_NAMES[r]).to_lower()])
 	for r: String in def.storage:
-		lines.append("Stockage : +%s %s %s" % [NumberFormatter.format(def.storage[r]), ColonyContent.RESOURCE_UNITS[r], ColonyContent.RESOURCE_NAMES[r].to_lower()])
+		lines.append(Tr.t("Stockage : +%s %s %s") % [NumberFormatter.format(def.storage[r]), Tr.t(ColonyContent.RESOURCE_UNITS[r]), Tr.t(ColonyContent.RESOURCE_NAMES[r]).to_lower()])
 	if def.housing > 0:
-		lines.append("Loge %d colons" % def.housing)
+		lines.append(Tr.t("Loge %d colons") % def.housing)
 	if def.solar:
-		lines.append("Poussière : %d %% (−%d %% d'énergie)" % [roundi(_engine.dust_of(index) * 100.0),
+		lines.append(Tr.t("Poussière : %d %% (−%d %% d'énergie)") % [roundi(_engine.dust_of(index) * 100.0),
 				roundi(ColonyEngine.DUST_LOSS * _engine.dust_of(index) * 100.0)])
 	var status_label := UiFx.paragraph(status.text, "HeadingLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	status_label.add_theme_color_override("font_color", Palette.SUCCESS if status.ok else Palette.WARNING)
@@ -546,7 +547,7 @@ func _show_building(index: int) -> void:
 	if def.id == "garage":
 		var trips := Button.new()
 		trips.theme_type_variation = "PurpleButton"
-		trips.text = "Expéditions…"
+		trips.text = Tr.t("Expéditions…")
 		trips.custom_minimum_size = Vector2(0, 60)
 		trips.focus_mode = Control.FOCUS_NONE
 		trips.pressed.connect(func() -> void:
@@ -556,7 +557,7 @@ func _show_building(index: int) -> void:
 	if _engine.is_broken(index) or def.solar:
 		var care := Button.new()
 		care.theme_type_variation = "GoldButton" if _engine.is_broken(index) else "Button"
-		care.text = "Réparer…" if _engine.is_broken(index) else "Entretien des panneaux…"
+		care.text = Tr.t("Réparer…") if _engine.is_broken(index) else Tr.t("Entretien des panneaux…")
 		care.custom_minimum_size = Vector2(0, 60)
 		care.focus_mode = Control.FOCUS_NONE
 		care.pressed.connect(func() -> void:
@@ -567,16 +568,16 @@ func _show_building(index: int) -> void:
 	extra.add_child(_upgrade_block(index, holder))
 	if not def.card.is_empty() and _engine.state.cards_unlocked.has(def.card):
 		var learn := Button.new()
-		learn.text = "En savoir plus : " + _engine.cards[def.card].title
+		learn.text = Tr.t("En savoir plus : ") + Tr.t(_engine.cards[def.card].title)
 		learn.focus_mode = Control.FOCUS_NONE
 		learn.clip_text = true
 		learn.pressed.connect(func() -> void: _show_card(def.card))
 		extra.add_child(learn)
 	var options := {
-		"icon": "tab_build", "title": def.name, "body": def.description, "extra": extra, "confirm_text": "Fermer",
+		"icon": "tab_build", "title": Tr.t(def.name), "body": def.description, "extra": extra, "confirm_text": Tr.t("Fermer"),
 	}
 	if not def.fixed:
-		options.cancel_text = "Démolir (+%s)" % NumberFormatter.format(def.cost * ColonyEngine.DEMOLISH_REFUND)
+		options.cancel_text = Tr.t("Démolir (+%s)") % NumberFormatter.format(def.cost * ColonyEngine.DEMOLISH_REFUND)
 		options.cancel_style = "Button"
 	if _engine.max_level(index) > 1:
 		# Fiche longue (améliorations) : elle défile.
@@ -600,27 +601,27 @@ func _on_era_started(era: int) -> void:
 	GameManager.vibrate(40)
 	if era == 3:
 		Modal.open(_modal_layer, {
-			"icon": "target", "title": "Ère 3 · Racines",
-			"body": "Le retour est assuré. Faut-il pour autant transformer Mars en seconde Terre ? Les chercheurs ont "
-					+ "fait les comptes : pas avec les techniques actuelles (voir la fiche « Terraformer Mars ? »).\n\n"
-					+ "Cette ère, on rend plutôt la colonie durable :\n"
-					+ "• S'abriter des éruptions solaires sous le régolithe.\n"
-					+ "• Produire de l'énergie nucléaire, jour et nuit.\n"
-					+ "• Cultiver une serre géante sur un sol vivant.\n"
-					+ "• Accueillir 20 colons avec la note d'efficacité A.",
-			"confirm_text": "Au travail !",
+			"icon": "target", "title": Tr.t("Ère 3 · Racines"),
+			"body": Tr.t("Le retour est assuré. Faut-il pour autant transformer Mars en seconde Terre ? Les chercheurs ont ")
+					+ Tr.t("fait les comptes : pas avec les techniques actuelles (voir la fiche « Terraformer Mars ? »).\n\n")
+					+ Tr.t("Cette ère, on rend plutôt la colonie durable :\n")
+					+ Tr.t("• S'abriter des éruptions solaires sous le régolithe.\n")
+					+ Tr.t("• Produire de l'énergie nucléaire, jour et nuit.\n")
+					+ Tr.t("• Cultiver une serre géante sur un sol vivant.\n")
+					+ Tr.t("• Accueillir 20 colons avec la note d'efficacité A."),
+			"confirm_text": Tr.t("Au travail !"),
 		})
 		return
 	if era != 2:
 		return
 	Modal.open(_modal_layer, {
-		"icon": "rocket", "title": "Ère 2 · Expansion",
-		"body": "Votre colonie tient seule sur Mars, bravo ! Place à l'expansion :\n\n"
-				+ "• Fabriquer du méthane avec la réaction de Sabatier (onglet Recherche).\n"
-				+ "• Explorer les environs en rover pressurisé et découvrir de vrais sites.\n"
-				+ "• Accueillir de nouveaux volontaires.\n"
-				+ "• Construire le véhicule de retour et remplir ses réservoirs, comme dans le plan Mars Direct.",
-		"confirm_text": "En route !",
+		"icon": "rocket", "title": Tr.t("Ère 2 · Expansion"),
+		"body": Tr.t("Votre colonie tient seule sur Mars, bravo ! Place à l'expansion :\n\n")
+				+ Tr.t("• Fabriquer du méthane avec la réaction de Sabatier (onglet Recherche).\n")
+				+ Tr.t("• Explorer les environs en rover pressurisé et découvrir de vrais sites.\n")
+				+ Tr.t("• Accueillir de nouveaux volontaires.\n")
+				+ Tr.t("• Construire le véhicule de retour et remplir ses réservoirs, comme dans le plan Mars Direct."),
+		"confirm_text": Tr.t("En route !"),
 	})
 
 
@@ -628,18 +629,18 @@ func _on_era_started(era: int) -> void:
 func _show_expeditions() -> void:
 	var holder: Array[Modal] = []
 	var box := UiFx.vbox(10)
-	box.add_child(UiFx.paragraph("Le rover pressurisé roule au méthane. Chaque expédition dure %s sols et coûte %s kg de méthane ; "
+	box.add_child(UiFx.paragraph(Tr.t("Le rover pressurisé roule au méthane. Chaque expédition dure %s sols et coûte %s kg de méthane ; ")
 			% [NumberFormatter.format(ColonyEngine.EXPEDITION_SOLS), NumberFormatter.format(ColonyEngine.EXPEDITION_METHANE)]
-			+ "elle rapporte des données ou des matériaux, et une fiche de découverte.", "SmallLabel"))
+			+ Tr.t("elle rapporte des données ou des matériaux, et une fiche de découverte."), "SmallLabel"))
 	for site: Dictionary in _engine.region_sites():
 		var found := _engine.state.sites_done.has(site.id)
-		var title := UiFx.label(("✓ " + site.name) if found else "Site inconnu", "BodyLabel")
+		var title := UiFx.label(("✓ " + Tr.t(site.name)) if found else Tr.t("Site inconnu"), "BodyLabel")
 		title.add_theme_color_override("font_color", Palette.SUCCESS if found else Palette.TEXT_DIM)
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var row := UiFx.hbox(8, [UiFx.image(UiFx.icon("rover" if found else "target"), 24, Palette.FAME if found else Palette.TEXT_DIM), title])
 		if found and not site.card.is_empty():
 			var read := Button.new()
-			read.text = "Fiche"
+			read.text = Tr.t("Fiche")
 			read.custom_minimum_size = Vector2(96, 48)
 			read.focus_mode = Control.FOCUS_NONE
 			read.pressed.connect(func() -> void:
@@ -649,7 +650,7 @@ func _show_expeditions() -> void:
 		box.add_child(row)
 	if not _engine.state.expedition.is_empty():
 		var left: float = _engine.state.expedition.until - _engine.state.sol
-		var away := UiFx.paragraph("Le rover est en route vers « %s ». Retour dans %s sol%s." % [
+		var away := UiFx.paragraph(Tr.t("Le rover est en route vers « %s ». Retour dans %s sol%s.") % [
 				_engine.site_by_id(_engine.state.expedition.site).name, NumberFormatter.format(maxf(0.0, left)),
 				"s" if left >= 2.0 else ""], "BodyLabel")
 		away.add_theme_color_override("font_color", Palette.FAME)
@@ -659,7 +660,7 @@ func _show_expeditions() -> void:
 		var problem := _engine.expedition_problem()
 		var go := Button.new()
 		go.theme_type_variation = "PurpleButton"
-		go.text = "Partir : %s · %s kg de méthane" % ["site inconnu" if next.id != "prospect" else next.name,
+		go.text = Tr.t("Partir : %s · %s kg de méthane") % [Tr.t("site inconnu") if next.id != "prospect" else Tr.t(next.name),
 				NumberFormatter.format(ColonyEngine.EXPEDITION_METHANE)]
 		go.custom_minimum_size = Vector2(0, 64)
 		go.focus_mode = Control.FOCUS_NONE
@@ -668,7 +669,7 @@ func _show_expeditions() -> void:
 			if _engine.start_expedition():
 				AudioManager.play("whoosh")
 				GameManager.vibrate(25)
-				_news.post("Le rover quitte la colonie. Les colons font coucou par le hublot.")
+				_news.post(Tr.t("Le rover quitte la colonie. Les colons font coucou par le hublot."))
 				holder[0].close())
 		box.add_child(go)
 		if not problem.is_empty():
@@ -676,7 +677,7 @@ func _show_expeditions() -> void:
 			reason.add_theme_color_override("font_color", Palette.WARNING)
 			box.add_child(reason)
 	holder.append(Modal.open(_modal_layer, {
-		"icon": "rover", "title": "Expéditions", "extra": box, "confirm_text": "Fermer",
+		"icon": "rover", "title": Tr.t("Expéditions"), "extra": box, "confirm_text": Tr.t("Fermer"),
 	}))
 
 
@@ -689,22 +690,22 @@ func _show_maintenance() -> void:
 		_show_maintenance.call_deferred()
 	var box := UiFx.vbox(10)
 	var dust := _engine.average_dust()
-	box.add_child(UiFx.label("Panneaux solaires", "HeadingLabel"))
-	box.add_child(UiFx.paragraph("Poussière moyenne : %d %%, soit −%d %% d'énergie solaire." % [roundi(dust * 100.0),
+	box.add_child(UiFx.label(Tr.t("Panneaux solaires"), "HeadingLabel"))
+	box.add_child(UiFx.paragraph(Tr.t("Poussière moyenne : %d %%, soit −%d %% d'énergie solaire.") % [roundi(dust * 100.0),
 			roundi(ColonyEngine.DUST_LOSS * dust * 100.0)], "BodyLabel"))
-	box.add_child(UiFx.paragraph("La poussière se dépose chaque sol, bien plus pendant les tempêtes. Les tourbillons de "
-			+ "poussière en balaient parfois quelques-uns, comme pour les rovers Spirit et Opportunity.", "SmallLabel"))
+	box.add_child(UiFx.paragraph(Tr.t("La poussière se dépose chaque sol, bien plus pendant les tempêtes. Les tourbillons de ")
+			+ Tr.t("poussière en balaient parfois quelques-uns, comme pour les rovers Spirit et Opportunity."), "SmallLabel"))
 	var problem := _engine.cleaning_problem()
 	var clean := Button.new()
 	clean.theme_type_variation = "GoldButton"
-	clean.text = "Sortie de nettoyage · %s kg d'oxygène" % NumberFormatter.format(_engine.cleaning_cost())
+	clean.text = Tr.t("Sortie de nettoyage · %s kg d'oxygène") % NumberFormatter.format(_engine.cleaning_cost())
 	clean.custom_minimum_size = Vector2(0, 64)
 	clean.focus_mode = Control.FOCUS_NONE
 	clean.disabled = not problem.is_empty()
 	clean.pressed.connect(func() -> void:
 		if _engine.clean_panels():
 			AudioManager.play("whoosh")
-			_news.post("Sortie réussie : les panneaux brillent à nouveau. Les colons, eux, sont couverts de poussière.")
+			_news.post(Tr.t("Sortie réussie : les panneaux brillent à nouveau. Les colons, eux, sont couverts de poussière."))
 			reopen.call())
 	box.add_child(clean)
 	if not problem.is_empty():
@@ -722,7 +723,7 @@ func _show_maintenance() -> void:
 		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var fix := Button.new()
 		fix.theme_type_variation = "GoldButton"
-		fix.text = "Réparer · %s" % NumberFormatter.format(_engine.repair_cost(i)[ColonyContent.MATERIALS])
+		fix.text = Tr.t("Réparer · %s") % NumberFormatter.format(_engine.repair_cost(i)[ColonyContent.MATERIALS])
 		fix.custom_minimum_size = Vector2(170, 56)
 		fix.focus_mode = Control.FOCUS_NONE
 		fix.disabled = not _engine.repair_problem(i).is_empty()
@@ -733,12 +734,12 @@ func _show_maintenance() -> void:
 				reopen.call())
 		box.add_child(UiFx.hbox(8, [UiFx.image(UiFx.icon("warning"), 24, Palette.WARNING), name, fix]))
 	if not any:
-		var fine := UiFx.paragraph("Aucune panne : tout tourne. Les machines lâchent de temps en temps ; une réparation coûte "
-				+ "30 % de leur prix en matériaux.", "SmallLabel")
+		var fine := UiFx.paragraph(Tr.t("Aucune panne : tout tourne. Les machines lâchent de temps en temps ; une réparation coûte ")
+				+ Tr.t("30 % de leur prix en matériaux."), "SmallLabel")
 		fine.add_theme_color_override("font_color", Palette.SUCCESS)
 		box.add_child(fine)
 	holder.append(Modal.open(_modal_layer, {
-		"icon": "gear", "title": "Entretien", "extra": box, "confirm_text": "Fermer",
+		"icon": "gear", "title": Tr.t("Entretien"), "extra": box, "confirm_text": Tr.t("Fermer"),
 	}))
 
 
@@ -749,18 +750,18 @@ func _upgrade_block(index: int, holder: Array[Modal]) -> Control:
 	if top <= 1:
 		return box
 	var level := _engine.level_of(index)
-	var caption := UiFx.label("NIVEAU %d / %d   %s" % [level, top, "★".repeat(level) + "☆".repeat(top - level)], "CaptionLabel")
+	var caption := UiFx.label(Tr.t("NIVEAU %d / %d   %s") % [level, top, "★".repeat(level) + "☆".repeat(top - level)], "CaptionLabel")
 	caption.add_theme_color_override("font_color", Palette.MONEY)
 	box.add_child(caption)
 	var upgrades: Array = ColonyContent.UPGRADES[_engine.state.buildings[index].id]
 	for i in level - 1:
-		var done := UiFx.paragraph("✓ %s : %s" % [upgrades[i].name, upgrades[i].effect], "SmallLabel")
+		var done := UiFx.paragraph(Tr.t("✓ %s : %s") % [Tr.t(upgrades[i].name), Tr.t(upgrades[i].effect)], "SmallLabel")
 		done.add_theme_color_override("font_color", Palette.SUCCESS)
 		box.add_child(done)
 	var next := _engine.next_upgrade(index)
 	if next.is_empty():
 		return box
-	var title := UiFx.label("Amélioration : " + next.name, "HeadingLabel")
+	var title := UiFx.label(Tr.t("Amélioration : ") + Tr.t(next.name), "HeadingLabel")
 	var effect := UiFx.label(next.effect, "BodyLabel")
 	effect.add_theme_color_override("font_color", Palette.ACCENT)
 	box.add_child(title)
@@ -770,7 +771,7 @@ func _upgrade_block(index: int, holder: Array[Modal]) -> Control:
 	var problem := _engine.upgrade_problem(index)
 	var button := Button.new()
 	button.theme_type_variation = "GoldButton"
-	button.text = "Améliorer · %s matériaux · %s données" % [NumberFormatter.format(cost[ColonyContent.MATERIALS]),
+	button.text = Tr.t("Améliorer · %s matériaux · %s données") % [NumberFormatter.format(cost[ColonyContent.MATERIALS]),
 			NumberFormatter.format(cost[ColonyContent.DATA])]
 	button.custom_minimum_size = Vector2(0, 64)
 	button.focus_mode = Control.FOCUS_NONE
@@ -782,7 +783,7 @@ func _upgrade_block(index: int, holder: Array[Modal]) -> Control:
 			return
 		AudioManager.play("upgrade")
 		GameManager.vibrate(30)
-		UiFx.float_text("Niveau %d !" % _engine.level_of(index), button.get_global_rect().get_center(), Palette.MONEY)
+		UiFx.float_text(Tr.t("Niveau %d !") % _engine.level_of(index), button.get_global_rect().get_center(), Palette.MONEY)
 		if not holder.is_empty():
 			holder[0].close()
 		_show_building.call_deferred(index))
@@ -799,7 +800,7 @@ func _synergy_block(index: int) -> Control:
 	var box := UiFx.vbox(6)
 	var active := _engine.synergies_of(index)
 	for synergy: Dictionary in active:
-		var title := UiFx.label("✦ %s : %s" % [synergy.name, synergy.effect], "BodyLabel")
+		var title := UiFx.label(Tr.t("✦ %s : %s") % [Tr.t(synergy.name), Tr.t(synergy.effect)], "BodyLabel")
 		title.add_theme_color_override("font_color", SYNERGY_COLOR)
 		box.add_child(title)
 		box.add_child(UiFx.paragraph(synergy.why, "SmallLabel"))
@@ -807,9 +808,9 @@ func _synergy_block(index: int) -> Control:
 	var id: String = _engine.state.buildings[index].id
 	for synergy: Dictionary in ColonyContent.SYNERGIES:
 		if synergy.building == id and not active.has(synergy):
-			possible.append("collé à : %s → %s" % [_engine.building_defs[synergy.neighbor].name, synergy.effect])
+			possible.append(Tr.t("collé à : %s → %s") % [Tr.t(_engine.building_defs[synergy.neighbor].name), Tr.t(synergy.effect)])
 	if not possible.is_empty():
-		var hint := UiFx.paragraph("Synergie possible si " + ", ou ".join(possible) + ".", "SmallLabel")
+		var hint := UiFx.paragraph(Tr.t("Synergie possible si ") + Tr.t(", ou ").join(possible) + ".", "SmallLabel")
 		hint.add_theme_color_override("font_color", Palette.TEXT_MUTED)
 		box.add_child(hint)
 	return box
@@ -819,10 +820,10 @@ func _synergy_block(index: int) -> Control:
 func _show_synergies() -> void:
 	var list := UiFx.vbox(14)
 	for synergy: Dictionary in ColonyContent.SYNERGIES:
-		var pair := "%s + %s" % [_engine.building_defs[synergy.building].name, _engine.building_defs[synergy.neighbor].name]
+		var pair := Tr.t("%s + %s") % [Tr.t(_engine.building_defs[synergy.building].name), Tr.t(_engine.building_defs[synergy.neighbor].name)]
 		var title := UiFx.label("✦ " + synergy.name, "HeadingLabel")
 		title.add_theme_color_override("font_color", SYNERGY_COLOR)
-		var effect := UiFx.paragraph("%s → %s" % [pair, synergy.effect], "BodyLabel")
+		var effect := UiFx.paragraph(Tr.t("%s → %s") % [pair, Tr.t(synergy.effect)], "BodyLabel")
 		list.add_child(UiFx.vbox(2, [title, effect, UiFx.paragraph(synergy.why, "SmallLabel")]))
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -830,9 +831,9 @@ func _show_synergies() -> void:
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(list)
 	Modal.open(_modal_layer, {
-		"icon": "tab_build", "title": "Synergies",
-		"body": "Collez ces modules l'un contre l'autre (sans conduite entre eux). Active : %d." % _engine.active_synergy_count(),
-		"extra": scroll, "confirm_text": "Fermer",
+		"icon": "tab_build", "title": Tr.t("Synergies"),
+		"body": Tr.t("Collez ces modules l'un contre l'autre (sans conduite entre eux). Active : %d.") % _engine.active_synergy_count(),
+		"extra": scroll, "confirm_text": Tr.t("Fermer"),
 	})
 
 
@@ -856,7 +857,7 @@ func _next_discovery() -> void:
 
 func _show_card(card_id: String) -> void:
 	var card: Defs.Card = _engine.cards[card_id]
-	var status := UiFx.label(card.status.to_upper(), "CaptionLabel")
+	var status := UiFx.label(Tr.t(card.status).to_upper(), "CaptionLabel")
 	status.add_theme_color_override("font_color", Palette.STATUS_COLORS.get(card.status, Palette.TEXT_MUTED))
 	var figure := UiFx.label(card.figure, "NumberLabel")
 	figure.add_theme_font_size_override("font_size", 40)
@@ -867,7 +868,7 @@ func _show_card(card_id: String) -> void:
 	head_text.alignment = BoxContainer.ALIGNMENT_CENTER
 	var head := UiFx.hbox(12, [UiFx.panel("Thumb", UiFx.building_icon(card.visual, Vector2(150, 120))), head_text])
 
-	var in_game := UiFx.paragraph("Dans le jeu : " + card.in_game, "SmallLabel")
+	var in_game := UiFx.paragraph(Tr.t("Dans le jeu : ") + Tr.t(card.in_game), "SmallLabel")
 	in_game.add_theme_color_override("font_color", Palette.ACCENT)
 	var content := UiFx.vbox(12, [head, UiFx.paragraph(card.fact, "BodyLabel"), in_game])
 	if not card.quiz.is_empty():
@@ -886,17 +887,17 @@ func _show_card(card_id: String) -> void:
 	scroll.custom_minimum_size.y = minf(820.0, size.y * 0.64)
 	scroll.add_child(content)
 	Modal.open(_modal_layer, {
-		"icon": "tab_knowledge", "title": card.title, "extra": scroll, "confirm_text": "Fermer",
+		"icon": "tab_knowledge", "title": card.title, "extra": scroll, "confirm_text": Tr.t("Fermer"),
 	})
 	var reward := _engine.read_card(card_id)
 	if reward > 0.0:
 		AudioManager.play("upgrade")
-		UiFx.float_text("+%d données" % int(reward), Vector2(size.x / 2.0, size.y * 0.5), Palette.resource_color(ColonyContent.DATA))
+		UiFx.float_text(Tr.t("+%d données") % int(reward), Vector2(size.x / 2.0, size.y * 0.5), Palette.resource_color(ColonyContent.DATA))
 
 
 ## Quiz d'une fiche : trois choix, une seule tentative, des données pour la bonne réponse.
 func _quiz_block(card: Defs.Card) -> Control:
-	var caption := UiFx.label("QUIZ · +%d données" % int(ColonyEngine.QUIZ_REWARD), "CaptionLabel")
+	var caption := UiFx.label(Tr.t("QUIZ · +%d données") % int(ColonyEngine.QUIZ_REWARD), "CaptionLabel")
 	caption.add_theme_color_override("font_color", Palette.ACCENT)
 	var feedback := UiFx.paragraph("", "SmallLabel")
 	var box := UiFx.vbox(8, [caption, UiFx.paragraph(card.quiz, "HeadingLabel")])
@@ -915,20 +916,20 @@ func _quiz_block(card: Defs.Card) -> Control:
 			buttons[i].mouse_filter = Control.MOUSE_FILTER_IGNORE
 			if i == card.answer:
 				buttons[i].theme_type_variation = "GreenButton"
-				buttons[i].text = "✓  " + card.choices[i]
+				buttons[i].text = "✓  " + Tr.t(card.choices[i])
 			elif i == picked:
-				buttons[i].text = "✗  " + card.choices[i]
+				buttons[i].text = "✗  " + Tr.t(card.choices[i])
 				buttons[i].modulate = Color(1.0, 0.55, 0.5)
 			else:
 				buttons[i].modulate.a = 0.5
 		var good: bool = _engine.state.quiz_answers.get(card.id, false)
-		feedback.text = ("Bonne réponse ! +%d données." % int(ColonyEngine.QUIZ_REWARD) if good
-				else "Raté : la bonne réponse est « %s »." % card.choices[card.answer])
+		feedback.text = (Tr.t("Bonne réponse ! +%d données.") % int(ColonyEngine.QUIZ_REWARD) if good
+				else Tr.t("Raté : la bonne réponse est « %s ».") % Tr.t(card.choices[card.answer]))
 		feedback.add_theme_color_override("font_color", Palette.SUCCESS if good else Palette.WARNING)
 	if _engine.state.quiz_answers.has(card.id):
 		show_result.call(-1)
 		if _engine.state.quiz_answers[card.id]:
-			feedback.text = "Quiz réussi ✓"
+			feedback.text = Tr.t("Quiz réussi ✓")
 	else:
 		for i in buttons.size():
 			buttons[i].pressed.connect(func() -> void:
@@ -937,7 +938,7 @@ func _quiz_block(card: Defs.Card) -> Control:
 				GameManager.vibrate(30 if good else 60)
 				show_result.call(i)
 				if good:
-					UiFx.float_text("+%d données" % int(ColonyEngine.QUIZ_REWARD), buttons[i].get_global_rect().get_center(),
+					UiFx.float_text(Tr.t("+%d données") % int(ColonyEngine.QUIZ_REWARD), buttons[i].get_global_rect().get_center(),
 							Palette.resource_color(ColonyContent.DATA))
 				else:
 					UiFx.shake(buttons[i]))
@@ -957,30 +958,30 @@ func _show_resource(resource: String) -> void:
 		if amount != 0.0:
 			by_type[def.name] = by_type.get(def.name, 0.0) + amount
 	for name: String in by_type:
-		lines.append("%s : %s%s %s/sol" % [name, "+" if by_type[name] > 0.0 else "", NumberFormatter.format(by_type[name]), unit])
+		lines.append(Tr.t("%s : %s%s %s/sol") % [name, "+" if by_type[name] > 0.0 else "", NumberFormatter.format(by_type[name]), unit])
 	var needs := _engine.colonist_needs()
 	if needs.has(resource):
-		lines.append("Colons (%d) : −%s %s/sol" % [_engine.state.colonists.size(),
+		lines.append(Tr.t("Colons (%d) : −%s %s/sol") % [_engine.state.colonists.size(),
 				NumberFormatter.format(needs[resource] * _engine.state.colonists.size()), unit])
 	if resource == ColonyContent.DATA:
-		lines.append("Colons (%d) : +%s/sol" % [_engine.state.colonists.size(), NumberFormatter.format(ColonyContent.COLONIST_DATA * _engine.state.colonists.size())])
+		lines.append(Tr.t("Colons (%d) : +%s/sol") % [_engine.state.colonists.size(), NumberFormatter.format(ColonyContent.COLONIST_DATA * _engine.state.colonists.size())])
 	var capacity := _engine.capacity(resource)
-	var stock := "%s %s" % [NumberFormatter.format(_engine.state.amount(resource)), unit]
+	var stock := Tr.t("%s %s") % [NumberFormatter.format(_engine.state.amount(resource)), unit]
 	if not is_inf(capacity):
-		stock += " / %s" % NumberFormatter.format(capacity)
+		stock += Tr.t(" / %s") % NumberFormatter.format(capacity)
 	var flow: float = flows[resource]
 	Modal.open(_modal_layer, {
 		"icon": resource,
 		"title": ColonyContent.RESOURCE_NAMES[resource],
 		"body": ColonyContent.RESOURCE_HELP[resource],
 		"extra": UiFx.vbox(6, [
-			UiFx.label("Réserve : " + stock, "HeadingLabel", HORIZONTAL_ALIGNMENT_CENTER),
-			UiFx.label("Bilan moyen : %s%s %s/sol" % ["+" if flow >= 0.0 else "", NumberFormatter.format(flow), unit],
+			UiFx.label(Tr.t("Réserve : ") + stock, "HeadingLabel", HORIZONTAL_ALIGNMENT_CENTER),
+			UiFx.label(Tr.t("Bilan moyen : %s%s %s/sol") % ["+" if flow >= 0.0 else "", NumberFormatter.format(flow), unit],
 					"IncomeLabel" if flow >= 0.0 else "BodyLabel", HORIZONTAL_ALIGNMENT_CENTER),
-			UiFx.paragraph("\n".join(lines) if not lines.is_empty() else "Aucun module ne produit ni ne consomme cette ressource.",
+			UiFx.paragraph("\n".join(lines) if not lines.is_empty() else Tr.t("Aucun module ne produit ni ne consomme cette ressource."),
 					"SmallLabel", HORIZONTAL_ALIGNMENT_CENTER),
 		]),
-		"confirm_text": "Fermer",
+		"confirm_text": Tr.t("Fermer"),
 	})
 
 
@@ -989,14 +990,14 @@ func _show_offline_report(report: Dictionary) -> void:
 	for r in ColonyContent.RESOURCES:
 		var delta: float = report.gains.get(r, 0.0)
 		if absf(delta) >= 0.5:
-			lines.append("%s : %s%s" % [ColonyContent.RESOURCE_NAMES[r], "+" if delta > 0.0 else "", NumberFormatter.format(delta)])
-	var body := "Absence : %s. La colonie a tourné en pilote automatique pendant %s sol%s, sans tempête ni danger." % [
+			lines.append(Tr.t("%s : %s%s") % [Tr.t(ColonyContent.RESOURCE_NAMES[r]), "+" if delta > 0.0 else "", NumberFormatter.format(delta)])
+	var body := Tr.t("Absence : %s. La colonie a tourné en pilote automatique pendant %s sol%s, sans tempête ni danger.") % [
 		NumberFormatter.duration(report.elapsed), NumberFormatter.format(report.sols), "s" if report.sols >= 2.0 else ""]
 	if not report.standby.is_empty():
-		body += "\n\nVeille sécurisée déclenchée : la réserve %s allait s'épuiser. %s" % [
-			ColonyContent.RESOURCE_PARTITIVE[report.standby], ColonyEngine.CAUSES.get(report.standby, "")]
+		body += Tr.t("\n\nVeille sécurisée déclenchée : la réserve %s allait s'épuiser. %s") % [
+			Tr.t(ColonyContent.RESOURCE_PARTITIVE[report.standby]), Tr.t(ColonyEngine.CAUSES.get(report.standby, ""))]
 	Modal.open(_modal_layer, {
-		"icon": "clock", "title": "Rapport du pilote automatique", "body": body,
+		"icon": "clock", "title": Tr.t("Rapport du pilote automatique"), "body": body,
 		"extra": UiFx.paragraph("\n".join(lines), "BodyLabel", HORIZONTAL_ALIGNMENT_CENTER),
 		"confirm_text": "Reprendre",
 	})
@@ -1004,7 +1005,7 @@ func _show_offline_report(report: Dictionary) -> void:
 
 func _show_settings() -> void:
 	var to_menu := Button.new()
-	to_menu.text = "Menu principal"
+	to_menu.text = Tr.t("Menu principal")
 	to_menu.custom_minimum_size.y = 60
 	to_menu.focus_mode = Control.FOCUS_NONE
 	var modal: Modal
@@ -1013,24 +1014,24 @@ func _show_settings() -> void:
 		modal.close()
 		GameManager.open_menu())
 	var extra := SettingsPanel.build()
-	extra.add_child(UiFx.paragraph("Glissez pour parcourir le cratère, pincez (ou molette) pour zoomer.\n"
-			+ "Touchez un module pour le détail, une ressource pour son explication.\n"
-			+ "Hors-ligne : pilote automatique prudent, 8 h au plus, sans tempête.",
+	extra.add_child(UiFx.paragraph(Tr.t("Glissez pour parcourir le cratère, pincez (ou molette) pour zoomer.\n")
+			+ Tr.t("Touchez un module pour le détail, une ressource pour son explication.\n")
+			+ Tr.t("Hors-ligne : pilote automatique prudent, 8 h au plus, sans tempête."),
 			"SmallLabel", HORIZONTAL_ALIGNMENT_CENTER))
 	extra.add_child(to_menu)
-	extra.add_child(UiFx.label("La partie est sauvegardée automatiquement.", "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER))
+	extra.add_child(UiFx.label(Tr.t("La partie est sauvegardée automatiquement."), "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER))
 	modal = Modal.open(_modal_layer, {
-		"icon": "gear", "title": "Réglages", "extra": extra, "confirm_text": "Fermer",
+		"icon": "gear", "title": Tr.t("Réglages"), "extra": extra, "confirm_text": Tr.t("Fermer"),
 	})
 
 
 func _show_load_problem() -> void:
 	match GameManager.load_result:
 		SaveService.LoadResult.RESTORED_FROM_BACKUP:
-			_news.post("Sauvegarde restaurée depuis la copie de secours.")
+			_news.post(Tr.t("Sauvegarde restaurée depuis la copie de secours."))
 		SaveService.LoadResult.CORRUPTED:
 			Modal.open(_modal_layer, {
-				"icon": "warning", "title": "Sauvegarde illisible",
-				"body": "Une nouvelle colonie commence. L'ancien fichier a été conservé à part et ne sera pas effacé.",
-				"confirm_text": "Compris",
+				"icon": "warning", "title": Tr.t("Sauvegarde illisible"),
+				"body": Tr.t("Une nouvelle colonie commence. L'ancien fichier a été conservé à part et ne sera pas effacé."),
+				"confirm_text": Tr.t("Compris"),
 			})

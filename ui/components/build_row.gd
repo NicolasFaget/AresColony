@@ -21,16 +21,16 @@ func _ready() -> void:
 	thumb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 	var title := UiFx.label(def.name, "HeadingLabel")
-	var size_label := UiFx.label("%d×%d" % [def.size.x, def.size.y], "CaptionLabel")
+	var size_label := UiFx.label(Tr.t("%d×%d") % [def.size.x, def.size.y], "CaptionLabel")
 	var effects := UiFx.hbox(10)
 	for r: String in def.outputs:
 		effects.add_child(_effect(r, def.outputs[r], true))
 	for r: String in def.inputs:
 		effects.add_child(_effect(r, def.inputs[r], false))
 	for r: String in def.storage:
-		effects.add_child(_effect(r, def.storage[r], true, "stock "))
+		effects.add_child(_effect(r, def.storage[r], true, Tr.t("stock ")))
 	if def.housing > 0:
-		effects.add_child(_effect_icon("person", Palette.TEXT, "+%d colons" % def.housing))
+		effects.add_child(_effect_icon("person", Palette.TEXT, Tr.t("+%d colons") % def.housing))
 	_lock = UiFx.label("", "SmallLabel")
 	_lock.add_theme_color_override("font_color", Palette.WARNING)
 	var info := UiFx.vbox(4, [UiFx.hbox(8, [title, size_label]), effects, _lock])
@@ -42,7 +42,7 @@ func _ready() -> void:
 	_button.custom_minimum_size = Vector2(128, 64)
 	_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_cost = UiFx.label(NumberFormatter.format(def.cost), "NumberLabel")
-	var content := UiFx.vbox(0, [UiFx.label("Placer", "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER),
+	var content := UiFx.vbox(0, [UiFx.label(Tr.t("Placer"), "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER),
 			UiFx.hbox(4, [UiFx.image(UiFx.icon("materials"), 20, Palette.ON_MONEY), _cost])])
 	(content.get_child(1) as BoxContainer).alignment = BoxContainer.ALIGNMENT_CENTER
 	content.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -61,7 +61,7 @@ func refresh() -> void:
 	_button.visible = unlocked
 	_lock.visible = not unlocked
 	if not unlocked:
-		_lock.text = "Recherche nécessaire : %s" % engine.research_defs[def.research].name
+		_lock.text = Tr.t("Recherche nécessaire : %s") % Tr.t(engine.research_defs[def.research].name)
 		return
 	var affordable := engine.state.amount(ColonyContent.MATERIALS) >= def.cost
 	_button.disabled = not affordable
