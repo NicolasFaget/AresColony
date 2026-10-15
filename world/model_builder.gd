@@ -175,6 +175,9 @@ static func building(building_id: String) -> Node3D:
 		"garage": _garage(root, true)
 		"garage_empty": _garage(root, false)
 		"erv": _erv(root)
+		"bunker": _bunker(root)
+		"reactor": _reactor(root)
+		"biodome": _biodome(root)
 	return root
 
 
@@ -376,6 +379,80 @@ static func _erv(r: Node3D) -> void:
 		strut(r, Vector3(0.62, y, -0.5), Vector3(0.2, y + 0.1, -0.15), 0.025, ORANGE)
 	cylinder(r, Vector3(-0.6, 0.35, 0.55), 0.18, 0.5, Color("#e98a5a"), Vector3.ZERO, -1.0, 16)
 	strut(r, Vector3(-0.5, 0.5, 0.45), Vector3(-0.15, 0.7, 0.1), 0.03, GREY)
+
+
+## Habitat enterré : un tumulus de régolithe, un sas en façade et des puits de lumière.
+static func _bunker(r: Node3D) -> void:
+	_pad(r, 1.9)
+	var soil := Color("#b8714a")
+	sphere(r, Vector3(0, 0.05, -0.05), 0.85, soil, Vector3(1.0, 0.55, 1.0), 0.0, true, 24)
+	sphere(r, Vector3(-0.35, 0.05, 0.3), 0.45, soil.darkened(0.08), Vector3(1.0, 0.6, 1.0), 0.0, true, 16)
+	# Sas d'entrée, voûté.
+	box(r, Vector3(0.15, 0.22, 0.72), Vector3(0.42, 0.36, 0.3), WHITE)
+	cylinder(r, Vector3(0.15, 0.4, 0.72), 0.21, 0.3, WHITE, Vector3(90, 0, 0), -1.0, 16)
+	box(r, Vector3(0.15, 0.2, 0.875), Vector3(0.24, 0.3, 0.02), DARK)
+	light(r, Vector3(0.36, 0.42, 0.88), Color("#5be49b"), 0.025, 2.0)
+	for at in [Vector3(-0.2, 0.44, -0.2), Vector3(0.3, 0.38, -0.3)]:
+		cylinder(r, at, 0.07, 0.12, WHITE, Vector3.ZERO, -1.0, 10)
+		cylinder(r, at + Vector3(0, 0.065, 0), 0.06, 0.01, LIGHT, Vector3.ZERO, -1.0, 10)
+
+
+## Réacteur à fission : cœur cylindrique, moteurs Stirling, grands radiateurs, clôture.
+static func _reactor(r: Node3D) -> void:
+	_pad(r, 1.9)
+	cylinder(r, Vector3(0, 0.45, 0), 0.22, 0.8, GREY, Vector3.ZERO, -1.0, 20)
+	cylinder(r, Vector3(0, 0.88, 0), 0.26, 0.08, DARK, Vector3.ZERO, -1.0, 20)
+	for angle in [0.0, 90.0, 180.0, 270.0]:
+		var dir := Vector3(cos(deg_to_rad(angle)), 0, sin(deg_to_rad(angle)))
+		cylinder(r, dir * 0.3 + Vector3(0, 0.75, 0), 0.06, 0.2, GOLD, Vector3.ZERO, -1.0, 10)
+	# Radiateurs : ils évacuent la chaleur que les moteurs Stirling ne transforment pas.
+	for side in [-1.0, 1.0]:
+		box(r, Vector3(side * 0.62, 0.6, 0), Vector3(0.04, 0.9, 1.3), Color("#dfe4ea"), Vector3(0, 0, side * -12.0))
+		for k in 5:
+			box(r, Vector3(side * 0.6, 0.6, -0.5 + k * 0.25), Vector3(0.05, 0.86, 0.02), GREY, Vector3(0, 0, side * -12.0))
+	light(r, Vector3(0, 0.95, 0), Color("#7ff5ea"), 0.04, 2.5)
+	for k in 6:
+		var x := -0.85 + k * 0.34
+		cylinder(r, Vector3(x, 0.15, 0.88), 0.012, 0.16, ORANGE, Vector3.ZERO, -1.0, 6)
+	box(r, Vector3(0, 0.2, 0.88), Vector3(1.75, 0.02, 0.01), ORANGE)
+
+
+## Serre géante : un grand dôme vitré sur un sol vivant, rangs de cultures et arbres fruitiers.
+static func _biodome(r: Node3D) -> void:
+	_pad(r, 2.9)
+	cylinder(r, Vector3(0, 0.1, 0), 1.3, 0.06, Color("#5a3b26"), Vector3.ZERO, -1.0, 32)
+	for row in 5:
+		for k in 7:
+			var at := Vector3(-0.9 + k * 0.3, 0.17, -0.8 + row * 0.4)
+			if at.length() < 1.15:
+				sphere(r, at, 0.1, GREEN if (row + k) % 2 == 0 else DARK_GREEN, Vector3(1.0, 0.8, 1.0), 0.0, false, 8)
+	for at in [Vector3(-0.4, 0.0, 0.3), Vector3(0.45, 0.0, -0.25)]:
+		cylinder(r, at + Vector3(0, 0.3, 0), 0.03, 0.4, Color("#6b4a2f"), Vector3.ZERO, -1.0, 8)
+		sphere(r, at + Vector3(0, 0.6, 0), 0.2, DARK_GREEN, Vector3.ONE, 0.0, false, 12)
+	var dome := sphere(r, Vector3(0, 0.1, 0), 1.35, GLASS, Vector3(1.0, 0.75, 1.0), 0.0, true, 32)
+	dome.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Armature : arceaux et anneaux (tores dans un repère aplati comme le dôme).
+	var frame := Node3D.new()
+	frame.position = Vector3(0, 0.1, 0)
+	frame.scale = Vector3(1.0, 0.75, 1.0)
+	r.add_child(frame)
+	for angle in [0.0, 45.0, 90.0, 135.0]:
+		var arch := TorusMesh.new()
+		arch.inner_radius = 1.33
+		arch.outer_radius = 1.37
+		arch.rings = 32
+		arch.ring_segments = 4
+		add(frame, arch, Vector3.ZERO, WHITE, Vector3(90, angle, 0))
+	for h in [0.45, 0.9]:
+		var ring := TorusMesh.new()
+		var radius := sqrt(1.35 * 1.35 - h * h)
+		ring.inner_radius = radius - 0.02
+		ring.outer_radius = radius + 0.02
+		ring.rings = 32
+		ring.ring_segments = 4
+		add(frame, ring, Vector3(0, h, 0), WHITE)
+	box(r, Vector3(0, 0.22, 1.33), Vector3(0.4, 0.3, 0.2), WHITE)
+	light(r, Vector3(0, 1.12, 0), WARM_LIGHT, 0.04, 2.0)
 
 
 ## Four à régolithe : four, concentrateur solaire sur mât, tapis et piles de briques.

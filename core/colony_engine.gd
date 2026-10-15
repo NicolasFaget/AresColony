@@ -20,6 +20,9 @@ signal resupply_arrived(report: Dictionary)
 signal shortage(resource: String)
 signal breakdown(index: int)
 signal era_started(era: int)
+signal flare_warning
+signal flare_started
+signal flare_ended
 signal expedition_returned(site: Dictionary)
 signal dust_devil(cleaned: int)
 
@@ -66,6 +69,13 @@ const EXPEDITION_SOLS := 2.0
 ## Ère 2 : colons visés et méthane à réunir pour le retour.
 const CITY_CREW := 14
 const RETURN_METHANE := 200.0
+## Éruptions solaires (ère 3) : préavis, durée, intervalle, santé perdue par sol sans abri.
+const FLARE_WARNING_SOLS := 0.5
+const FLARE_SOLS := 0.3
+const FLARE_DAMAGE := 1.0
+## Ère 3 : colons visés et note demandée.
+const ROOTED_CREW := 20
+const ROOTED_SCORE := 85.0
 const AUTONOMY_CREW := 8
 
 const START_RESOURCES := {
@@ -78,6 +88,7 @@ const CAUSES := {
 	ColonyContent.OXYGEN: "Manque d'oxygène. Construisez des électrolyseurs et donnez-leur assez d'énergie, jour et nuit.",
 	ColonyContent.WATER: "Manque d'eau. Recherchez la glace souterraine et posez un extracteur dessus.",
 	ColonyContent.FOOD: "Manque de nourriture. Les ravitaillements diminuent : il faut des serres.",
+	"radiation": "Radiations d'une éruption solaire. Construisez des habitats enterrés pour abriter tout le monde.",
 }
 
 var state: ColonyState
@@ -99,6 +110,7 @@ var _efficiency_avg: Array[float] = []
 var _occupied := {}
 var _rng := RandomNumberGenerator.new()
 var _storm_warned := false
+var _flare_warned := false
 var _shortage_flags := {}
 var _autopilot := false
 
@@ -704,17 +716,25 @@ func _update_health(satisfied: Dictionary, ds: float) -> void:
 			if satisfied.get(r, 1.0) < worst:
 				worst = satisfied.get(r, 1.0)
 				cause = r
+	var flare := is_flare()
+	var shelter := shelter_capacity()
 	for i in range(state.colonists.size() - 1, -1, -1):
 		var colonist: Dictionary = state.colonists[i]
-		if loss <= 0.0:
+		var mine := loss
+		var why := cause
+		# Les premiers colons trouvent place dans les abris ; les autres prennent les radiations.
+		if flare and i >= shelter:
+			mine += FLARE_DAMAGE
+			why = "radiation"
+		if mine <= 0.0:
 			colonist.health = minf(1.0, colonist.health + 0.3 * ds)
 		elif not _autopilot:
 			# Résistance un peu différente selon les colons : ils ne partent pas tous en même temps.
-			colonist.health -= loss * ds * (1.0 + 0.12 * (i % 4))
+			colonist.health -= mine * ds * (1.0 + 0.12 * (i % 4))
 			if colonist.health <= 0.0:
 				state.colonists.remove_at(i)
 				state.evacuated += 1
-				colonist_evacuated.emit(colonist.name, CAUSES.get(cause, ""))
+				colonist_evacuated.emit(colonist.name, CAUSES.get(why, ""))
 
 
 func _arrive(member: Array) -> void:
@@ -761,6 +781,7 @@ func _events() -> void:
 	_dust_devils()
 	_breakdowns()
 	_finish_expedition()
+	_flares()
 
 
 # ---------- Poussière et pannes ----------
@@ -952,6 +973,42 @@ func _finish_expedition() -> void:
 	_check_objectives()
 
 
+# ---------- Éruptions solaires (ère 3) ----------
+
+func is_flare() -> bool:
+	return state.flare_until > 0.0 and state.sol < state.flare_until
+
+
+func flare_soon() -> bool:
+	return not is_flare() and state.next_flare - state.sol <= FLARE_WARNING_SOLS
+
+
+## Colons qui tiennent dans les abris (habitats enterrés raccordés).
+func shelter_capacity() -> int:
+	var total := 0
+	for i in state.buildings.size():
+		if _connected[i]:
+			total += def_of(i).shelter
+	return total
+
+
+func _flares() -> void:
+	if state.era < 3:
+		return
+	if not _flare_warned and flare_soon():
+		_flare_warned = true
+		flare_warning.emit()
+	if state.flare_until < 0.0 and state.sol >= state.next_flare:
+		state.flare_until = state.sol + FLARE_SOLS
+		state.next_flare = state.flare_until + _rng.randf_range(10.0, 16.0)
+		state.event_seed = _rng.state
+		flare_started.emit()
+	elif state.flare_until > 0.0 and state.sol >= state.flare_until:
+		state.flare_until = -1.0
+		_flare_warned = false
+		flare_ended.emit()
+
+
 func resupplies_left() -> int:
 	return maxi(0, RESUPPLY_LIMIT - state.resupply_count)
 
@@ -988,7 +1045,11 @@ func _check_objectives() -> void:
 			if objective.era == state.era and not state.objectives_done.has(objective.id):
 				return
 		state.era += 1
+		if state.era == 3:
+			state.next_flare = state.sol + 6.0
 		era_started.emit(state.era)
+		if state.era == 3:
+			unlock_card("terraforming")
 
 
 func _objective_met(objective_id: String) -> bool:
@@ -1021,6 +1082,18 @@ func _objective_met(objective_id: String) -> bool:
 			return state.colonists.size() >= CITY_CREW
 		"return":
 			return _has_connected("erv") and state.amount(ColonyContent.METHANE) >= RETURN_METHANE
+		"shelter":
+			return shelter_capacity() >= maxi(4, state.colonists.size())
+		"nuclear":
+			return _has_connected("reactor")
+		"garden":
+			return _has_connected("biodome")
+		"rooted":
+			for other in ["shelter", "nuclear", "garden"]:
+				if not state.objectives_done.has(other):
+					return false
+			return state.colonists.size() >= ROOTED_CREW and shelter_capacity() >= state.colonists.size() \
+					and colony_rating().score >= ROOTED_SCORE
 	return false
 
 
@@ -1046,6 +1119,11 @@ func objective_progress(objective_id: String) -> float:
 			return clampf(float(state.colonists.size()) / CITY_CREW, 0.0, 1.0)
 		"return":
 			return clampf(state.amount(ColonyContent.METHANE) / RETURN_METHANE, 0.0, 1.0) if _has_connected("erv") else 0.0
+		"shelter":
+			return clampf(float(shelter_capacity()) / maxi(4, state.colonists.size()), 0.0, 1.0)
+		"rooted":
+			return clampf(minf(minf(float(state.colonists.size()) / ROOTED_CREW, colony_rating().score / ROOTED_SCORE),
+					float(shelter_capacity()) / maxi(1, state.colonists.size())), 0.0, 1.0)
 	return 0.0
 
 

@@ -23,6 +23,9 @@ var era: int = 1
 var expedition: Dictionary = {}
 var sites_done: Array[String] = []
 var expeditions: int = 0
+## Éruptions solaires (ère 3) : prochaine, et fin de celle en cours.
+var next_flare: float = 1e9
+var flare_until: float = -1.0
 ## Fiches déjà lues (la première lecture rapporte des données).
 var cards_read: Array[String] = []
 ## Quiz répondus : identifiant de fiche -> vrai si bonne réponse (une seule tentative).
@@ -83,6 +86,8 @@ func to_dict() -> Dictionary:
 		"expedition": expedition.duplicate(),
 		"sites_done": sites_done.duplicate(),
 		"expeditions": expeditions,
+		"next_flare": next_flare,
+		"flare_until": flare_until,
 		"cards_read": cards_read.duplicate(),
 		"quiz_answers": quiz_answers.duplicate(),
 		"map_seed": map_seed,
@@ -133,12 +138,14 @@ static func from_dict(data: Dictionary) -> ColonyState:
 	state.research_progress = clampf(_num(data.get("research_progress"), 0.0), 0.0, 1.0)
 	state.objectives_done = _ids(data.get("objectives_done"))
 	state.cards_unlocked = _ids(data.get("cards_unlocked"))
-	state.era = clampi(int(_num(data.get("era"), 1)), 1, 2)
+	state.era = clampi(int(_num(data.get("era"), 1)), 1, 3)
 	var trip: Variant = data.get("expedition")
 	if trip is Dictionary and trip.get("site") is String:
 		state.expedition = { "site": trip.site, "until": _num(trip.get("until"), 0.0) }
 	state.sites_done = _ids(data.get("sites_done"))
 	state.expeditions = int(_num(data.get("expeditions"), 0))
+	state.next_flare = _num(data.get("next_flare"), state.next_flare)
+	state.flare_until = _num(data.get("flare_until"), -1.0)
 	state.cards_read = _ids(data.get("cards_read"))
 	var answers: Variant = data.get("quiz_answers")
 	if answers is Dictionary:

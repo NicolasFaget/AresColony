@@ -48,13 +48,14 @@ const COLONIST_NEEDS := { OXYGEN: 0.84, WATER: 2.5, FOOD: 1.0, ENERGY: 0.5 }
 ## Données scientifiques produites par chaque colon par sol.
 const COLONIST_DATA := 1.0
 ## Modules qui peuvent tomber en panne (les machines).
-const BREAKABLE := ["moxie", "extractor", "greenhouse", "electrolyser", "kiln", "sabatier"]
+const BREAKABLE := ["moxie", "extractor", "greenhouse", "electrolyser", "kiln", "sabatier", "biodome"]
 ## Ce que racontent les colons quand une machine lâche.
 const BREAKDOWN_LINES := {
 	"moxie": "L'électrolyseur de CO₂ a surchauffé. Il sent le grille-pain.",
 	"extractor": "La foreuse de l'extracteur est coincée dans la glace. Elle boude.",
 	"greenhouse": "Une pompe d'arrosage de la serre a lâché. Les radis s'inquiètent.",
 	"electrolyser": "Une fuite sur l'électrolyseur d'eau ! Le sifflement est très désagréable.",
+	"biodome": "L'arrosage de la serre géante s'est bloqué. Les tomates font la tête.",
 	"sabatier": "Le réacteur Sabatier a perdu la pression. Il boude à 400 °C.",
 	"kiln": "Le four à régolithe s'est arrêté net. Il y a de la poussière partout. Encore plus que d'habitude.",
 }
@@ -136,6 +137,22 @@ static func buildings() -> Array[Defs.Building]:
 			"storage": { METHANE: 200.0 }, "card": "mars_direct",
 			"description": "La fusée qui ramènera un jour l'équipage. Ses réservoirs se remplissent avec le méthane fabriqué sur Mars.",
 		}),
+		Defs.Building.new({
+			"id": "bunker", "name": "Habitat enterré", "size": Vector2i(2, 2), "cost": 120.0, "research": "shielding",
+			"inputs": { ENERGY: 3.0 }, "storage": { OXYGEN: 20.0, FOOD: 20.0 }, "housing": 4, "shelter": 4, "card": "radiation",
+			"description": "Un habitat couvert d'environ un mètre de régolithe : quatre colons y sont à l'abri des radiations.",
+		}),
+		Defs.Building.new({
+			"id": "reactor", "name": "Réacteur à fission", "size": Vector2i(2, 2), "cost": 200.0, "research": "fission",
+			"outputs": { ENERGY: 60.0 }, "card": "kilopower",
+			"description": "Un petit réacteur nucléaire : de l'énergie jour et nuit, tempête ou pas, sans poussière sur les panneaux.",
+		}),
+		Defs.Building.new({
+			"id": "biodome", "name": "Serre géante", "size": Vector2i(3, 3), "cost": 160.0, "research": "soil",
+			"inputs": { ENERGY: 16.0, WATER: 8.0 }, "outputs": { FOOD: 14.0, OXYGEN: 2.0 }, "storage": { FOOD: 80.0 },
+			"card": "worms",
+			"description": "Une grande serre sur un vrai sol vivant : régolithe lavé, compost et vers de terre.",
+		}),
 	]
 
 
@@ -143,6 +160,7 @@ static func buildings() -> Array[Defs.Building]:
 const ERAS := {
 	1: "Ère 1 · Survie : tenir sans dépendre de la Terre.",
 	2: "Ère 2 · Expansion : explorer Jezero et préparer le retour.",
+	3: "Ère 3 · Racines : vivre durablement sur Mars.",
 }
 
 ## Expéditions en rover (ère 2) : sites réels autour de Jezero, découverts dans l'ordre ; ensuite,
@@ -214,6 +232,14 @@ const UPGRADES := {
 			"inputs": { ENERGY: 0.7 },
 			"why": "La réaction de Sabatier dégage de la chaleur : on la récupère pour préchauffer les gaz au lieu de la perdre." },
 	],
+	"biodome": [
+		{ "name": "Vers de terre", "effect": "+25 % de nourriture",
+			"outputs": { FOOD: 1.25 },
+			"why": "Les vers aèrent le sol, mélangent la matière organique et aident l'eau à pénétrer : un sol vivant nourrit mieux les plantes." },
+		{ "name": "Compost des déchets", "effect": "+25 % de nourriture, −20 % d'eau",
+			"outputs": { FOOD: 1.25 }, "inputs": { WATER: 0.8 },
+			"why": "Les restes de récolte, compostés, rendent au sol ses nutriments et l'aident à retenir l'eau." },
+	],
 	"kiln": [
 		{ "name": "Concentrateur solaire", "effect": "−30 % d'énergie",
 			"inputs": { ENERGY: 0.7 },
@@ -236,6 +262,10 @@ const UPGRADES := {
 ## `building` reçoit le bonus quand au moins un `neighbor` le touche. Les effets ne se cumulent pas.
 ## outputs / inputs : multiplicateurs par ressource.
 const SYNERGIES := [
+	{ "id": "kiln_reactor", "building": "kiln", "neighbor": "reactor",
+		"name": "Chaleur nucléaire", "effect": "−40 % d'énergie pour le four",
+		"outputs": {}, "inputs": { ENERGY: 0.6 },
+		"why": "Le cœur d'un petit réacteur comme KRUSTY fonctionne vers 800 °C : sa chaleur, au lieu d'être perdue dans les radiateurs, aide à cuire le régolithe." },
 	{ "id": "sabatier_electrolyser", "building": "sabatier", "neighbor": "electrolyser",
 		"name": "Boucle de l'hydrogène", "effect": "−25 % d'eau pour le réacteur",
 		"outputs": {}, "inputs": { WATER: 0.75 },
@@ -296,6 +326,15 @@ static func research() -> Array[Defs.Research]:
 		Defs.Research.new({ "id": "erv", "name": "Mars Direct", "cost": 80.0, "duration": 3.0, "era": 2,
 				"requires": ["sabatier"], "card": "mars_direct",
 				"summary": "Débloque le véhicule de retour, à remplir de méthane fabriqué sur Mars." }),
+		Defs.Research.new({ "id": "shielding", "name": "Blindage en régolithe", "cost": 60.0, "duration": 2.0, "era": 3,
+				"requires": ["regolith"], "card": "radiation",
+				"summary": "Débloque l'habitat enterré : un abri contre les éruptions solaires." }),
+		Defs.Research.new({ "id": "fission", "name": "Réacteur à fission", "cost": 90.0, "duration": 3.0, "era": 3,
+				"card": "kilopower",
+				"summary": "Débloque un petit réacteur nucléaire : de l'énergie même la nuit et pendant les tempêtes." }),
+		Defs.Research.new({ "id": "soil", "name": "Sol vivant", "cost": 70.0, "duration": 2.0, "era": 3,
+				"requires": ["perchlorate"], "card": "worms",
+				"summary": "Débloque la serre géante, sur un sol enrichi de compost et de vers de terre." }),
 	]
 
 
@@ -332,6 +371,18 @@ static func objectives() -> Array[Defs.Objective]:
 		Defs.Objective.new({ "id": "return", "title": "Retour assuré", "era": 2,
 				"description": "Construire le véhicule de retour et réunir 200 kg de méthane.",
 				"reward": { DATA: 50.0 } }),
+		Defs.Objective.new({ "id": "shelter", "title": "À l'abri", "era": 3,
+				"description": "Pouvoir abriter tous les colons des radiations (habitats enterrés).",
+				"reward": { DATA: 40.0 } }),
+		Defs.Objective.new({ "id": "nuclear", "title": "Énergie de base", "era": 3,
+				"description": "Construire un réacteur à fission.",
+				"reward": { MATERIALS: 100.0 } }),
+		Defs.Objective.new({ "id": "garden", "title": "Grand jardin", "era": 3,
+				"description": "Construire une serre géante sur un sol vivant.",
+				"reward": { DATA: 40.0 } }),
+		Defs.Objective.new({ "id": "rooted", "title": "Enracinés", "era": 3,
+				"description": "Accueillir 20 colons, tous à l'abri, avec la note d'efficacité A (85 / 100).",
+				"reward": { DATA: 100.0 } }),
 	]
 
 
@@ -454,6 +505,34 @@ static func cards() -> Array[Defs.Card]:
 			"in_game": "L'expédition à Nili Fossae rapporte des données et des minerais.",
 			"sources": [["HiRISE (Université d'Arizona)", "https://www.uahirise.org/PSP_007358_2015"],
 				["Science News", "https://www.sciencenews.org/article/craft-reveals-martian-site-ancient-water"]] }),
+		Defs.Card.new({ "id": "radiation", "figure": "0,67 mSv", "figure_label": "de radiations par jour à la surface de Mars", "visual": "bunker",
+			"quiz": "Où la dose de radiations mesurée par Curiosity était-elle la plus forte ?", "choices": ["Pendant le voyage vers Mars", "À la surface de Mars", "Au fond d'un cratère"], "answer": 0,
+			"title": "Sous les rayons cosmiques", "status": "Mesuré",
+			"fact": "Sans champ magnétique global et avec une atmosphère très fine, Mars est peu protégée. Le rover Curiosity a mesuré une dose moyenne de 0,67 millisievert par jour à la surface, due aux rayons cosmiques (2012-2013), contre 1,8 mSv par jour pendant le voyage. Les éruptions solaires ajoutent des pics : d'après des études de modélisation, environ un mètre de régolithe au-dessus d'un habitat en fait un bon abri.",
+			"in_game": "Pendant une éruption solaire, les colons qui n'ont pas de place dans un habitat enterré perdent de la santé.",
+			"sources": [["SwRI (2013)", "https://www.swri.org/press-release/swri-scientists-publish-first-radiation-measurements-surface-mars"],
+				["Universe Today", "https://www.universetoday.com/158091/whats-the-best-shielding-to-protect-astronauts-on-mars"]] }),
+		Defs.Card.new({ "id": "kilopower", "figure": "10 ans", "figure_label": "d'électricité jour et nuit visés par le projet Kilopower", "visual": "reactor",
+			"quiz": "Quel avantage a un réacteur à fission sur les panneaux solaires ?", "choices": ["Il marche la nuit et pendant les tempêtes", "Il ne pèse presque rien", "Il ne chauffe pas"], "answer": 0,
+			"title": "Un réacteur pour Mars", "status": "Expérimenté",
+			"fact": "En 2018, au Nevada, la NASA a testé KRUSTY, un petit réacteur à fission dont le cœur, vers 800 °C, alimentait des moteurs Stirling : environ 1 kilowatt d'électricité. L'essai final a duré 28 heures à pleine puissance. Le projet Kilopower vise jusqu'à 10 kW pendant au moins 10 ans ; selon la NASA, quatre unités suffiraient pour un avant-poste.",
+			"in_game": "Le réacteur à fission produit la même énergie jour et nuit, même pendant les tempêtes de poussière.",
+			"sources": [["NASA – Technical Reports Server", "https://ntrs.nasa.gov/citations/20180005435"],
+				["The Chemical Engineer", "https://www.thechemicalengineer.com/news/successful-testing-of-fission-reactor-for-future-space-exploration/"]] }),
+		Defs.Card.new({ "id": "worms", "figure": "2", "figure_label": "jeunes vers de terre nés dans un sol martien simulé", "visual": "biodome",
+			"quiz": "Qu'ont ajouté les chercheurs au simulant de sol martien ?", "choices": ["Du lisier (fumier)", "Du sel", "Du sable de plage"], "answer": 0,
+			"title": "Des vers de terre sur Mars", "status": "Expérimenté",
+			"fact": "En 2017, à l'université de Wageningen, Wieger Wamelink a placé des vers de terre adultes dans un simulant de sol martien fourni par la NASA, enrichi de lisier de porc et planté de roquette. À la fin de l'expérience, surprise : deux jeunes vers ! Avec le fumier, le simulant a même mieux réussi que le sable témoin. Les vers aident aussi l'eau à pénétrer le sol.",
+			"in_game": "La serre géante pousse sur un sol vivant ; ses améliorations ajoutent vers de terre et compost.",
+			"sources": [["Wageningen University & Research", "https://www.wur.nl/en/newsarticle/Earthworms-can-reproduce-in-Mars-soil-simulant.htm"],
+				["ScienceAlert", "https://www.sciencealert.com/earthworms-can-reproduce-in-fertilised-mars-soil-simulant"]] }),
+		Defs.Card.new({ "id": "terraforming", "figure": "7 %", "figure_label": "de la pression terrestre, au mieux, en libérant tout le CO₂", "visual": "biodome",
+			"quiz": "Pourquoi ne peut-on pas terraformer Mars aujourd'hui ?", "choices": ["Il n'y a pas assez de CO₂ disponible", "Mars est trop chaude", "Il y a trop d'oxygène"], "answer": 0,
+			"title": "Terraformer Mars ?", "status": "Mesuré",
+			"fact": "Pourrait-on réchauffer Mars en libérant le CO₂ de ses calottes et de son sol ? En 2018, Bruce Jakosky et Christopher Edwards ont fait les comptes avec les données de plusieurs sondes : même en traitant toutes les sources de la planète, la pression n'atteindrait qu'environ 7 % de celle de la Terre. Avec les techniques actuelles, terraformer Mars est hors de portée.",
+			"in_game": "D'où l'ère « Racines » : on ne transforme pas la planète, on rend la colonie durable.",
+			"sources": [["Astronomy", "https://www.astronomy.com/science/theres-not-enough-co2-to-terraform-mars/"],
+				["Space.com", "https://space.com/41318-we-cant-terraform-mars.html"]] }),
 	]
 
 
@@ -463,7 +542,8 @@ const CREW := [["Ada", "ingénieure"], ["Malik", "botaniste"], ["Inès", "géolo
 const RECRUITS := [["Yuki", "chimiste"], ["Léo", "pilote"], ["Sofia", "ingénieure"], ["Omar", "biologiste"],
 		["Nina", "géologue"], ["Paul", "médecin"], ["Zoé", "botaniste"], ["Kofi", "électricien"],
 		["Hana", "astrophysicienne"], ["Diego", "mécanicien"], ["Lina", "cheffe cuisinière"], ["Arjun", "géophysicien"],
-		["Maëlle", "pilote de rover"], ["Tariq", "chimiste"]]
+		["Maëlle", "pilote de rover"], ["Tariq", "chimiste"], ["Ines", "radiologue"], ["Bao", "agronome"],
+		["Elsa", "ingénieure nucléaire"], ["Moussa", "maçon"]]
 
 ## Messages d'ambiance du bandeau (avec une touche d'humour).
 const CHATTER := [

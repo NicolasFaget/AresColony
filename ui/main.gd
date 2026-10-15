@@ -206,6 +206,14 @@ func _connect_engine() -> void:
 		GameManager.vibrate(60)
 		_news.post("Panne ! " + ColonyContent.BREAKDOWN_LINES.get(_engine.state.buildings[i].id, "Une machine s'est arrêtée.")))
 	_engine.era_started.connect(_on_era_started)
+	_engine.flare_warning.connect(func() -> void:
+		AudioManager.play("alert")
+		GameManager.vibrate(40)
+		_news.post("Les satellites détectent une éruption solaire : les particules arrivent dans quelques heures. Tout le monde aux abris !"))
+	_engine.flare_started.connect(func() -> void:
+		AudioManager.play("alert")
+		_news.post("Éruption solaire en cours. Les compteurs Geiger crépitent."))
+	_engine.flare_ended.connect(func() -> void: _news.post("L'éruption solaire est passée. On peut ressortir."))
 	_engine.expedition_returned.connect(func(site: Dictionary) -> void:
 		AudioManager.play("milestone")
 		_news.post("Le rover est rentré : %s. Butin : %s." % [site.name, ColonyPage._reward_text(site.reward)]))
@@ -445,6 +453,14 @@ func _on_objective_completed(objective_id: String) -> void:
 			AudioManager.play("milestone")
 			GameManager.vibrate(30)
 			_news.post("Objectif atteint : %s ! Récompense : %s" % [o.title, ColonyPage._reward_text(o.reward)])
+			if objective_id == "rooted":
+				Modal.open(_modal_layer, {
+					"icon": "check", "title": "Colonie enracinée !",
+					"body": "Vingt colons vivent à l'abri des radiations, nourris par une serre sur un sol vivant et "
+							+ "alimentés jour et nuit. Votre colonie est durable : c'est exactement ce que préparent "
+							+ "les agences spatiales pour les premières bases martiennes.\n\nMerci d'avoir joué, commandant !",
+					"confirm_text": "Continuer à jouer",
+				})
 			if objective_id == "return":
 				Modal.open(_modal_layer, {
 					"icon": "rocket", "title": "Retour assuré !",
@@ -580,10 +596,23 @@ func _show_building(index: int) -> void:
 
 ## Début d'une nouvelle ère : ce qui change et ce qu'il faut viser.
 func _on_era_started(era: int) -> void:
-	if era != 2:
-		return
 	AudioManager.play("milestone")
 	GameManager.vibrate(40)
+	if era == 3:
+		Modal.open(_modal_layer, {
+			"icon": "target", "title": "Ère 3 · Racines",
+			"body": "Le retour est assuré. Faut-il pour autant transformer Mars en seconde Terre ? Les chercheurs ont "
+					+ "fait les comptes : pas avec les techniques actuelles (voir la fiche « Terraformer Mars ? »).\n\n"
+					+ "Cette ère, on rend plutôt la colonie durable :\n"
+					+ "• S'abriter des éruptions solaires sous le régolithe.\n"
+					+ "• Produire de l'énergie nucléaire, jour et nuit.\n"
+					+ "• Cultiver une serre géante sur un sol vivant.\n"
+					+ "• Accueillir 20 colons avec la note d'efficacité A.",
+			"confirm_text": "Au travail !",
+		})
+		return
+	if era != 2:
+		return
 	Modal.open(_modal_layer, {
 		"icon": "rocket", "title": "Ère 2 · Expansion",
 		"body": "Votre colonie tient seule sur Mars, bravo ! Place à l'expansion :\n\n"

@@ -75,6 +75,16 @@ static func alerts(engine: ColonyEngine) -> Array[Dictionary]:
 			"advice": "Un module ne fonctionne que s'il est relié à l'atterrisseur. Posez des conduites.",
 			"tab": TAB_BUILD, "target": "link" })
 
+	if engine.state.era >= 3 and (engine.is_flare() or engine.flare_soon()):
+		var exposed := maxi(0, engine.state.colonists.size() - engine.shelter_capacity())
+		if exposed > 0:
+			var researched := engine.state.research_done.has("shielding")
+			list.insert(0, { "level": "danger", "resource": "", "sols": 0.0,
+				"title": ("Éruption solaire ! %d colon%s sans abri" if engine.is_flare() else "Éruption solaire imminente : %d colon%s sans abri") % [
+						exposed, "s" if exposed > 1 else ""],
+				"advice": "Construisez des habitats enterrés : 4 places à l'abri chacun." if researched
+						else "Recherchez « Blindage en régolithe » pour construire des abris.",
+				"tab": TAB_BUILD if researched else TAB_RESEARCH, "target": "bunker" if researched else "shielding" })
 	var broken := engine.broken_count()
 	if broken > 0:
 		list.append({ "level": "warning", "resource": "", "sols": INF,

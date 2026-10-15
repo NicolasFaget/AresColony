@@ -5,7 +5,7 @@ extends RefCounted
 ## construit ce qui manque le plus, garde une réserve de matériaux, étend ses conduites vers la glace.
 
 const R = preload("res://core/colony_content.gd")
-const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate", "regolith", "sabatier", "rovers", "erv"]
+const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate", "regolith", "sabatier", "rovers", "erv", "shielding", "fission", "soil"]
 
 
 ## Lance la prochaine recherche disponible, dans l'ordre conseillé.
@@ -71,8 +71,17 @@ static func build(engine: ColonyEngine) -> void:
 	elif engine.is_unlocked(engine.building_defs["kiln"]) and engine.resupplies_left() <= 2 \
 			and _count(engine, "kiln") < 1 + engine.state.colonists.size() / 4:
 		want = "kiln"
+	elif engine.state.era >= 3 and engine.is_unlocked(engine.building_defs["bunker"]) \
+			and engine.state.colonists.size() >= engine.housing() - 1 and engine.state.recruits_sent < R.RECRUITS.size():
+		want = "bunker"
 	elif engine.state.colonists.size() >= engine.housing() - 1 and engine.state.recruits_sent < R.RECRUITS.size() 			and flows[R.OXYGEN] >= margin[R.OXYGEN] and flows[R.FOOD] >= margin[R.FOOD]:
 		want = "habitat"
+	elif engine.is_unlocked(engine.building_defs["bunker"]) and engine.shelter_capacity() < engine.state.colonists.size():
+		want = "bunker"
+	elif engine.is_unlocked(engine.building_defs["reactor"]) and _count(engine, "reactor") == 0:
+		want = "reactor"
+	elif engine.is_unlocked(engine.building_defs["biodome"]) and _count(engine, "biodome") < 2:
+		want = "biodome"
 	elif engine.is_unlocked(engine.building_defs["garage"]) and _count(engine, "garage") == 0:
 		want = "garage"
 	elif engine.is_unlocked(engine.building_defs["sabatier"]) and _count(engine, "sabatier") < 3 \
@@ -88,7 +97,7 @@ static func build(engine: ColonyEngine) -> void:
 	if not engine.is_unlocked(engine.building_defs[want]):
 		return
 	# Confort (habitat, batteries) : seulement si une réserve reste pour les urgences vitales.
-	if want in ["habitat", "battery", "garage", "erv", "sabatier"] and engine.state.amount(R.MATERIALS) < engine.building_defs[want].cost + 50.0:
+	if want in ["habitat", "battery", "garage", "erv", "sabatier", "bunker", "reactor", "biodome"] and engine.state.amount(R.MATERIALS) < engine.building_defs[want].cost + 50.0:
 		return
 	if want == "extractor":
 		reach_ice(engine)

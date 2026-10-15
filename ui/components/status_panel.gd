@@ -50,7 +50,10 @@ func refresh() -> void:
 	var engine := GameManager.engine
 	var minutes := int(engine.time_of_day() * (24.0 * 60.0 + 39.0))
 	_clock.text = "Sol %d · %02d:%02d" % [engine.sol_number(), minutes / 60, minutes % 60]
-	if engine.is_storm():
+	if engine.is_flare():
+		_weather_icon.texture = UiFx.icon("warning")
+		_weather_icon.modulate = Palette.DANGER
+	elif engine.is_storm():
 		_weather_icon.texture = UiFx.icon("storm")
 		_weather_icon.modulate = Palette.WARNING
 	elif engine.is_night():

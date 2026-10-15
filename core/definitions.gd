@@ -31,6 +31,9 @@ class Building:
 	## Module de départ, ni constructible ni démolissable.
 	var fixed: bool
 
+	## Colons protégés des radiations pendant une éruption solaire.
+	var shelter: int
+
 	func _init(p: Dictionary) -> void:
 		id = p.id
 		name = p.name
@@ -46,6 +49,7 @@ class Building:
 		card = p.get("card", "")
 		description = p.get("description", "")
 		fixed = p.get("fixed", false)
+		shelter = p.get("shelter", 0)
 
 
 ## Recherche : coûte des données scientifiques et prend un peu de temps.

@@ -292,6 +292,44 @@ func _run() -> void:
 			main._world.rig.zoom(0.8)
 			await _frames(40)
 			await _shot("80_rover")
+		"ere3":
+			ColonyBot.play(engine, 146.0)
+			engine.state.speed = 0
+			engine.state.sol = floorf(engine.state.sol) + 1.45
+			engine.state.next_flare = engine.state.sol + 0.3
+			engine.advance(0.05)
+			main = await _open_main()
+			_close_modals(main)
+			main._on_era_started(3)
+			await _shot("90_ere3")
+			_close_modals(main)
+			if not main._window.collapsed:
+				main._window.toggle_collapsed()
+			for id in ["biodome", "reactor", "bunker"]:
+				for i in engine.state.buildings.size():
+					if engine.state.buildings[i].id == id:
+						main._world.rig.focus(main._world.footprint_center(engine.cell_of(i), engine.def_of(i).size), 0.0)
+						await _frames(30)
+						await _shot("91_" + id)
+						break
+			main._select_tab(1)
+			main._window.toggle_collapsed()
+			await _frames(30)
+			await _shot("92_colonie_ere3")
+		"biodome":
+			engine.state.research_done.append("soil")
+			engine.state.resources[ColonyContent.MATERIALS] = 400.0
+			var spot := ColonyBot.connected_spot(engine, "biodome")
+			engine.place("biodome", spot)
+			engine.state.sol = 1.45
+			main = await _open_main()
+			_close_modals(main)
+			if not main._window.collapsed:
+				main._window.toggle_collapsed()
+			main._world.rig.focus(main._world.footprint_center(spot, Vector2i(3, 3)), 0.0)
+			main._world.rig.zoom(0.7)
+			await _frames(30)
+			await _shot("93_biodome")
 		"interaction":
 			main = await _open_main()
 			_close_modals(main)

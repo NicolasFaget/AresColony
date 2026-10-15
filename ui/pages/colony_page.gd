@@ -95,6 +95,8 @@ func refresh() -> void:
 	_objectives_done.visible = not done.is_empty()
 
 	_crew_title.text = "Équipage : %d colons · %d places" % [engine.state.colonists.size(), engine.housing()]
+	if engine.state.era >= 3:
+		_crew_title.text += " · %d à l'abri" % mini(engine.shelter_capacity(), engine.state.colonists.size())
 	while _crew.get_child_count() < engine.state.colonists.size():
 		_crew.add_child(_colonist_line())
 	while _crew.get_child_count() > engine.state.colonists.size():

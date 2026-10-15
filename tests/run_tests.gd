@@ -21,6 +21,7 @@ func _init() -> void:
 	_test_upgrades()
 	_test_hazards()
 	_test_era2()
+	_test_era3()
 	_test_night_and_batteries()
 	_test_colonists()
 	_test_research()
@@ -72,6 +73,53 @@ func _rich_engine() -> ColonyEngine:
 		engine.state.research_done.append(r.id)
 	engine.state.resources[R.MATERIALS] = 400.0
 	return engine
+
+
+# ---------- Ère 3 ----------
+
+func _test_era3() -> void:
+	var engine := _rich_engine()
+	engine.state.era = 2
+	for objective in engine.objectives:
+		if objective.era <= 2 and objective.id != "return":
+			engine.state.objectives_done.append(objective.id)
+	engine.state.resources[R.MATERIALS] = 400.0
+	var lander := engine.map.lander_cell
+	engine.place("erv", lander + Vector2i(2, 0))
+	engine.state.resources[R.METHANE] = ColonyEngine.RETURN_METHANE
+	engine._check_objectives()
+	_check(engine.state.era == 3, "l'ère 3 commence après l'ère 2")
+	_check(engine.state.cards_unlocked.has("terraforming"), "fiche sur la terraformation")
+	_check(engine.state.next_flare < 1e8, "les éruptions solaires sont programmées")
+	_check(engine.shelter_capacity() == 0, "aucun abri au départ")
+	# Éruption sans abri : tout le monde perd de la santé.
+	engine.state.next_flare = engine.state.sol + 0.01
+	var flares := [0]
+	engine.flare_started.connect(func() -> void: flares[0] += 1)
+	engine.advance(0.2)
+	_check(flares[0] == 1 and engine.is_flare(), "une éruption commence")
+	var hurt := true
+	for c in engine.state.colonists:
+		hurt = hurt and c.health < 1.0
+	_check(hurt, "sans abri, les colons prennent les radiations")
+	# Avec un habitat enterré, quatre colons sont protégés.
+	engine.state.resources[R.MATERIALS] = 400.0
+	_check(engine.place("bunker", lander + Vector2i(4, 0)), "pose d'un habitat enterré")
+	_check(engine.shelter_capacity() == 4, "l'habitat enterré abrite 4 colons")
+	for c in engine.state.colonists:
+		c.health = 1.0
+	engine.advance(0.05)
+	var safe := 0
+	for c in engine.state.colonists:
+		if c.health >= 1.0:
+			safe += 1
+	_check(safe >= mini(4, engine.state.colonists.size()), "les colons abrités sont protégés")
+	_check(engine.place("reactor", lander + Vector2i(6, 0)), "pose d'un réacteur à fission")
+	var reactor := engine.state.buildings.size() - 1
+	_check(_near(engine._output_rate(reactor, R.ENERGY, 0.0), 60.0), "le réacteur produit même sans soleil")
+	_check(not "rooted" in engine.state.objectives_done, "« Enracinés » attend les autres objectifs")
+	var copy := ColonyState.from_dict(JSON.parse_string(JSON.stringify(engine.state.to_dict())))
+	_check(copy.era == 3 and _near(copy.next_flare, engine.state.next_flare), "ère 3 sauvegardée")
 
 
 # ---------- Ère 2 ----------
@@ -601,7 +649,7 @@ func _simulate_campaign() -> void:
 		var flows := engine.average_flows()
 		print("  évacuation de %s au sol %.1f (O₂ %.1f, eau %.1f, nourriture %.1f, énergie %.1f/sol, matériaux %.0f, O₂ stock %.1f) : %s" % [
 			n, engine.state.sol, flows[R.OXYGEN], flows[R.WATER], flows[R.FOOD], flows[R.ENERGY], engine.state.amount(R.MATERIALS), engine.state.amount(R.OXYGEN), c.left(20)]))
-	while engine.state.sol < 170.0 and done.size() < engine.objectives.size():
+	while engine.state.sol < 260.0 and done.size() < engine.objectives.size():
 		ColonyBot.research(engine)
 		ColonyBot.maintain(engine)
 		ColonyBot.build(engine)
@@ -619,7 +667,12 @@ func _simulate_campaign() -> void:
 		if objective.era == 1:
 			era1 = maxf(era1, done.get(objective.id, INF))
 	_check(era1 <= 80.0, "ère 1 accomplie avant le sol 80")
-	_check(done.size() == engine.objectives.size() and done.values().max() <= 160.0, "ère 2 accomplie avant le sol 160")
+	var era2 := 0.0
+	for objective in engine.objectives:
+		if objective.era == 2:
+			era2 = maxf(era2, done.get(objective.id, INF))
+	_check(era2 <= 160.0, "ère 2 accomplie avant le sol 160")
+	_check(done.size() == engine.objectives.size() and done.values().max() <= 250.0, "ère 3 accomplie avant le sol 250")
 	_check(evacuations[0] == 0, "un joueur raisonnable ne perd aucun colon")
 
 	# Un joueur qui ne fait rien finit par mettre la colonie en danger, mais pas tout de suite.
