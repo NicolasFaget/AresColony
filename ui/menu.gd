@@ -121,8 +121,9 @@ func _refresh() -> void:
 static func _summary_text(summary: Dictionary) -> String:
 	if summary.is_empty():
 		return "Emplacement libre"
-	return "Sol %d · %d colon%s · %d/6 objectifs · %s" % [summary.sol, summary.colonists,
-			"s" if summary.colonists > 1 else "", summary.objectives, _ago(summary.last_saved_unix)]
+	return "Sol %d · %d colon%s · %d/%d objectifs · %s" % [summary.sol, summary.colonists,
+			"s" if summary.colonists > 1 else "", summary.objectives, ColonyContent.objectives().size(),
+			_ago(summary.last_saved_unix)]
 
 
 static func _ago(unix: int) -> String:

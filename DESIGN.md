@@ -67,6 +67,9 @@ de vie de l'application.
   la recherche « Nettoyage des panneaux ».
 - Santé : un manque d'oxygène vide les réserves de secours en environ un sol, puis le colon est
   évacué (jamais de mort). La cause et la parade sont expliquées.
+- Synergies (`ColonyContent.SYNERGIES`) : un module qui touche directement un voisin du bon type
+  gagne un multiplicateur sur ses entrées ou sorties (une fois par type de synergie). Calculées dans
+  `_rebuild()` ; `preview_synergies()` alimente l'aperçu au placement ; jonctions dorées dans le monde.
 - Hors-ligne (pilote automatique) : un sol toutes les 20 minutes d'absence, 8 h au plus, sans
   événement ni perte de santé ; veille sécurisée dès qu'une ressource vitale descend sous un quart
   de sol de consommation. Les échéances (tempêtes, ravitaillements) sont décalées d'autant.
@@ -80,6 +83,7 @@ de vie de l'application.
 | Main verte (serre) | 8 |
 | Équipage complet (8 colons) | 40 |
 | Nuits sereines (150 kWh de stockage) | 24,5 |
+| Ingénierie fine (4 synergies actives) | 31 |
 | Autonomie (10 sols sans déficit, 8 colons) | 50 |
 
 Sans évacuation pour un joueur raisonnable. Un joueur qui ne fait rien perd son premier colon au
@@ -96,7 +100,8 @@ fourchettes.
 
 ## Prochaines étapes
 
-1. Tester sur téléphone (performances des ombres, ergonomie du placement).
+1. Mettre en avant les fiches (découverte plein écran, encyclopédie, prime de données), améliorations
+   de modules, difficulté (poussière, pannes, fin des ravitaillements).
 2. Rovers d'exploration et sites à découvrir ; quiz facultatifs.
 3. Ère 2 « Autonomie » : Sabatier, briques de régolithe, recyclage, deuxième région.
 4. Tutoriel guidé, traduction anglaise.

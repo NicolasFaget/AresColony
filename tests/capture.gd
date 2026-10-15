@@ -116,6 +116,40 @@ func _run() -> void:
 			await _tap(main._alert.get_child(0).get_child(2).get_global_rect().get_center())
 			await _frames(40)
 			await _shot("16_que_faire")
+		"synergies":
+			for r: Defs.Research in engine.research_defs.values():
+				engine.state.research_done.append(r.id)
+			engine.state.resources[ColonyContent.MATERIALS] = 600.0
+			var lander := engine.map.lander_cell
+			for x in range(lander.x - 1, lander.x + 9):
+				for y in range(lander.y - 1, lander.y + 6):
+					if engine.map.tile_at(Vector2i(x, y)) != ColonyMap.Tile.RIM:
+						engine.map.set_tile(Vector2i(x, y), ColonyMap.Tile.PLAIN)
+			engine.place("habitat", lander + Vector2i(2, 0))
+			engine.place("habitat", lander + Vector2i(4, 0))
+			engine.place("greenhouse", lander + Vector2i(6, 0))
+			engine.place("moxie", lander + Vector2i(6, 2))
+			engine.place("solar", lander + Vector2i(0, 2))
+			engine.place("battery", lander + Vector2i(0, 3))
+			print("synergies actives : ", engine.active_synergy_count())
+			main = await _open_main()
+			_close_modals(main)
+			if not main._window.collapsed:
+				main._window.toggle_collapsed()
+			main._world.rig.zoom(0.7)
+			main._world.rig.focus(main._world.cell_center(lander + Vector2i(3, 1)), 0.0)
+			await _frames(30)
+			await _shot("29_jonctions_dorees")
+			main._start_placement("greenhouse")
+			main._world.move_ghost(lander + Vector2i(2, 2))
+			main._refresh_placement()
+			await _shot("30_apercu_synergie")
+			main._stop_placement()
+			main._show_synergies()
+			await _shot("31_liste_synergies")
+			_close_modals(main)
+			main._show_building(3)
+			await _shot("32_fiche_synergie")
 		"interaction":
 			main = await _open_main()
 			_close_modals(main)

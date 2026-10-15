@@ -16,6 +16,7 @@ func _init() -> void:
 	_test_placement()
 	_test_sunlight()
 	_test_production()
+	_test_synergies()
 	_test_night_and_batteries()
 	_test_colonists()
 	_test_research()
@@ -64,6 +65,35 @@ func _rich_engine() -> ColonyEngine:
 		engine.state.research_done.append(r.id)
 	engine.state.resources[R.MATERIALS] = 400.0
 	return engine
+
+
+# ---------- Synergies ----------
+
+func _test_synergies() -> void:
+	var engine := _rich_engine()
+	var lander := engine.map.lander_cell
+	for synergy: Dictionary in R.SYNERGIES:
+		_check(engine.building_defs.has(synergy.building) and engine.building_defs.has(synergy.neighbor),
+				"synergie entre modules connus : %s" % synergy.id)
+	_check(engine.place("habitat", lander + Vector2i(2, 0)), "pose d'un habitat")
+	var first := engine.state.buildings.size() - 1
+	_check(engine.synergies_of(first).is_empty(), "habitat seul : pas de synergie")
+	var preview := engine.preview_synergies("habitat", lander + Vector2i(4, 0))
+	_check(preview.size() == 2, "aperçu : murs mitoyens pour les deux habitats")
+	_check(engine.place("habitat", lander + Vector2i(4, 0)), "pose d'un second habitat collé")
+	var second := engine.state.buildings.size() - 1
+	_check(engine.synergies_of(first).size() == 1 and engine.synergies_of(second).size() == 1, "murs mitoyens actifs")
+	var base: float = engine.def_of(first).inputs[R.ENERGY]
+	_check(_near(engine._input_rate(first, R.ENERGY), base * 0.75), "murs mitoyens : −25 % d'énergie")
+	_check(engine.active_synergy_count() == 2, "deux synergies actives")
+	var green := engine.preview_synergies("greenhouse", lander + Vector2i(6, 0))
+	_check(green.size() == 1 and green[0].synergy.id == "greenhouse_habitat", "aperçu : serre collée à l'habitat")
+	_check(engine.place("greenhouse", lander + Vector2i(6, 0)), "pose de la serre")
+	var house := engine.state.buildings.size() - 1
+	var food: float = engine.def_of(house).outputs[R.FOOD]
+	_check(_near(engine._output_rate(house, R.FOOD, 1.0), food * 1.25 * engine.effect("food")), "serre + habitat : +25 % de nourriture")
+	_check(engine.demolish(second), "démolition du second habitat")
+	_check(engine.synergies_of(first).is_empty(), "sans voisin, la synergie disparaît")
 
 
 # ---------- Contenu ----------

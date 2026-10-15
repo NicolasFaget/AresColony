@@ -100,6 +100,33 @@ static func buildings() -> Array[Defs.Building]:
 	]
 
 
+## Synergies entre modules voisins (qui se touchent directement, sans conduite entre eux).
+## `building` reçoit le bonus quand au moins un `neighbor` le touche. Les effets ne se cumulent pas.
+## outputs / inputs : multiplicateurs par ressource.
+const SYNERGIES := [
+	{ "id": "greenhouse_habitat", "building": "greenhouse", "neighbor": "habitat",
+		"name": "Échange CO₂ / O₂", "effect": "+25 % de nourriture",
+		"outputs": { FOOD: 1.25 }, "inputs": {},
+		"why": "Les plantes absorbent le CO₂ expiré par les colons et rendent de l'oxygène : c'est le principe des systèmes de survie biorégénératifs comme MELiSSA, à l'Agence spatiale européenne." },
+	{ "id": "greenhouse_moxie", "building": "greenhouse", "neighbor": "moxie",
+		"name": "Chaleur récupérée", "effect": "−50 % d'énergie pour la serre",
+		"outputs": {}, "inputs": { ENERGY: 0.5 },
+		"why": "L'électrolyseur de CO₂ fonctionne vers 800 °C, comme MOXIE : sa chaleur perdue peut chauffer la serre." },
+	{ "id": "habitat_habitat", "building": "habitat", "neighbor": "habitat",
+		"name": "Murs mitoyens", "effect": "−25 % d'énergie de chauffage",
+		"outputs": {}, "inputs": { ENERGY: 0.75 },
+		"why": "Deux habitats collés exposent moins de surface au froid martien (environ −60 °C en moyenne) : il faut moins chauffer." },
+	{ "id": "electrolyser_extractor", "building": "electrolyser", "neighbor": "extractor",
+		"name": "Circuit court", "effect": "−25 % d'énergie",
+		"outputs": {}, "inputs": { ENERGY: 0.75 },
+		"why": "L'eau arrive directement de l'extracteur : moins de pompage et de réchauffage (principe d'ingénierie simplifié pour le jeu)." },
+	{ "id": "solar_battery", "building": "solar", "neighbor": "battery",
+		"name": "Stockage au plus près", "effect": "+10 % d'énergie",
+		"outputs": { ENERGY: 1.1 }, "inputs": {},
+		"why": "Des câbles plus courts entre production et stockage : moins de pertes électriques (principe d'ingénierie simplifié pour le jeu)." },
+]
+
+
 static func research() -> Array[Defs.Research]:
 	return [
 		Defs.Research.new({ "id": "moxie", "name": "Électrolyse du CO₂", "cost": 6.0, "duration": 0.5,
@@ -136,6 +163,9 @@ static func objectives() -> Array[Defs.Objective]:
 				"description": "Atteindre 150 kWh de stockage d'énergie.", "reward": { MATERIALS: 40.0 } }),
 		Defs.Objective.new({ "id": "crew", "title": "Équipage complet",
 				"description": "Accueillir 8 colons.", "reward": { DATA: 20.0 } }),
+		Defs.Objective.new({ "id": "synergies", "title": "Ingénierie fine",
+				"description": "Activer 4 synergies entre modules voisins (onglet Construire › Synergies).",
+				"reward": { DATA: 15.0 } }),
 		Defs.Objective.new({ "id": "autonomy", "title": "Autonomie",
 				"description": "Avec au moins 8 colons, tenir 10 sols d'affilée sans déficit d'oxygène, d'eau ni de nourriture.",
 				"reward": { MATERIALS: 100.0 } }),

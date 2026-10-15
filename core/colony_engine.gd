@@ -57,6 +57,8 @@ var cards := {}
 var objectives: Array[Defs.Objective] = []
 
 var _connected: Array[bool] = []
+## Synergies actives de chaque module (identifiants de ColonyContent.SYNERGIES).
+var _synergies: Array = []
 var _efficiency: Array[float] = []
 var _occupied := {}
 var _rng := RandomNumberGenerator.new()
@@ -195,9 +197,9 @@ func average_flows() -> Dictionary:
 			continue
 		var def := def_of(i)
 		for r: String in def.inputs:
-			flows[r] -= def.inputs[r]
+			flows[r] -= _input_rate(i, r)
 		for r: String in def.outputs:
-			flows[r] += _output_rate(def, r, sun)
+			flows[r] += _output_rate(i, r, sun)
 	var count := state.colonists.size()
 	var needs := colonist_needs()
 	for r: String in needs:
@@ -224,6 +226,61 @@ func building_status(index: int) -> Dictionary:
 		if is_night():
 			return { "ok": true, "text": "Nuit : aucune production solaire." }
 	return { "ok": true, "text": "En service." }
+
+
+## Synergies actives d'un module (dictionnaires de ColonyContent.SYNERGIES).
+func synergies_of(index: int) -> Array:
+	return _synergies[index]
+
+
+func active_synergy_count() -> int:
+	var count := 0
+	for i in state.buildings.size():
+		if _connected[i]:
+			count += _synergies[i].size()
+	return count
+
+
+## Synergies que gagnerait un module posé là, et celles qu'il offrirait à ses voisins.
+## Retourne une liste de { "synergy", "target": nom du module bénéficiaire }.
+func preview_synergies(def_id: String, cell: Vector2i) -> Array[Dictionary]:
+	var def: Defs.Building = building_defs.get(def_id)
+	var result: Array[Dictionary] = []
+	if def == null:
+		return result
+	var neighbors := _neighbors_of(cell, def.size)
+	var seen := {}
+	for synergy: Dictionary in ColonyContent.SYNERGIES:
+		if synergy.building == def_id and not seen.has(synergy.id):
+			for j: int in neighbors:
+				if state.buildings[j].id == synergy.neighbor:
+					seen[synergy.id] = true
+					result.append({ "synergy": synergy, "target": def.name })
+					break
+		if synergy.neighbor == def_id:
+			for j: int in neighbors:
+				if state.buildings[j].id == synergy.building and not _has_synergy(j, synergy.id):
+					result.append({ "synergy": synergy, "target": def_of(j).name })
+					break
+	return result
+
+
+func _has_synergy(index: int, synergy_id: String) -> bool:
+	for synergy: Dictionary in _synergies[index]:
+		if synergy.id == synergy_id:
+			return true
+	return false
+
+
+## Modules qui touchent directement une emprise (4 voisins).
+func _neighbors_of(cell: Vector2i, size: Vector2i) -> Array[int]:
+	var result: Array[int] = []
+	for c in _footprint(cell, size):
+		for step in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var other: int = _occupied.get(c + step, -1)
+			if other >= 0 and not result.has(other) and _occupied.get(c, -2) != other:
+				result.append(other)
+	return result
 
 
 func research_state(research_id: String) -> String:
@@ -371,10 +428,10 @@ func _step(ds: float) -> void:
 		var def := def_of(i)
 		if def.inputs.is_empty():
 			for r: String in def.outputs:
-				passive[r] = passive.get(r, 0.0) + _output_rate(def, r, sun) * ds
+				passive[r] = passive.get(r, 0.0) + _output_rate(i, r, sun) * ds
 		else:
 			for r: String in def.inputs:
-				demand[r] = demand.get(r, 0.0) + def.inputs[r] * ds
+				demand[r] = demand.get(r, 0.0) + _input_rate(i, r) * ds
 	var count := state.colonists.size()
 	var needs := colonist_needs()
 	for r: String in needs:
@@ -395,9 +452,9 @@ func _step(ds: float) -> void:
 			for r: String in def.inputs:
 				e = minf(e, satisfied[r])
 			for r: String in def.inputs:
-				delta[r] = delta.get(r, 0.0) - def.inputs[r] * e * ds
+				delta[r] = delta.get(r, 0.0) - _input_rate(i, r) * e * ds
 			for r: String in def.outputs:
-				delta[r] = delta.get(r, 0.0) + _output_rate(def, r, sun) * e * ds
+				delta[r] = delta.get(r, 0.0) + _output_rate(i, r, sun) * e * ds
 		_efficiency[i] = e
 	for r: String in needs:
 		delta[r] = delta.get(r, 0.0) - needs[r] * count * ds * satisfied.get(r, 1.0)
@@ -415,8 +472,26 @@ func _step(ds: float) -> void:
 	_check_objectives()
 
 
-func _output_rate(def: Defs.Building, resource: String, sun: float) -> float:
+## Multiplicateur dû aux synergies sur une entrée ou une sortie d'un module.
+func synergy_factor(index: int, resource: String, output: bool) -> float:
+	var factor := 1.0
+	for synergy: Dictionary in _synergies[index]:
+		factor *= (synergy.outputs if output else synergy.inputs).get(resource, 1.0)
+	return factor
+
+
+func _input_rate(index: int, resource: String) -> float:
+	var rate: float = def_of(index).inputs[resource]
+	for synergy: Dictionary in _synergies[index]:
+		rate *= synergy.inputs.get(resource, 1.0)
+	return rate
+
+
+func _output_rate(index: int, resource: String, sun: float) -> float:
+	var def := def_of(index)
 	var rate: float = def.outputs[resource]
+	for synergy: Dictionary in _synergies[index]:
+		rate *= synergy.outputs.get(resource, 1.0)
 	if def.solar and resource == ColonyContent.ENERGY:
 		rate *= sun
 	if resource == ColonyContent.FOOD:
@@ -534,6 +609,8 @@ func _objective_met(objective_id: String) -> bool:
 			return _has_connected("greenhouse")
 		"nights":
 			return capacity(ColonyContent.ENERGY) >= 150.0
+		"synergies":
+			return active_synergy_count() >= 4
 		"crew":
 			return state.colonists.size() >= 8
 		"autonomy":
@@ -548,6 +625,8 @@ func objective_progress(objective_id: String) -> float:
 	match objective_id:
 		"nights":
 			return clampf(capacity(ColonyContent.ENERGY) / 150.0, 0.0, 1.0)
+		"synergies":
+			return clampf(active_synergy_count() / 4.0, 0.0, 1.0)
 		"crew":
 			return clampf(state.colonists.size() / 8.0, 0.0, 1.0)
 		"autonomy":
@@ -652,6 +731,19 @@ func _rebuild() -> void:
 	_connected.resize(n)
 	_connected.fill(false)
 	_efficiency.resize(n)
+	# Synergies : chaque module, une fois par type de synergie, si un voisin direct convient.
+	_synergies.resize(n)
+	for i in n:
+		var active: Array = []
+		var neighbors := _neighbors_of(cell_of(i), def_of(i).size)
+		for synergy: Dictionary in ColonyContent.SYNERGIES:
+			if synergy.building != state.buildings[i].id:
+				continue
+			for j: int in neighbors:
+				if state.buildings[j].id == synergy.neighbor:
+					active.append(synergy)
+					break
+		_synergies[i] = active
 	if n == 0:
 		return
 	var queue: Array[int] = [0]

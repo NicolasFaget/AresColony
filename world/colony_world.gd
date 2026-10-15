@@ -689,6 +689,9 @@ void fragment() {
 
 # ---------- Réseau : galeries vitrées et passages ----------
 
+const SYNERGY_GOLD := Color("#ffc94a")
+
+
 func _flow_material(active: float) -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
 	mat.shader = preload("res://world/flow.gdshader")
@@ -747,7 +750,7 @@ func _airlock(parent: Node3D, at: Vector3, dir: Vector2i) -> void:
 
 
 ## Jonction basse entre deux modules qui se touchent : gaine, deux colliers et câble lumineux.
-func _joint(parent: Node3D, dir: Vector2i, flow: Material) -> void:
+func _joint(parent: Node3D, dir: Vector2i, flow: Material, synergy := false) -> void:
 	var rot := Vector3(90, 0, 0) if dir.y != 0 else Vector3(0, 0, 90)
 	var along := Vector3(dir.x, 0, dir.y)
 	ModelBuilder.box(parent, Vector3(0, 0.03, 0), Vector3(0.5 if dir.x != 0 else 0.3, 0.06, 0.5 if dir.y != 0 else 0.3), ModelBuilder.CONCRETE)
@@ -757,6 +760,21 @@ func _joint(parent: Node3D, dir: Vector2i, flow: Material) -> void:
 	var cable := ModelBuilder.cylinder(parent, Vector3(0, 0.215, 0), 0.025, 0.52, Color.WHITE, rot, -1.0, 8)
 	cable.material_override = flow
 	cable.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if synergy:
+		# Synergie active : bague dorée lumineuse au milieu de la gaine.
+		var ring := ModelBuilder.cylinder(parent, Vector3(0, 0.12, 0), 0.15, 0.2, SYNERGY_GOLD, rot, -1.0, 14)
+		ring.material_override = ModelBuilder.material(SYNERGY_GOLD, 2.2)
+		ModelBuilder.box(parent, Vector3(0, 0.33, 0), Vector3(0.13, 0.13, 0.13), SYNERGY_GOLD, Vector3(45, 45, 0), 2.5)
+
+
+## Vrai si les modules i et j se touchent et que l'un tire une synergie de l'autre.
+func _in_synergy(i: int, j: int) -> bool:
+	for pair in [[i, j], [j, i]]:
+		var neighbor_id: String = _engine.state.buildings[pair[1]].id
+		for synergy: Dictionary in _engine.synergies_of(pair[0]):
+			if synergy.neighbor == neighbor_id:
+				return true
+	return false
 
 
 ## Jonctions entre modules qui se touchent (les conduites ont déjà leurs galeries).
@@ -778,7 +796,8 @@ func _rebuild_connectors() -> void:
 						continue
 					var key := "%d-%d" % [i, j]
 					if not pairs.has(key):
-						pairs[key] = { "points": [], "dir": dir, "linked": _engine.is_linked(i) }
+						pairs[key] = { "points": [], "dir": dir, "linked": _engine.is_linked(i),
+								"synergy": _engine.is_linked(i) and _in_synergy(i, j) }
 					pairs[key].points.append(cell_center(c) + Vector3(dir.x, 0, dir.y) * 0.5)
 	for pair: Dictionary in pairs.values():
 		var mid := Vector3.ZERO
@@ -788,7 +807,7 @@ func _rebuild_connectors() -> void:
 		var dir: Vector2i = pair.dir
 		var passage := Node3D.new()
 		passage.position = mid
-		_joint(passage, dir, _flow_on if pair.linked else _flow_off)
+		_joint(passage, dir, _flow_on if pair.linked else _flow_off, pair.synergy)
 		_network_root.add_child(ModelBuilder.bake(passage))
 
 

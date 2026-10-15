@@ -6,6 +6,7 @@ extends Control
 const MARGIN := 10
 const WINDOW_SHARE := 0.5
 const TAP_SLOP := 12.0
+const SYNERGY_COLOR := Color("#ffc94a")
 ## Un message d'ambiance tous les ~1,5 sol de jeu.
 const CHATTER_EVERY := 1.5
 
@@ -26,6 +27,7 @@ var _current_page := 0
 var _placement_bar: PanelContainer
 var _placement_title: Label
 var _placement_reason: Label
+var _placement_synergy: Label
 var _placement_confirm: Button
 var _placing := ""
 
@@ -115,6 +117,7 @@ func _build_layout() -> void:
 
 	var build := BuildPage.new()
 	build.place_requested.connect(_start_placement)
+	build.synergies_requested.connect(_show_synergies)
 	var colony := ColonyPage.new()
 	_research_page = ResearchPage.new()
 	var knowledge := KnowledgePage.new()
@@ -149,6 +152,8 @@ func _build_layout() -> void:
 func _build_placement_bar() -> Control:
 	_placement_title = UiFx.label("", "HeadingLabel")
 	_placement_reason = UiFx.paragraph("", "SmallLabel")
+	_placement_synergy = UiFx.paragraph("", "SmallLabel")
+	_placement_synergy.add_theme_color_override("font_color", SYNERGY_COLOR)
 	var cancel := Button.new()
 	cancel.text = "Terminer"
 	cancel.custom_minimum_size = Vector2(0, 68)
@@ -165,7 +170,7 @@ func _build_placement_bar() -> Control:
 	_placement_confirm.focus_mode = Control.FOCUS_NONE
 	_placement_confirm.pressed.connect(_confirm_placement)
 	_placement_bar = UiFx.panel("WindowPanel", UiFx.vbox(8, [
-		_placement_title, _placement_reason, UiFx.hbox(10, [cancel, _placement_confirm])]))
+		_placement_title, _placement_reason, _placement_synergy, UiFx.hbox(10, [cancel, _placement_confirm])]))
 	_placement_bar.visible = false
 	return _placement_bar
 
@@ -324,6 +329,12 @@ func _refresh_placement() -> void:
 		_placement_reason.text = "Touchez le sol pour déplacer le module. Emplacement valide et raccordé."
 		_placement_reason.add_theme_color_override("font_color", Palette.SUCCESS)
 	_placement_confirm.disabled = not problem.is_empty()
+	var bonuses: Array[String] = []
+	if problem.is_empty():
+		for found: Dictionary in _engine.preview_synergies(_placing, cell):
+			bonuses.append("✦ %s : %s (%s)" % [found.synergy.name, found.synergy.effect, found.target])
+	_placement_synergy.text = "\n".join(bonuses)
+	_placement_synergy.visible = not bonuses.is_empty()
 
 
 func _confirm_placement() -> void:
@@ -471,9 +482,9 @@ func _show_building(index: int) -> void:
 	var status := _engine.building_status(index)
 	var lines: Array[String] = []
 	for r: String in def.outputs:
-		lines.append("+%s %s %s/sol" % [NumberFormatter.format(def.outputs[r]), ColonyContent.RESOURCE_UNITS[r], ColonyContent.RESOURCE_NAMES[r].to_lower()])
+		lines.append("+%s %s %s/sol" % [NumberFormatter.format(def.outputs[r] * _engine.synergy_factor(index, r, true)), ColonyContent.RESOURCE_UNITS[r], ColonyContent.RESOURCE_NAMES[r].to_lower()])
 	for r: String in def.inputs:
-		lines.append("−%s %s %s/sol" % [NumberFormatter.format(def.inputs[r]), ColonyContent.RESOURCE_UNITS[r], ColonyContent.RESOURCE_NAMES[r].to_lower()])
+		lines.append("−%s %s %s/sol" % [NumberFormatter.format(def.inputs[r] * _engine.synergy_factor(index, r, false)), ColonyContent.RESOURCE_UNITS[r], ColonyContent.RESOURCE_NAMES[r].to_lower()])
 	for r: String in def.storage:
 		lines.append("Stockage : +%s %s %s" % [NumberFormatter.format(def.storage[r]), ColonyContent.RESOURCE_UNITS[r], ColonyContent.RESOURCE_NAMES[r].to_lower()])
 	if def.housing > 0:
@@ -483,6 +494,7 @@ func _show_building(index: int) -> void:
 	var extra := UiFx.vbox(8, [UiFx.panel("Thumb", UiFx.building_icon(def.id, Vector2(200, 160))), status_label,
 			UiFx.paragraph("\n".join(lines), "BodyLabel", HORIZONTAL_ALIGNMENT_CENTER)])
 	(extra.get_child(0) as Control).size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	extra.add_child(_synergy_block(index))
 	if not def.card.is_empty() and _engine.state.cards_unlocked.has(def.card):
 		var learn := Button.new()
 		learn.text = "En savoir plus : " + _engine.cards[def.card].title
@@ -501,6 +513,48 @@ func _show_building(index: int) -> void:
 		modal.cancelled.connect(func() -> void:
 			if _engine.demolish(index):
 				AudioManager.play("whoosh"))
+
+
+## Synergies d'un module dans sa fiche : actives (dorées, avec le pourquoi) ou possibles.
+func _synergy_block(index: int) -> Control:
+	var box := UiFx.vbox(6)
+	var active := _engine.synergies_of(index)
+	for synergy: Dictionary in active:
+		var title := UiFx.label("✦ %s : %s" % [synergy.name, synergy.effect], "BodyLabel")
+		title.add_theme_color_override("font_color", SYNERGY_COLOR)
+		box.add_child(title)
+		box.add_child(UiFx.paragraph(synergy.why, "SmallLabel"))
+	var possible: Array[String] = []
+	var id: String = _engine.state.buildings[index].id
+	for synergy: Dictionary in ColonyContent.SYNERGIES:
+		if synergy.building == id and not active.has(synergy):
+			possible.append("collé à : %s → %s" % [_engine.building_defs[synergy.neighbor].name, synergy.effect])
+	if not possible.is_empty():
+		var hint := UiFx.paragraph("Synergie possible si " + ", ou ".join(possible) + ".", "SmallLabel")
+		hint.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+		box.add_child(hint)
+	return box
+
+
+## Toutes les synergies : quels modules coller, quel effet, et pourquoi.
+func _show_synergies() -> void:
+	var list := UiFx.vbox(14)
+	for synergy: Dictionary in ColonyContent.SYNERGIES:
+		var pair := "%s + %s" % [_engine.building_defs[synergy.building].name, _engine.building_defs[synergy.neighbor].name]
+		var title := UiFx.label("✦ " + synergy.name, "HeadingLabel")
+		title.add_theme_color_override("font_color", SYNERGY_COLOR)
+		var effect := UiFx.paragraph("%s → %s" % [pair, synergy.effect], "BodyLabel")
+		list.add_child(UiFx.vbox(2, [title, effect, UiFx.paragraph(synergy.why, "SmallLabel")]))
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size.y = minf(760.0, size.y * 0.6)
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(list)
+	Modal.open(_modal_layer, {
+		"icon": "tab_build", "title": "Synergies",
+		"body": "Collez ces modules l'un contre l'autre (sans conduite entre eux). Active : %d." % _engine.active_synergy_count(),
+		"extra": scroll, "confirm_text": "Fermer",
+	})
 
 
 func _show_card(card_id: String, discovered := false) -> void:
