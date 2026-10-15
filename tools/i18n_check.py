@@ -8,6 +8,8 @@ import subprocess
 import sys
 import tempfile
 
+sys.stdout.reconfigure(encoding="utf-8")
+
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 out = os.path.join(tempfile.gettempdir(), "ares_strings.json")
 subprocess.run([sys.executable, os.path.join(root, "tools", "i18n_extract.py"), root, out], check=True)
