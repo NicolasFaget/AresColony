@@ -152,6 +152,7 @@ func _update_lights() -> void:
 		elif _engine.efficiency(i) < 0.999 and not _engine.def_of(i).inputs.is_empty():
 			color = Color("#ffb347")
 		light.material_override = ModelBuilder.material(color, 1.2)
+		light.visible = color != Color("#5be49b")
 
 
 static func _model_height(node: Node3D) -> float:

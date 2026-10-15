@@ -1,7 +1,8 @@
 class_name GameWindow
 extends PanelContainer
-## Panneau principal en bas de l'écran (« bottom sheet ») : poignée, onglets, contenu.
-## Toucher la poignée replie le panneau pour laisser voir le monde.
+## Barre d'onglets en bas de l'écran ; le panneau de contenu s'ouvre au-dessus quand on touche
+## un onglet, et se referme en touchant de nouveau l'onglet actif (ou la poignée).
+## Fermé par défaut : le monde occupe tout l'écran.
 
 signal tab_selected(index: int)
 signal collapsed_changed(collapsed: bool)
@@ -14,12 +15,13 @@ const TABS := [
 ]
 
 var current := 0
-var collapsed := false
+var collapsed := true
 var body: PanelContainer
 
 var _tabs: Array[Button] = []
 var _icons: Array[TextureRect] = []
 var _badges: Array[Control] = []
+var _labels: Array[Label] = []
 var _handle: Control
 
 
@@ -31,6 +33,7 @@ func _ready() -> void:
 	_handle.gui_input.connect(_on_handle_input)
 
 	var group := ButtonGroup.new()
+	group.allow_unpress = true
 	var tab_row := UiFx.hbox(6)
 	for i in TABS.size():
 		tab_row.add_child(_build_tab(i, group))
@@ -38,15 +41,24 @@ func _ready() -> void:
 	body = UiFx.panel("Inset")
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
-	add_child(UiFx.vbox(8, [_handle, tab_row, body]))
-	select(0)
+	add_child(UiFx.vbox(6, [_handle, body, tab_row]))
+	body.visible = false
+	_handle.visible = false
+	_paint()
 
 
 func select(index: int) -> void:
 	current = index
-	_tabs[index].button_pressed = true
-	for i in _icons.size():
-		_icons[i].modulate = Palette.ACCENT if i == index else Palette.TEXT_MUTED
+	_paint()
+
+
+## Onglet actif en cyan, seulement quand le panneau est ouvert.
+func _paint() -> void:
+	for i in _tabs.size():
+		var active := i == current and not collapsed
+		_tabs[i].set_pressed_no_signal(active)
+		_icons[i].modulate = Palette.ACCENT if active else Palette.TEXT_MUTED
+		_labels[i].add_theme_color_override("font_color", Palette.ACCENT if active else Palette.TEXT_DIM)
 
 
 func set_badge(index: int, on: bool) -> void:
@@ -59,7 +71,8 @@ func set_badge(index: int, on: bool) -> void:
 func toggle_collapsed() -> void:
 	collapsed = not collapsed
 	body.visible = not collapsed
-	_handle.queue_redraw()
+	_handle.visible = not collapsed
+	_paint()
 	collapsed_changed.emit(collapsed)
 
 
@@ -76,19 +89,16 @@ func _build_tab(index: int, group: ButtonGroup) -> Button:
 	button.toggle_mode = true
 	button.button_group = group
 	button.focus_mode = Control.FOCUS_NONE
-	button.custom_minimum_size = Vector2(0, 78)
+	button.custom_minimum_size = Vector2(0, 64)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
-	var icon := UiFx.image(UiFx.icon(TABS[index][0]), 32, Palette.TEXT_MUTED)
+	var icon := UiFx.image(UiFx.icon(TABS[index][0]), 28, Palette.TEXT_MUTED)
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var label := UiFx.label(TABS[index][1], "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	var content := UiFx.vbox(4, [icon, label])
 	content.alignment = BoxContainer.ALIGNMENT_CENTER
 	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	button.add_child(content)
-	# Le libellé suit la couleur du bouton (cyan quand l'onglet est actif).
-	button.toggled.connect(func(on: bool) -> void:
-		label.add_theme_color_override("font_color", Palette.ACCENT if on else Palette.TEXT_DIM))
 
 	var badge := _Dot.new()
 	badge.visible = false
@@ -100,10 +110,15 @@ func _build_tab(index: int, group: ButtonGroup) -> Button:
 	button.pressed.connect(func() -> void:
 		GameManager.vibrate(8)
 		AudioManager.play("tab")
+		# Toucher l'onglet déjà ouvert referme le panneau.
+		if not collapsed and index == current:
+			toggle_collapsed()
+			return
 		select(index)
 		if collapsed:
 			toggle_collapsed()
 		tab_selected.emit(index))
+	_labels.append(label)
 	_tabs.append(button)
 	_icons.append(icon)
 	_badges.append(badge)

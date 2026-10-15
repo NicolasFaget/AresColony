@@ -17,7 +17,7 @@ func _init(p_def: Defs.Building) -> void:
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_PASS
-	var thumb := UiFx.panel("Thumb", UiFx.building_icon(def.id, Vector2(96, 80)))
+	var thumb := UiFx.panel("Thumb", UiFx.building_icon(def.id, Vector2(84, 68)))
 	thumb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 	var title := UiFx.label(def.name, "HeadingLabel")
@@ -33,13 +33,13 @@ func _ready() -> void:
 		effects.add_child(_effect_icon("person", Palette.TEXT, "+%d colons" % def.housing))
 	_lock = UiFx.label("", "SmallLabel")
 	_lock.add_theme_color_override("font_color", Palette.WARNING)
-	var info := UiFx.vbox(4, [UiFx.hbox(8, [title, size_label]), effects,
-			UiFx.paragraph(def.description, "SmallLabel"), _lock])
+	var info := UiFx.vbox(4, [UiFx.hbox(8, [title, size_label]), effects, _lock])
+	info.alignment = BoxContainer.ALIGNMENT_CENTER
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	_button = Button.new()
 	_button.theme_type_variation = "GoldButton"
-	_button.custom_minimum_size = Vector2(150, 76)
+	_button.custom_minimum_size = Vector2(128, 64)
 	_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_cost = UiFx.label(NumberFormatter.format(def.cost), "NumberLabel")
 	var content := UiFx.vbox(0, [UiFx.label("Placer", "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER),

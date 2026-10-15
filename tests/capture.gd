@@ -68,7 +68,6 @@ func _run() -> void:
 			ColonyBot.play(engine, 21.9)
 			main = await _open_main()
 			_close_modals(main)
-			main._window.toggle_collapsed()
 			await _frames(30)
 			await _shot("11_nuit")
 		"tempete":
@@ -76,7 +75,6 @@ func _run() -> void:
 			engine.state.storm_until = engine.state.sol + 3.0
 			main = await _open_main()
 			_close_modals(main)
-			main._window.toggle_collapsed()
 			await _frames(120)
 			await _shot("12_tempete")
 		"zoom":
@@ -84,7 +82,6 @@ func _run() -> void:
 			engine.state.speed = 1
 			main = await _open_main()
 			_close_modals(main)
-			main._window.toggle_collapsed()
 			var rig: Node3D = main._world.rig
 			# Centre sur la première conduite (le réseau vers la glace).
 			var target := Vector3(engine.map.lander_cell.x, 0, engine.map.lander_cell.y)

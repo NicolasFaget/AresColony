@@ -1,6 +1,6 @@
 class_name NewsTicker
 extends PanelContainer
-## Bandeau d'actualités du bas : un message à la fois, qui défile depuis la droite.
+## Messages éphémères : un à la fois, qui apparaît en fondu puis s'efface.
 
 const DISPLAY_SECONDS := 4.0
 const MAX_QUEUE := 4
@@ -22,6 +22,7 @@ func _ready() -> void:
 	_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_clip.add_child(_label)
 	add_child(UiFx.hbox(10, [UiFx.image(UiFx.icon("news"), 26, Palette.ACCENT), _clip]))
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_label.text = "Bienvenue sur Mars, commandant !"
 	_showing = true
 	_timer = DISPLAY_SECONDS
@@ -37,6 +38,7 @@ func post(message: String) -> void:
 
 func _process(delta: float) -> void:
 	_label.position.y = (_clip.size.y - _label.size.y) / 2.0
+	modulate.a = move_toward(modulate.a, 1.0 if _showing else 0.0, delta * 3.0)
 	if not _showing:
 		return
 	_timer -= delta

@@ -17,35 +17,37 @@ func _ready() -> void:
 	box.bg_color = Color(0.03, 0.14, 0.16, 0.95)
 	box.border_color = Palette.ACCENT
 	box.set_border_width_all(2)
-	box.set_corner_radius_all(22)
-	box.set_content_margin_all(12)
+	box.set_corner_radius_all(18)
+	box.set_content_margin_all(8)
+	box.content_margin_left = 12
 	add_theme_stylebox_override("panel", box)
 
 	_counter = UiFx.label("", "CaptionLabel")
 	_counter.add_theme_color_override("font_color", Palette.ACCENT)
-	_text = UiFx.paragraph("", "BodyLabel")
+	_text = UiFx.paragraph("", "SmallLabel")
 	_text.add_theme_color_override("font_color", Palette.TEXT)
 	var show := Button.new()
 	show.theme_type_variation = "GreenButton"
 	show.text = "Montrer"
-	show.custom_minimum_size = Vector2(0, 54)
-	show.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	show.custom_minimum_size = Vector2(118, 48)
+	show.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	show.focus_mode = Control.FOCUS_NONE
 	show.pressed.connect(func() -> void:
 		AudioManager.play("click")
 		var step: Dictionary = ColonyAdvisor.TUTORIAL[_step]
 		show_requested.emit(step.tab, step.target))
 	var skip := Button.new()
-	skip.text = "Passer le guide"
-	skip.custom_minimum_size = Vector2(0, 54)
+	skip.text = "✕"
+	skip.tooltip_text = "Passer le guide"
+	skip.custom_minimum_size = Vector2(48, 48)
+	skip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	skip.focus_mode = Control.FOCUS_NONE
 	skip.pressed.connect(func() -> void:
 		AudioManager.play("click")
 		skip_requested.emit())
-	add_child(UiFx.vbox(6, [
-		UiFx.hbox(8, [UiFx.image(UiFx.icon("target"), 22, Palette.ACCENT), _counter]),
-		_text, UiFx.hbox(8, [show, skip]),
-	]))
+	var info := UiFx.vbox(0, [_counter, _text])
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_child(UiFx.hbox(8, [info, show, skip]))
 	visible = false
 
 
@@ -57,7 +59,7 @@ func show_step(step: int) -> bool:
 	visible = step >= 0
 	if step < 0:
 		return changed
-	_counter.text = "GUIDE · ÉTAPE %d / %d" % [step + 1, ColonyAdvisor.TUTORIAL.size()]
+	_counter.text = "GUIDE %d/%d" % [step + 1, ColonyAdvisor.TUTORIAL.size()]
 	_text.text = ColonyAdvisor.TUTORIAL[step].text
 	if changed:
 		UiFx.pop(self, 0.04)

@@ -4,7 +4,7 @@ extends Control
 ## Il affiche ce que ColonyEngine expose et ne calcule rien lui-même.
 
 const MARGIN := 10
-const WINDOW_SHARE := 0.42
+const WINDOW_SHARE := 0.5
 const TAP_SLOP := 12.0
 ## Un message d'ambiance tous les ~1,5 sol de jeu.
 const CHATTER_EVERY := 1.5
@@ -131,7 +131,8 @@ func _build_layout() -> void:
 	_pages[0].visible = true
 
 	_news = NewsTicker.new()
-	root.add_child(_news)
+	add_child(_news)
+	_news.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 
 	var fx := Control.new()
 	fx.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -214,6 +215,10 @@ func _layout_changed() -> void:
 		if panel.visible:
 			bottom_top = minf(bottom_top, panel.get_global_rect().position.y)
 	var covered_bottom := size.y - bottom_top
+	_news.offset_left = MARGIN + 6
+	_news.offset_right = -MARGIN - 6
+	_news.offset_bottom = bottom_top - size.y - 8
+	_news.offset_top = _news.offset_bottom - 50
 	_world.rig.covered_fraction = clampf((covered_bottom - covered_top) / size.y, -0.5, 0.9)
 
 
