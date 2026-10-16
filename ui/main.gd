@@ -656,7 +656,7 @@ func _show_network() -> void:
 	for i in campaign.colonies.size():
 		var state := campaign.colonies[i]
 		var name := UiFx.label(campaign.colony_name(i), "HeadingLabel")
-		var info := UiFx.label(Tr.t("%s · Sol %d · %d colons · ère %d") % [Tr.t(ColonyContent.REGIONS[state.region].planet),
+		var info := UiFx.label(Tr.t("%s · Sol %d · %d colons · ère %d") % [Tr.t(ColonyContent.PLANETS[campaign.planet_of(i)].name),
 				int(state.sol) + 1, state.colonists.size(), state.era], "SmallLabel")
 		var status := UiFx.paragraph("", "SmallLabel")
 		var alerts := ColonyAdvisor.alerts(campaign.engines[i])
@@ -718,7 +718,11 @@ func _show_network() -> void:
 	actions.add_child(cargo)
 	actions.add_child(found)
 	box.add_child(actions)
-	var later := UiFx.paragraph(Tr.t("Prochaines destinations : Cérès, puis Titan."), "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
+	if campaign.interplanetary_unlocked():
+		box.add_child(UiFx.label(Tr.t("Fenêtres de tir"), "HeadingLabel"))
+		for line in _window_lines(campaign):
+			box.add_child(UiFx.paragraph(line, "SmallLabel"))
+	var later := UiFx.paragraph(Tr.t("Destination suivante : Titan, la lune de Saturne."), "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	later.add_theme_color_override("font_color", Palette.TEXT_MUTED)
 	box.add_child(later)
 	var scroll := _fitted_scroll(box)
@@ -742,18 +746,23 @@ func _fitted_scroll(box: Control) -> ScrollContainer:
 	return scroll
 
 
-## Fonder une colonie : le site d'atterrissage, et ce que le vaisseau emporte.
+## Fonder une colonie : le site d'atterrissage, et ce que le vaisseau emporte (selon la destination).
 func _show_founding() -> void:
 	var campaign := GameManager.campaign
+	var origin := campaign.active
 	var holder: Array[Modal] = []
-	var problem := campaign.founding_problem(campaign.active)
 	var box := UiFx.vbox(10)
-	box.add_child(UiFx.paragraph(Tr.t("Le vaisseau emporte %d colons, %s matériaux et %s kg de méthane de cette colonie. Arrivée : %s sol après le départ.") % [
-			Campaign.FOUNDING_CREW, NumberFormatter.format(Campaign.FOUNDING_MATERIALS),
-			NumberFormatter.format(Campaign.FOUNDING_FUEL), NumberFormatter.format(Campaign.SURFACE_HOP_SOLS)], "SmallLabel"))
-	for id: String in ColonyContent.REGION_ORDER:
+	box.add_child(UiFx.paragraph(Tr.t("Le vaisseau emporte %d colons de cette colonie, des matériaux pour démarrer, et son carburant.") % Campaign.FOUNDING_CREW, "SmallLabel"))
+	for id: String in ColonyContent.FOUNDING_REGIONS:
 		var region: Dictionary = ColonyContent.REGIONS[id]
-		var title := UiFx.label("%s · %s" % [Tr.t(region.planet), Tr.t(region.name)], "HeadingLabel")
+		var planet: Dictionary = ColonyContent.PLANETS[region.planet]
+		var title := UiFx.label("%s · %s" % [Tr.t(planet.name), Tr.t(region.name)], "HeadingLabel")
+		var cost := campaign.founding_cost(origin, id)
+		var trip := UiFx.label(Tr.t("%s matériaux · %s kg de méthane · %s sol%s de voyage") % [
+				NumberFormatter.format(cost[ColonyContent.MATERIALS]), NumberFormatter.format(cost[ColonyContent.METHANE]),
+				NumberFormatter.format(campaign.transit_sols(origin, id)), "s" if campaign.transit_sols(origin, id) >= 2.0 else ""], "SmallLabel")
+		trip.add_theme_color_override("font_color", Palette.ACCENT)
+		var problem := campaign.founding_problem(origin, id)
 		var go := Button.new()
 		go.theme_type_variation = "GoldButton"
 		go.text = Tr.t("Se poser ici")
@@ -761,25 +770,43 @@ func _show_founding() -> void:
 		go.focus_mode = Control.FOCUS_NONE
 		go.disabled = not problem.is_empty()
 		go.pressed.connect(func() -> void:
-			if campaign.found_colony(campaign.active, id):
+			if campaign.found_colony(origin, id):
 				AudioManager.play("whoosh")
 				GameManager.vibrate(40)
 				_world.launch_from_spaceport()
 				_news.post(Tr.t("Le vaisseau de fondation décolle vers %s !") % Tr.t(region.name))
 				holder[0].close())
-		box.add_child(UiFx.panel("Row", UiFx.vbox(6, [title, UiFx.paragraph(Tr.t(region.tagline), "SmallLabel"), go])))
-	for world_name in ["Cérès", "Titan"]:
-		var soon := UiFx.panel("RowLocked", UiFx.vbox(4, [UiFx.label(Tr.t(world_name), "HeadingLabel"),
-				UiFx.label(Tr.t("Bientôt : il faudra attendre les fenêtres de tir."), "SmallLabel")]))
-		box.add_child(soon)
-	if not problem.is_empty():
-		var reason := UiFx.paragraph(problem, "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
-		reason.add_theme_color_override("font_color", Palette.WARNING)
-		box.add_child(reason)
+		var rows: Array = [title, UiFx.paragraph(Tr.t(region.tagline), "SmallLabel"), trip, go]
+		if not problem.is_empty():
+			var reason := UiFx.paragraph(problem, "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
+			reason.add_theme_color_override("font_color", Palette.WARNING)
+			rows.append(reason)
+		box.add_child(UiFx.panel("Row", UiFx.vbox(6, rows)))
+	var soon := UiFx.panel("RowLocked", UiFx.vbox(4, [UiFx.label(Tr.t("Titan"), "HeadingLabel"),
+			UiFx.label(Tr.t("Bientôt : la lune de Saturne, au bout du voyage."), "SmallLabel")]))
+	box.add_child(soon)
 	var scroll := _fitted_scroll(box)
 	holder.append(Modal.open(_modal_layer, {
 		"icon": "planet", "title": Tr.t("Fonder une colonie"), "extra": scroll, "confirm_text": Tr.t("Fermer"),
 	}))
+
+
+## Fenêtres de tir entre les mondes du réseau (et vers les mondes à coloniser).
+func _window_lines(campaign: Campaign) -> Array[String]:
+	var lines: Array[String] = []
+	for key: String in ColonyContent.ROUTES:
+		var worlds := key.split("-")
+		var a := worlds[0]
+		var b := worlds[1]
+		var r: Dictionary = ColonyContent.ROUTES[key]
+		var names := "%s ⇄ %s" % [Tr.t(ColonyContent.PLANETS[a].name), Tr.t(ColonyContent.PLANETS[b].name)]
+		if campaign.window_open(a, b):
+			lines.append(Tr.t("%s : fenêtre de tir ouverte, encore %s sols · trajet %s sols.") % [names,
+					NumberFormatter.format(campaign.window_wait(a, b, true)), NumberFormatter.format(r.transit)])
+		else:
+			lines.append(Tr.t("%s : prochaine fenêtre de tir dans %s sols · trajet %s sols.") % [names,
+					NumberFormatter.format(campaign.window_wait(a, b)), NumberFormatter.format(r.transit)])
+	return lines
 
 
 ## Cargaison : destination, quantités (et colons), carburant et arrivée.
@@ -797,6 +824,7 @@ func _show_cargo() -> void:
 	var box := UiFx.vbox(8)
 	box.add_child(UiFx.label(Tr.t("Destination"), "HeadingLabel"))
 	var group := ButtonGroup.new()
+	var refresh_ref: Array[Callable] = []
 	var targets := UiFx.hbox(6)
 	for i in campaign.colonies.size():
 		if i == origin:
@@ -810,18 +838,25 @@ func _show_cargo() -> void:
 		target.custom_minimum_size = Vector2(0, 52)
 		target.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		target.focus_mode = Control.FOCUS_NONE
-		target.pressed.connect(func() -> void: destination[0] = i)
+		target.pressed.connect(func() -> void:
+			destination[0] = i
+			refresh_ref[0].call())
 		targets.add_child(target)
 	box.add_child(targets)
 	box.add_child(UiFx.label(Tr.t("Soute"), "HeadingLabel"))
 	var launch := Button.new()
 	var summary := UiFx.paragraph("", "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	var refresh := func() -> void:
+		if destination[0] < 0:
+			return
 		var problem := campaign.shipment_problem(origin, destination[0], amounts, crew[0])
 		launch.disabled = not problem.is_empty()
+		var region := campaign.colonies[destination[0]].region
 		summary.text = problem if not problem.is_empty() else Tr.t("Carburant : %s kg de méthane · arrivée dans %s sol.") % [
-				NumberFormatter.format(campaign.fuel_cost(amounts, crew[0])), NumberFormatter.format(Campaign.SURFACE_HOP_SOLS)]
+				NumberFormatter.format(campaign.fuel_cost(origin, region, amounts, crew[0])),
+				NumberFormatter.format(campaign.transit_sols(origin, region))]
 		summary.add_theme_color_override("font_color", Palette.WARNING if not problem.is_empty() else Palette.ACCENT)
+	refresh_ref.append(refresh)
 	var rows: Array = Campaign.CARGO.duplicate()
 	rows.append("colonists")
 	for r: String in rows:

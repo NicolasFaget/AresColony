@@ -23,6 +23,10 @@ const PAYLOAD_UNITS := 300.0
 const FOUNDING_CREW := 4
 const FOUNDING_MATERIALS := 150.0
 const FOUNDING_FUEL := 60.0
+## Vers un autre monde, le vaisseau emporte de quoi tenir plus longtemps.
+const FOUNDING_MATERIALS_FAR := 250.0
+## Entre deux mondes, chaque unité de cargaison coûte plus cher en carburant qu'un simple saut.
+const FAR_UNIT_FACTOR := 3.0
 ## Ressources qu'on peut expédier.
 const CARGO := [ColonyContent.MATERIALS, ColonyContent.WATER, ColonyContent.FOOD, ColonyContent.OXYGEN,
 		ColonyContent.METHANE, ColonyContent.DATA]
@@ -165,15 +169,62 @@ func interplanetary_unlocked() -> bool:
 	return false
 
 
+static func planet_of_region(region: String) -> String:
+	return ColonyContent.REGIONS[region].get("planet", "mars")
+
+
+func planet_of(index: int) -> String:
+	return planet_of_region(colonies[index].region)
+
+
+## Route entre deux mondes ({} sur un même monde).
+static func route(a: String, b: String) -> Dictionary:
+	if a == b:
+		return {}
+	var key := "%s-%s" % [a, b] if a < b else "%s-%s" % [b, a]
+	return ColonyContent.ROUTES.get(key, {})
+
+
+## Fenêtre de tir ouverte entre deux mondes (toujours vrai sur un même monde).
+func window_open(a: String, b: String) -> bool:
+	var r := route(a, b)
+	return r.is_empty() or fposmod(time - r.phase, r.synodic) < r.open
+
+
+## Sols avant la prochaine ouverture (0 si ouverte), ou avant sa fermeture avec `closing`.
+func window_wait(a: String, b: String, closing := false) -> float:
+	var r := route(a, b)
+	if r.is_empty():
+		return 0.0
+	var position := fposmod(time - r.phase, r.synodic)
+	if closing:
+		return maxf(0.0, r.open - position)
+	return 0.0 if position < r.open else r.synodic - position
+
+
 func transit_sols(from: int, to_region: String) -> float:
-	return SURFACE_HOP_SOLS
+	var r := route(planet_of(from), planet_of_region(to_region))
+	return SURFACE_HOP_SOLS if r.is_empty() else r.transit
 
 
-func fuel_cost(cargo: Dictionary, colonists: int) -> float:
+## Méthane du vol : base (saut ou route), plus la cargaison ; une faible gravité au départ allège tout.
+func fuel_cost(from: int, to_region: String, cargo: Dictionary, colonists: int) -> float:
 	var units := colonists * COLONIST_UNITS
 	for r: String in cargo:
 		units += cargo[r]
-	return HOP_FUEL + FUEL_PER_UNIT * units
+	var r := route(planet_of(from), planet_of_region(to_region))
+	var lift: float = ColonyContent.PLANETS[planet_of(from)].launch_fuel
+	if r.is_empty():
+		return (HOP_FUEL + FUEL_PER_UNIT * units) * lift
+	return (r.fuel + FUEL_PER_UNIT * FAR_UNIT_FACTOR * units) * lift
+
+
+func _window_problem(from: int, to_region: String) -> String:
+	var a := planet_of(from)
+	var b := planet_of_region(to_region)
+	if window_open(a, b):
+		return ""
+	return Tr.t("Fenêtre de tir fermée : prochaine ouverture dans %s sols.") % NumberFormatter.format(window_wait(a, b))
 
 
 ## Raison pour laquelle l'envoi est impossible ("" s'il est possible).
@@ -192,7 +243,10 @@ func shipment_problem(from: int, to: int, cargo: Dictionary, colonists: int) -> 
 		return Tr.t("Trop lourd : %d unités au plus.") % int(PAYLOAD_UNITS)
 	if colonists > 0 and colonists >= origin.state.colonists.size():
 		return Tr.t("Il faut laisser au moins un colon sur place.")
-	var fuel := fuel_cost(cargo, colonists)
+	var window := _window_problem(from, colonies[to].region)
+	if not window.is_empty():
+		return window
+	var fuel := fuel_cost(from, colonies[to].region, cargo, colonists)
 	for r: String in cargo:
 		var needed: float = cargo[r] + (fuel if r == ColonyContent.METHANE else 0.0)
 		if origin.state.amount(r) < needed - 0.001:
@@ -206,15 +260,26 @@ func send_cargo(from: int, to: int, cargo: Dictionary, colonists: int) -> bool:
 	if not shipment_problem(from, to, cargo, colonists).is_empty():
 		return false
 	var origin := engines[from]
-	origin.withdraw(ColonyContent.METHANE, fuel_cost(cargo, colonists))
+	origin.withdraw(ColonyContent.METHANE, fuel_cost(from, colonies[to].region, cargo, colonists))
 	for r: String in cargo:
 		origin.withdraw(r, cargo[r])
+	origin.state.exported_materials += cargo.get(ColonyContent.MATERIALS, 0.0)
 	var crew := origin.release_colonists(colonists)
 	_launch("cargo", from, to, cargo, crew, colonies[to].region)
 	return true
 
 
-func founding_problem(from: int) -> String:
+## Ce que coûte la fondation d'une colonie dans `region` depuis `from` : matériaux et méthane.
+func founding_cost(from: int, region: String) -> Dictionary:
+	var far := not route(planet_of(from), planet_of_region(region)).is_empty()
+	var materials := FOUNDING_MATERIALS_FAR if far else FOUNDING_MATERIALS
+	var fuel := FOUNDING_FUEL
+	if far:
+		fuel = fuel_cost(from, region, { ColonyContent.MATERIALS: materials }, FOUNDING_CREW)
+	return { ColonyContent.MATERIALS: materials, ColonyContent.METHANE: fuel }
+
+
+func founding_problem(from: int, region := "jezero") -> String:
 	if not interplanetary_unlocked():
 		return Tr.t("Terminez d'abord les trois ères de Mars.")
 	var origin := engines[from]
@@ -222,22 +287,27 @@ func founding_problem(from: int) -> String:
 		return Tr.t("Il faut un astroport raccordé dans la colonie de départ.")
 	if origin.state.colonists.size() <= FOUNDING_CREW:
 		return Tr.t("Il faut plus de %d colons pour en envoyer %d.") % [FOUNDING_CREW, FOUNDING_CREW]
-	if origin.state.amount(ColonyContent.MATERIALS) < FOUNDING_MATERIALS:
+	var window := _window_problem(from, region)
+	if not window.is_empty():
+		return window
+	var cost := founding_cost(from, region)
+	if origin.state.amount(ColonyContent.MATERIALS) < cost[ColonyContent.MATERIALS]:
 		return Tr.t("Pas assez %s.") % Tr.t(ColonyContent.RESOURCE_PARTITIVE[ColonyContent.MATERIALS])
-	if origin.state.amount(ColonyContent.METHANE) < FOUNDING_FUEL:
-		return Tr.t("Pas assez de méthane pour le vol (%s kg).") % NumberFormatter.format(FOUNDING_FUEL)
+	if origin.state.amount(ColonyContent.METHANE) < cost[ColonyContent.METHANE]:
+		return Tr.t("Pas assez de méthane pour le vol (%s kg).") % NumberFormatter.format(cost[ColonyContent.METHANE])
 	return ""
 
 
 ## Lance un vaisseau de fondation vers `region` : la colonie naît à son arrivée.
 func found_colony(from: int, region: String) -> bool:
-	if not founding_problem(from).is_empty() or not ColonyContent.REGIONS.has(region):
+	if not ColonyContent.REGIONS.has(region) or not founding_problem(from, region).is_empty():
 		return false
 	var origin := engines[from]
-	origin.withdraw(ColonyContent.MATERIALS, FOUNDING_MATERIALS)
-	origin.withdraw(ColonyContent.METHANE, FOUNDING_FUEL)
+	var cost := founding_cost(from, region)
+	origin.withdraw(ColonyContent.MATERIALS, cost[ColonyContent.MATERIALS])
+	origin.withdraw(ColonyContent.METHANE, cost[ColonyContent.METHANE])
 	var crew := origin.release_colonists(FOUNDING_CREW)
-	_launch("colony", from, -1, { ColonyContent.MATERIALS: FOUNDING_MATERIALS }, crew, region)
+	_launch("colony", from, -1, { ColonyContent.MATERIALS: cost[ColonyContent.MATERIALS] }, crew, region)
 	return true
 
 
@@ -306,9 +376,15 @@ func _add_colony(state: ColonyState, existing: ColonyEngine = null) -> int:
 
 ## Ce que les objectifs d'une colonie doivent savoir de la campagne.
 func _update_info() -> void:
+	var planets := []
+	for state in colonies:
+		var planet := planet_of_region(state.region)
+		if not planets.has(planet):
+			planets.append(planet)
 	for colony in engines:
 		colony.campaign_colonies = colonies.size()
 		colony.campaign_deliveries = deliveries
+		colony.campaign_planets = planets
 
 
 # ---------- Sauvegarde ----------

@@ -70,7 +70,7 @@ func _ready() -> void:
 
 func refresh() -> void:
 	var engine := GameManager.engine
-	_era.text = ColonyContent.ERAS[engine.state.era]
+	_era.text = Tr.t(engine.era_title())
 	_trips.visible = engine.state.era >= 2
 	if engine.state.expedition.is_empty():
 		var found := engine.state.sites_done.size()

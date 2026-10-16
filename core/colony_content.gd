@@ -48,7 +48,7 @@ const COLONIST_NEEDS := { OXYGEN: 0.84, WATER: 2.5, FOOD: 1.0, ENERGY: 0.5 }
 ## Données scientifiques produites par chaque colon par sol.
 const COLONIST_DATA := 1.0
 ## Modules qui peuvent tomber en panne (les machines).
-const BREAKABLE := ["moxie", "extractor", "greenhouse", "electrolyser", "kiln", "sabatier", "biodome"]
+const BREAKABLE := ["moxie", "extractor", "greenhouse", "electrolyser", "kiln", "sabatier", "biodome", "brine"]
 ## Ce que racontent les colons quand une machine lâche.
 const BREAKDOWN_LINES := {
 	"moxie": "L'électrolyseur de CO₂ a surchauffé. Il sent le grille-pain.",
@@ -56,6 +56,7 @@ const BREAKDOWN_LINES := {
 	"greenhouse": "Une pompe d'arrosage de la serre a lâché. Les radis s'inquiètent.",
 	"electrolyser": "Une fuite sur l'électrolyseur d'eau ! Le sifflement est très désagréable.",
 	"biodome": "L'arrosage de la serre géante s'est bloqué. Les tomates font la tête.",
+	"brine": "La raffinerie de saumure est entartrée de sel. Il faut gratter.",
 	"sabatier": "Le réacteur Sabatier a perdu la pression. Il boude à 400 °C.",
 	"kiln": "Le four à régolithe s'est arrêté net. Il y a de la poussière partout. Encore plus que d'habitude.",
 }
@@ -158,6 +159,12 @@ static func buildings() -> Array[Defs.Building]:
 			"storage": { METHANE: 100.0 }, "card": "hohmann",
 			"description": "Un pas de tir et sa fusée : fonder de nouvelles colonies, expédier des cargaisons entre elles.",
 		}),
+		Defs.Building.new({
+			"id": "brine", "name": "Raffinerie de saumure", "size": Vector2i(2, 2), "cost": 80.0, "research": "brines",
+			"requires_tile": ColonyMap.Tile.ICE, "inputs": { ENERGY: 10.0 }, "outputs": { WATER: 8.0, MATERIALS: 4.0 },
+			"card": "occator",
+			"description": "Pompe la saumure sous la glace : de l'eau, et des sels (carbonates) pour les matériaux. À poser sur la glace.",
+		}),
 	]
 
 
@@ -169,23 +176,52 @@ const ERAS := {
 	4: "Ère 4 · Interplanétaire : relier plusieurs colonies.",
 }
 
+## Mondes colonisables. launch_fuel : carburant de décollage relatif (gravité) ;
+## atmosphere : sans air, ni tempêtes ni poussière soulevée ; forbidden : modules impossibles.
+const PLANETS := {
+	"mars": { "name": "Mars", "launch_fuel": 1.0, "atmosphere": true, "forbidden": [] },
+	"ceres": { "name": "Cérès", "launch_fuel": 0.25, "atmosphere": false, "forbidden": ["moxie", "sabatier"],
+		"forbidden_reason": "Pas d'atmosphère de CO₂ sur Cérès." },
+}
+const PLANET_ORDER := ["mars", "ceres"]
+## Routes entre mondes (dans le jeu, un sol de voyage vaut environ un mois réel) : durée du trajet
+## (orbite de Hohmann), période entre deux fenêtres de tir (période synodique), durée d'ouverture,
+## carburant de base et décalage de la première fenêtre.
+const ROUTES := {
+	"ceres-mars": { "transit": 19.0, "synodic": 38.0, "open": 6.0, "fuel": 120.0, "phase": 4.0 },
+}
+
+## Ères propres à chaque monde (Mars utilise ERAS).
+const PLANET_ERAS := {
+	"ceres": { 1: "Cérès · Avant-poste minier : glace, sels et minerais de la ceinture." },
+}
+
 ## Régions d'atterrissage, choisies à la création de la colonie.
 ## effects : multiplicateurs (comme ceux des recherches) ; sites : expéditions, dans l'ordre.
 const REGIONS := {
 	"jezero": {
 		"name": "Cratère Jezero", "tagline": "Un ancien lac, au bord du grand bassin d'Isidis.",
 		"traits": ["Équilibré : soleil et glace modérés", "4 sites célèbres à explorer"],
-		"planet": "Mars", "effects": {}, "sites": ["delta", "meteorite", "rochette", "nili"], "card": "",
+		"planet": "mars", "effects": {}, "sites": ["delta", "meteorite", "rochette", "nili"], "card": "",
 		"rim": "Le rebord du cratère Jezero. Superbe vue, mais trop pentu pour bâtir.",
+	},
+	"ceres": {
+		"name": "Cratère Occator", "tagline": "Sur Cérès, au pied des taches de sel les plus brillantes de la ceinture.",
+		"traits": ["Glace et saumures partout, gravité minuscule", "Trois fois moins de soleil que sur Mars, −120 °C"],
+		"planet": "ceres", "effects": { "solar": 0.3, "heating": 1.5, "dust": 0.0 },
+		"sites": ["occator", "ahuna", "ernutet"], "card": "ceres",
+		"rim": "Le rebord du cratère Occator, sous un ciel noir.",
 	},
 	"arcadia": {
 		"name": "Arcadia Planitia", "tagline": "Une plaine du nord où la glace affleure sous la poussière.",
 		"traits": ["Beaucoup de glace, presque pas de rochers", "Plus au nord : −20 % de soleil, +25 % de chauffage"],
-		"planet": "Mars", "effects": { "solar": 0.8, "heating": 1.25 }, "sites": ["ice_impact", "meteorite"], "card": "arcadia",
+		"planet": "mars", "effects": { "solar": 0.8, "heating": 1.25 }, "sites": ["ice_impact", "meteorite"], "card": "arcadia",
 		"rim": "Le terrain se soulève ici : trop accidenté pour bâtir.",
 	},
 }
 const REGION_ORDER := ["jezero", "arcadia"]
+## Régions où l'on peut fonder une colonie depuis l'astroport.
+const FOUNDING_REGIONS := ["jezero", "arcadia", "ceres"]
 ## Modules chauffés : leur besoin d'énergie suit l'effet « heating » de la région.
 const HEATED := ["habitat", "greenhouse", "bunker", "biodome"]
 
@@ -197,6 +233,9 @@ const SITES := [
 	{ "id": "rochette", "name": "Le rocher « Rochette »", "card": "sample", "reward": { DATA: 40.0 } },
 	{ "id": "nili", "name": "Les fractures de Nili Fossae", "card": "nili", "reward": { DATA: 40.0, MATERIALS: 40.0 } },
 	{ "id": "ice_impact", "name": "Un cratère tout neuf", "card": "impact_ice", "reward": { WATER: 60.0, DATA: 40.0 } },
+	{ "id": "occator", "name": "Les taches brillantes", "card": "occator", "reward": { MATERIALS: 80.0 } },
+	{ "id": "ahuna", "name": "Le mont Ahuna", "card": "ahuna", "reward": { DATA: 50.0, WATER: 60.0 } },
+	{ "id": "ernutet", "name": "Les terres rouges d'Ernutet", "card": "ernutet", "reward": { DATA: 70.0 } },
 ]
 const PROSPECTION := { "id": "prospect", "name": "Prospection de minerais", "card": "", "reward": { MATERIALS: 50.0 } }
 
@@ -365,6 +404,9 @@ static func research() -> Array[Defs.Research]:
 		Defs.Research.new({ "id": "spaceport", "name": "Astroport", "cost": 100.0, "duration": 3.0, "era": 4,
 				"card": "hohmann",
 				"summary": "Débloque l'astroport : fonder d'autres colonies et leur envoyer des cargaisons." }),
+		Defs.Research.new({ "id": "brines", "name": "Traitement des saumures", "cost": 120.0, "duration": 3.0, "era": 4,
+				"requires": ["spaceport"], "card": "occator",
+				"summary": "Débloque la raffinerie de saumure, pour la colonie de Cérès." }),
 	]
 
 
@@ -422,6 +464,21 @@ static func objectives() -> Array[Defs.Objective]:
 		Defs.Objective.new({ "id": "cargo", "title": "Pont aérien", "era": 4,
 				"description": "Livrer une première cargaison d'une colonie à l'autre.",
 				"reward": { DATA: 60.0 } }),
+		Defs.Objective.new({ "id": "ceres", "title": "Ceinture d'astéroïdes", "era": 4,
+				"description": "Fonder une colonie sur Cérès, pendant une fenêtre de tir.",
+				"reward": { DATA: 100.0 } }),
+		Defs.Objective.new({ "id": "ceres_breath", "title": "Souffle salé", "era": 1, "planet": "ceres",
+				"description": "Produire de l'oxygène par électrolyse de l'eau (pas de CO₂ ici).",
+				"reward": { DATA: 30.0 } }),
+		Defs.Objective.new({ "id": "ceres_brine", "title": "Saumures d'Occator", "era": 1, "planet": "ceres",
+				"description": "Construire une raffinerie de saumure sur la glace.",
+				"reward": { MATERIALS: 100.0 } }),
+		Defs.Objective.new({ "id": "ceres_ahuna", "title": "Le volcan de glace", "era": 1, "planet": "ceres",
+				"description": "Mener une expédition jusqu'au mont Ahuna (le méthane vient de Mars).",
+				"reward": { DATA: 60.0 } }),
+		Defs.Objective.new({ "id": "ceres_export", "title": "Mine de la ceinture", "era": 1, "planet": "ceres",
+				"description": "Expédier 200 matériaux depuis Cérès vers d'autres colonies.",
+				"reward": { DATA: 80.0 } }),
 	]
 
 
@@ -593,6 +650,34 @@ static func cards() -> Array[Defs.Card]:
 			"in_game": "Entre deux sites de Mars, une fusée fait un saut d'un sol. Vers les autres mondes, il faudra attendre les fenêtres de tir.",
 			"sources": [["Wikipedia – orbite de Hohmann", "https://en.wikipedia.org/wiki/Hohmann_transfer_orbit"],
 				["NSTA (Science Scope, 2020)", "https://www.nsta.org/science-scope/science-scope-julyaugust-2020/back-mars"]] }),
+		Defs.Card.new({ "id": "ceres", "figure": "950 km", "figure_label": "de diamètre : le plus gros objet de la ceinture d'astéroïdes", "visual": "lander",
+			"quiz": "Quelle sonde a été la première à tourner autour d'une planète naine ?", "choices": ["Dawn", "Curiosity", "Voyager 1"], "answer": 0,
+			"title": "Cérès, la planète naine", "status": "Mesuré",
+			"fact": "Découverte en 1801 et d'abord classée parmi les planètes, Cérès est une planète naine depuis 2006. Avec environ 950 km de diamètre, c'est le plus gros objet de la ceinture d'astéroïdes, entre Mars et Jupiter : elle contient à elle seule environ un quart à un tiers de sa masse. La sonde Dawn s'y est mise en orbite le 6 mars 2015, la première autour d'une planète naine.",
+			"in_game": "Sur Cérès, la gravité est minuscule : décoller ne coûte presque rien. Mais le Soleil est loin et il n'y a pas d'air.",
+			"sources": [["NASA Goddard (Dawn à Cérès)", "https://svs.gsfc.nasa.gov/cgi-bin/details.cgi?aid=11758"],
+				["HyperPhysics (Georgia State University)", "https://hyperphysics.gsu.edu/hbase/Solar/ceres.html"]] }),
+		Defs.Card.new({ "id": "occator", "figure": "≈ 40 km", "figure_label": "de profondeur pour le réservoir de saumure sous Occator", "visual": "brine",
+			"quiz": "De quoi sont faites les taches brillantes d'Occator ?", "choices": ["De sels, surtout du carbonate de sodium", "De glace pure", "De métal poli"], "answer": 0,
+			"title": "Les taches brillantes d'Occator", "status": "Mesuré",
+			"fact": "Les taches brillantes du cratère Occator sont des dépôts de sels, surtout du carbonate de sodium : les plus grands dépôts de carbonates connus hors de la Terre. En 2020, l'équipe de Dawn a montré qu'ils proviennent d'une saumure remontée par des fractures depuis un réservoir situé à environ 40 km de profondeur. L'eau s'est évaporée en laissant une croûte de sel. Certains dépôts ont moins de 2 millions d'années.",
+			"in_game": "La raffinerie de saumure pompe cette eau salée : de l'eau, et des sels pour les matériaux.",
+			"sources": [["UC Berkeley News (2020)", "https://news.berkeley.edu/2020/08/10/dwarf-planet-ceres-has-reservoirs-of-salty-water/"],
+				["Wikipedia – taches brillantes de Cérès", "https://en.wikipedia.org/wiki/Bright_spots_on_Ceres"]] }),
+		Defs.Card.new({ "id": "ahuna", "figure": "4 km", "figure_label": "de haut pour Ahuna Mons, un volcan de glace", "visual": "extractor",
+			"quiz": "Qu'est-ce qui sort d'un cryovolcan comme Ahuna Mons ?", "choices": ["De la glace boueuse et salée", "De la lave en fusion", "Du méthane liquide"], "answer": 0,
+			"title": "Le volcan de glace", "status": "Mesuré",
+			"fact": "Ahuna Mons se dresse, isolée, à environ 4 km de hauteur en moyenne (5 km sur son flanc le plus raide), pour une vingtaine de kilomètres de large. D'après l'équipe de Dawn, c'est un cryovolcan : au lieu de lave, il a fait remonter de la glace boueuse et salée. Il serait jeune, à peine quelques centaines de millions d'années.",
+			"in_game": "L'expédition au mont Ahuna rapporte de l'eau et des données.",
+			"sources": [["NASA (2016)", "https://nasa.gov/feature/goddard/2016/ceres-cryo-volcano"],
+				["Wikipedia – Ahuna Mons", "https://en.wikipedia.org/wiki/Ahuna_Mons"]] }),
+		Defs.Card.new({ "id": "ernutet", "figure": "1 000 km²", "figure_label": "de terrain riche en matière organique près d'Ernutet", "visual": "garage",
+			"quiz": "Qu'a détecté la sonde Dawn près du cratère Ernutet ?", "choices": ["De la matière organique", "Des traces de vie", "De l'or"], "answer": 0,
+			"title": "Des molécules organiques", "status": "Mesuré",
+			"fact": "En 2017, le spectromètre de Dawn a repéré près du cratère Ernutet la signature de matière organique aliphatique (des chaînes de carbone), sur environ 1 000 km². C'était la première détection claire de molécules organiques depuis l'orbite sur un corps de la ceinture principale. Leur nature exacte reste inconnue ; elles viendraient peut-être de l'intérieur de Cérès.",
+			"in_game": "Les terres rouges d'Ernutet intéressent beaucoup vos chercheurs : l'expédition rapporte des données.",
+			"sources": [["Sky & Telescope", "https://skyandtelescope.org/astronomy-news/scientists-find-organics-on-ceres-1602201723/"],
+				["Astrobiology (communiqué NASA)", "https://astrobiology.com/2017/02/16/dawn-discovers-evidence-for-organic-material-on-ceres/"]] }),
 	]
 
 

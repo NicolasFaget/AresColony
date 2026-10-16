@@ -123,9 +123,12 @@ class Objective:
 	## Récompense : ressource -> quantité.
 	var reward: Dictionary
 	var era: int
+	## Monde où l'objectif s'applique.
+	var planet: String
 
 	func _init(p: Dictionary) -> void:
 		era = p.get("era", 1)
+		planet = p.get("planet", "mars")
 		id = p.id
 		title = p.title
 		description = p.description

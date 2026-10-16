@@ -34,6 +34,8 @@ var quiz_answers: Dictionary = {}
 var map_seed: int = 1
 ## Région d'atterrissage (ColonyContent.REGIONS).
 var region: String = "jezero"
+## Matériaux expédiés vers d'autres colonies (objectif de Cérès).
+var exported_materials: float = 0.0
 ## Nom de la colonie (plusieurs colonies peuvent partager une région : « Jezero II »).
 var name: String = ""
 ## Graine des événements, avancée à chaque tirage (parties reproductibles).
@@ -99,6 +101,7 @@ func to_dict() -> Dictionary:
 		"cards_read": cards_read.duplicate(),
 		"quiz_answers": quiz_answers.duplicate(),
 		"map_seed": map_seed,
+		"exported_materials": exported_materials,
 		"name": name,
 		"region": region,
 		"event_seed": event_seed,
@@ -150,6 +153,7 @@ static func from_dict(data: Dictionary) -> ColonyState:
 	state.cards_unlocked = _ids(data.get("cards_unlocked"))
 	state.era = clampi(int(_num(data.get("era"), 1)), 1, 4)
 	state.name = str(data.get("name", "")) if data.get("name") is String else ""
+	state.exported_materials = maxf(0.0, _num(data.get("exported_materials"), 0.0))
 	var trip: Variant = data.get("expedition")
 	if trip is Dictionary and trip.get("site") is String:
 		state.expedition = { "site": trip.site, "until": _num(trip.get("until"), 0.0) }

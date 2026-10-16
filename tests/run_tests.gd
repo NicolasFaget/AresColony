@@ -24,6 +24,7 @@ func _init() -> void:
 	_test_era3()
 	_test_guides()
 	_test_campaign()
+	_test_ceres()
 	_test_regions()
 	_test_night_and_batteries()
 	_test_colonists()
@@ -162,6 +163,66 @@ func _test_campaign() -> void:
 	var copy := Campaign.from_dict(JSON.parse_string(JSON.stringify(campaign.to_dict())))
 	_check(copy.colonies.size() == 2 and copy.active == 1 and copy.shipments.size() == campaign.shipments.size(), "campagne sauvegardée")
 	_check(copy.colonies[1].name == "Arcadia Planitia", "nom de colonie sauvegardé")
+
+
+# ---------- Cérès ----------
+
+func _test_ceres() -> void:
+	var state := ColonyState.new()
+	var campaign := Campaign.from_state(state)
+	var mars := campaign.engine()
+	mars.state.next_storm = 1e9
+	mars.state.next_resupply = 1e9
+	mars.state.next_dust_devil = 1e9
+	mars.dust_rate = 0.0
+	mars.breakdown_rate = 0.0
+	for r: Defs.Research in mars.research_defs.values():
+		mars.state.research_done.append(r.id)
+	mars.state.era = 4
+	var lander := mars.map.lander_cell
+	for x in range(lander.x + 2, lander.x + 9):
+		for y in range(lander.y - 1, lander.y + 3):
+			mars.map.set_tile(Vector2i(x, y), ColonyMap.Tile.PLAIN)
+	mars.state.resources[R.MATERIALS] = 400.0
+	mars.place("spaceport", lander + Vector2i(2, 0))
+	for k in 8:
+		mars.state.colonists.append({ "name": "Recrue %d" % k, "role": "pilote", "health": 1.0 })
+	var route: Dictionary = Campaign.route("mars", "ceres")
+	_check(not route.is_empty() and route.transit > 10.0, "route Mars-Cérès : un long voyage")
+	# Fenêtre de tir : fermée, puis ouverte.
+	campaign.time = route.phase + route.open + 1.0
+	_check(not campaign.window_open("mars", "ceres") and campaign.window_wait("mars", "ceres") > 0.0, "fenêtre de tir fermée")
+	mars.state.resources[R.METHANE] = 300.0
+	_check(campaign.founding_problem(0, "ceres").begins_with("Fenêtre de tir fermée"), "fondation sur Cérès hors fenêtre refusée")
+	_check(campaign.founding_problem(0, "arcadia").is_empty(), "fondation sur Mars possible à tout moment")
+	campaign.time = route.phase + route.synodic
+	_check(campaign.window_open("mars", "ceres"), "fenêtre de tir ouverte")
+	var cost := campaign.founding_cost(0, "ceres")
+	_check(cost[R.MATERIALS] > Campaign.FOUNDING_MATERIALS and cost[R.METHANE] > Campaign.FOUNDING_FUEL, "fonder sur Cérès coûte plus cher")
+	mars.state.resources[R.MATERIALS] = 400.0
+	mars.state.resources[R.METHANE] = 300.0
+	_check(campaign.found_colony(0, "ceres"), "départ vers Cérès")
+	campaign.advance(route.transit - 1.0)
+	_check(campaign.colonies.size() == 1, "le vaisseau est encore en route")
+	campaign.advance(1.5)
+	_check(campaign.colonies.size() == 2 and campaign.planet_of(1) == "ceres", "colonie fondée sur Cérès")
+	var ceres := campaign.engines[1]
+	_check(ceres.planet().forbidden.has("moxie"), "pas d'électrolyseur de CO₂ sans air")
+	_check(_near(ceres.effect("solar"), mars.effect("solar") * 0.3), "Cérès : trois fois moins de soleil")
+	var reactor := false
+	for building in ceres.state.buildings:
+		reactor = reactor or building.id == "reactor"
+	_check(reactor, "l'avant-poste arrive avec un petit réacteur")
+	_check(ceres.current_objective().planet == "ceres", "objectifs propres à Cérès")
+	_check(ceres.era_title().begins_with("Cérès"), "ère propre à Cérès")
+	mars._check_objectives()
+	_check("ceres" in mars.state.objectives_done, "objectif « Ceinture d'astéroïdes »")
+	var sol := ceres.state.sol
+	ceres.advance(30.0)
+	_check(not ceres.is_storm() and ceres.dust_of(0) == 0.0, "pas de tempête ni de poussière sans air")
+	# Décoller de Cérès coûte bien moins que de Mars.
+	_check(campaign.fuel_cost(1, "jezero", {}, 0) < campaign.fuel_cost(0, "ceres", {}, 0) * 0.5, "décollage de Cérès bon marché")
+	_check(sol < ceres.state.sol, "Cérès avance")
 
 
 # ---------- Guides des ères ----------

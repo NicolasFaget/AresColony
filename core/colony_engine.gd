@@ -107,6 +107,7 @@ var dust_rate := DUST_RATE
 ## Ce que la campagne dit à la colonie (objectifs de l'ère 4).
 var campaign_colonies := 1
 var campaign_deliveries := 0
+var campaign_planets: Array = ["mars"]
 # Caches (le jeu avance d'un tout petit pas à chaque image : chaque microseconde compte).
 ## Par module : [niveau, multiplicateurs d'entrée, multiplicateurs de sortie] (synergies et améliorations).
 var _factor_cache: Array = []
@@ -138,7 +139,9 @@ func _init(p_state: ColonyState) -> void:
 		research_defs[r.id] = r
 	for card in ColonyContent.cards():
 		cards[card.id] = card
-	objectives = ColonyContent.objectives()
+	for objective in ColonyContent.objectives():
+		if objective.planet == planet_id():
+			objectives.append(objective)
 	map = ColonyMap.new(state.map_seed, state.region)
 	_rng.seed = state.map_seed
 	_rng.state = state.event_seed
@@ -509,6 +512,8 @@ func placement_problem(def_id: String, cell: Vector2i) -> String:
 			ice += 1
 	if def.requires_tile == ColonyMap.Tile.ICE and ice < 2:
 		return Tr.t("À poser sur une plaque de glace (au moins 2 cases).")
+	if planet().forbidden.has(def.id):
+		return Tr.t(planet().forbidden_reason)
 	if def.id == "erv" and _count_of("erv") > 0:
 		return Tr.t("Un seul véhicule de retour suffit.")
 	if state.amount(ColonyContent.MATERIALS) < def.cost:
@@ -735,6 +740,27 @@ func region() -> Dictionary:
 	return ColonyContent.REGIONS[state.region]
 
 
+func planet_id() -> String:
+	return region().get("planet", "mars")
+
+
+func planet() -> Dictionary:
+	return ColonyContent.PLANETS[planet_id()]
+
+
+## Titre de l'ère en cours (chaque monde a les siennes).
+func era_title() -> String:
+	var eras: Dictionary = ColonyContent.PLANET_ERAS.get(planet_id(), ColonyContent.ERAS)
+	return eras.get(state.era, eras.values().back())
+
+
+func era_count() -> int:
+	var count := 1
+	for objective in objectives:
+		count = maxi(count, objective.era)
+	return count
+
+
 ## Sites d'expédition de la région, dans l'ordre.
 func region_sites() -> Array[Dictionary]:
 	var list: Array[Dictionary] = []
@@ -800,6 +826,8 @@ func _arrive(member: Array) -> void:
 # ---------- Événements ----------
 
 func _events(ds: float) -> void:
+	if not planet().atmosphere:
+		state.next_storm = state.sol + 1e6
 	if not is_storm() and not _storm_warned and state.sol >= state.next_storm - STORM_WARNING_SOLS:
 		_storm_warned = true
 		storm_warning.emit()
@@ -911,6 +939,8 @@ func clean_panels() -> bool:
 
 ## De temps en temps, un tourbillon de poussière balaie quelques panneaux (comme pour Spirit et Opportunity).
 func _dust_devils() -> void:
+	if not planet().atmosphere:
+		return
 	if is_storm() or state.sol < state.next_dust_devil:
 		return
 	state.next_dust_devil = state.sol + _rng.randf_range(5.0, 9.0)
@@ -1104,7 +1134,7 @@ func _check_objectives() -> void:
 			_add(r, objective.reward[r])
 		objective_completed.emit(objective.id)
 	# Toute l'ère accomplie : la suivante commence.
-	if state.era < ColonyContent.ERAS.size():
+	if state.era < era_count():
 		for objective in objectives:
 			if objective.era == state.era and not state.objectives_done.has(objective.id):
 				return
@@ -1158,6 +1188,16 @@ func _objective_met(objective_id: String) -> bool:
 			return campaign_colonies >= 2
 		"cargo":
 			return campaign_deliveries >= 1
+		"ceres":
+			return campaign_planets.has("ceres")
+		"ceres_breath":
+			return _has_connected("electrolyser")
+		"ceres_brine":
+			return _has_connected("brine")
+		"ceres_ahuna":
+			return state.sites_done.has("ahuna")
+		"ceres_export":
+			return state.exported_materials >= 200.0
 		"rooted":
 			for other in ["shelter", "nuclear", "garden"]:
 				if not state.objectives_done.has(other):
@@ -1302,7 +1342,27 @@ func setup_outpost(crew: Array, cargo: Dictionary) -> void:
 	state.next_storm += state.sol
 	state.next_resupply += state.sol
 	state.next_dust_devil += state.sol
+	if not planet().atmosphere:
+		state.next_storm = state.sol + 1e6
+		var spot := _spot_beside_lander(Vector2i(2, 2))
+		if spot.x >= 0:
+			state.buildings.append({ "id": "reactor", "x": spot.x, "y": spot.y, "level": 1 })
+			_rebuild()
 	changed.emit()
+
+
+## Case libre pour une emprise collée à l'atterrisseur (ou Vector2i(-1, -1)).
+func _spot_beside_lander(size: Vector2i) -> Vector2i:
+	var lander := map.lander_cell
+	for offset in [Vector2i(2, 0), Vector2i(-size.x, 0), Vector2i(0, 2), Vector2i(0, -size.y), Vector2i(2, -1), Vector2i(-size.x, 1)]:
+		var cell: Vector2i = lander + offset
+		var free := true
+		for c in _footprint(cell, size):
+			if not map.in_bounds(c) or not map.is_buildable(c) or _occupied.has(c):
+				free = false
+		if free:
+			return cell
+	return Vector2i(-1, -1)
 
 
 func apply_offline_seconds(elapsed: float) -> Dictionary:

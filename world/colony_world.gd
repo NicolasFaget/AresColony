@@ -478,6 +478,9 @@ func launch_rocket(start: Vector3) -> void:
 ## Couleurs du ciel martien : caramel le jour, bleuté autour du soleil couchant
 ## (la poussière fine diffuse le bleu vers l'avant), nuit bleu sombre.
 func _update_sky(delta: float) -> void:
+	if not _engine.planet().atmosphere:
+		_update_airless_sky()
+		return
 	var t := _engine.time_of_day()
 	var daylight := clampf(cos(TAU * (t - 0.5)) * 1.6 + 0.15, 0.0, 1.0)
 	var twilight := clampf(1.0 - absf(cos(TAU * (t - 0.5))) * 3.0, 0.0, 1.0) * (1.0 if daylight > 0.0 else 0.4)
@@ -517,6 +520,26 @@ func _update_sky(delta: float) -> void:
 	_sky_mat.sky_horizon_color = horizon
 	_sky_mat.ground_horizon_color = horizon.darkened(0.2)
 	_sky_mat.ground_bottom_color = Color(0.3, 0.14, 0.08).lerp(Color(0.04, 0.03, 0.05), 1.0 - daylight)
+
+
+## Monde sans atmosphère : ciel noir de jour comme de nuit, soleil blanc et dur, ombres très sombres.
+func _update_airless_sky() -> void:
+	var t := _engine.time_of_day()
+	var daylight := clampf(cos(TAU * (t - 0.5)) * 1.6 + 0.15, 0.0, 1.0)
+	var angle := TAU * (t - 0.25)
+	_sun.rotation = Vector3(-maxf(0.15, sin(angle)) * 1.1, -0.6 + cos(angle) * 0.9, 0) if daylight > 0.08 else Vector3(-0.95, -0.2, 0)
+	_sun.light_energy = lerpf(0.25, 1.15, daylight)
+	_sun.light_color = Color(1.0, 1.0, 0.98) if daylight > 0.08 else Color(0.6, 0.66, 0.85)
+	_env.ambient_light_sky_contribution = 0.2
+	_env.ambient_light_color = Color(0.5, 0.52, 0.6)
+	_env.ambient_light_energy = lerpf(0.55, 0.42, daylight)
+	_env.fog_density = 0.0
+	_motes.emitting = false
+	_dust.emitting = false
+	_sky_mat.sky_top_color = Color(0.0, 0.0, 0.01)
+	_sky_mat.sky_horizon_color = Color(0.04, 0.04, 0.06)
+	_sky_mat.ground_horizon_color = Color(0.05, 0.05, 0.06)
+	_sky_mat.ground_bottom_color = Color(0.02, 0.02, 0.03)
 
 
 func _build_environment() -> void:
@@ -623,6 +646,8 @@ func _particles(color: Color, size: float, amount: int, lifetime: float) -> CPUP
 
 ## De temps en temps, un tourbillon de poussière traverse le paysage (les rovers en ont filmé).
 func _update_dust_devils(delta: float) -> void:
+	if not _engine.planet().atmosphere:
+		return
 	if _engine.state.speed == 0 or _engine.is_night() or _engine.is_storm():
 		return
 	_devil_timer -= delta * _engine.state.speed
@@ -708,6 +733,12 @@ func _build_terrain() -> void:
 
 	var mat := ShaderMaterial.new()
 	mat.shader = preload("res://world/terrain.gdshader")
+	if not _engine.planet().atmosphere:
+		# Cérès : régolithe très sombre (l'un des sols les plus noirs du système solaire), gris-brun.
+		mat.set_shader_parameter("sand_color", Color(0.23, 0.22, 0.21))
+		mat.set_shader_parameter("light_sand", Color(0.33, 0.32, 0.3))
+		mat.set_shader_parameter("dark_color", Color(0.1, 0.1, 0.1))
+		mat.set_shader_parameter("rock_color", Color(0.17, 0.16, 0.15))
 	mat.set_shader_parameter("noise_large", _noise_texture(0.012, 5, false, 1))
 	mat.set_shader_parameter("noise_fine", _noise_texture(0.08, 2, false, 2))
 	mat.set_shader_parameter("detail_normal", _noise_texture(0.05, 4, true, 3))
@@ -764,7 +795,7 @@ func _build_pebbles() -> void:
 		multimesh.set_instance_transform(i, transforms[i])
 	var pebbles := MultiMeshInstance3D.new()
 	pebbles.multimesh = multimesh
-	pebbles.material_override = ModelBuilder.rock_material(Color("#4e2516"))
+	pebbles.material_override = ModelBuilder.rock_material(Color("#2e2c2a") if not _engine.planet().atmosphere else Color("#4e2516"))
 	pebbles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(pebbles)
 
@@ -798,7 +829,7 @@ func _build_rocks() -> void:
 		multimesh.set_instance_transform(i, transforms[i])
 	var rocks := MultiMeshInstance3D.new()
 	rocks.multimesh = multimesh
-	rocks.material_override = ModelBuilder.rock_material()
+	rocks.material_override = ModelBuilder.rock_material(Color("#3a3734")) if not _engine.planet().atmosphere else ModelBuilder.rock_material()
 	add_child(rocks)
 
 
