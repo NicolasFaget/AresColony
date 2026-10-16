@@ -29,6 +29,7 @@ func _run() -> void:
 	manager.take_startup_report()
 	var engine: ColonyEngine = ColonyEngine.new(ColonyState.new())
 	manager.engine = engine
+	manager.campaign = Campaign.from_engine(engine)
 	var main: Control
 
 	match scenario:
@@ -348,6 +349,7 @@ func _run() -> void:
 			st.region = "arcadia"
 			engine = ColonyEngine.new(st)
 			manager.engine = engine
+			manager.campaign = Campaign.from_engine(engine)
 			ColonyBot.play(engine, 25.0)
 			engine.state.speed = 0
 			engine.state.sol = floorf(engine.state.sol) + 1.45
@@ -366,6 +368,44 @@ func _run() -> void:
 			for t in [0.5, 1.0, 1.8]:
 				await create_timer(t if t == 0.5 else 0.6).timeout
 				await _shot("00_splash_%s" % str(t).replace(".", "_"))
+		"reseau":
+			ColonyBot.play(engine, 152.0)
+			engine.state.speed = 0
+			engine.state.era = 4
+			engine.state.research_done.append("spaceport")
+			engine.state.resources[ColonyContent.MATERIALS] = 400.0
+			engine.state.resources[ColonyContent.METHANE] = 200.0
+			engine.place("spaceport", ColonyBot.connected_spot(engine, "spaceport"))
+			var campaign: Campaign = manager.campaign
+			campaign.found_colony(0, "arcadia")
+			campaign.advance(1.05)
+			engine.state.resources[ColonyContent.METHANE] = 200.0
+			campaign.send_cargo(0, 1, { ColonyContent.MATERIALS: 80.0, ColonyContent.FOOD: 40.0 }, 2)
+			campaign.advance(0.3)
+			engine.state.sol = floorf(engine.state.sol) + 1.45
+			main = await _open_main()
+			_close_modals(main)
+			if not main._window.collapsed:
+				main._window.toggle_collapsed()
+			await _frames(20)
+			await _shot("A0_barre")
+			main._show_network()
+			await _shot("A1_reseau")
+			_close_modals(main)
+			main._show_cargo()
+			await _shot("A2_cargaison")
+			_close_modals(main)
+			main._show_founding()
+			await _shot("A3_fondation")
+			_close_modals(main)
+			main.queue_free()
+			manager.switch_colony(1)
+			await _frames(120)
+			var game: Control = current_scene
+			for modal in game._modal_layer.get_children():
+				modal.queue_free()
+			await _frames(30)
+			await _shot("A4_arcadia")
 		"interaction":
 			main = await _open_main()
 			_close_modals(main)

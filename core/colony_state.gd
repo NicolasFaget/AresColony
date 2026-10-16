@@ -34,6 +34,8 @@ var quiz_answers: Dictionary = {}
 var map_seed: int = 1
 ## Région d'atterrissage (ColonyContent.REGIONS).
 var region: String = "jezero"
+## Nom de la colonie (plusieurs colonies peuvent partager une région : « Jezero II »).
+var name: String = ""
 ## Graine des événements, avancée à chaque tirage (parties reproductibles).
 var event_seed: int = 1
 var next_storm: float = 12.0
@@ -72,6 +74,7 @@ func summary() -> Dictionary:
 		"modules": maxi(0, buildings.size() - 1),
 		"last_saved_unix": last_saved_unix,
 		"region": region,
+		"name": name,
 	}
 
 
@@ -96,6 +99,7 @@ func to_dict() -> Dictionary:
 		"cards_read": cards_read.duplicate(),
 		"quiz_answers": quiz_answers.duplicate(),
 		"map_seed": map_seed,
+		"name": name,
 		"region": region,
 		"event_seed": event_seed,
 		"next_storm": next_storm,
@@ -144,7 +148,8 @@ static func from_dict(data: Dictionary) -> ColonyState:
 	state.research_progress = clampf(_num(data.get("research_progress"), 0.0), 0.0, 1.0)
 	state.objectives_done = _ids(data.get("objectives_done"))
 	state.cards_unlocked = _ids(data.get("cards_unlocked"))
-	state.era = clampi(int(_num(data.get("era"), 1)), 1, 3)
+	state.era = clampi(int(_num(data.get("era"), 1)), 1, 4)
+	state.name = str(data.get("name", "")) if data.get("name") is String else ""
 	var trip: Variant = data.get("expedition")
 	if trip is Dictionary and trip.get("site") is String:
 		state.expedition = { "site": trip.site, "until": _num(trip.get("until"), 0.0) }

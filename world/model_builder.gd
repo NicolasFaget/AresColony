@@ -176,6 +176,7 @@ static func building(building_id: String) -> Node3D:
 		"garage_empty": _garage(root, false)
 		"erv": _erv(root)
 		"bunker": _bunker(root)
+		"spaceport": _spaceport(root)
 		"reactor": _reactor(root)
 		"biodome": _biodome(root)
 	return root
@@ -379,6 +380,27 @@ static func _erv(r: Node3D) -> void:
 		strut(r, Vector3(0.62, y, -0.5), Vector3(0.2, y + 0.1, -0.15), 0.025, ORANGE)
 	cylinder(r, Vector3(-0.6, 0.35, 0.55), 0.18, 0.5, Color("#e98a5a"), Vector3.ZERO, -1.0, 16)
 	strut(r, Vector3(-0.5, 0.5, 0.45), Vector3(-0.15, 0.7, 0.1), 0.03, GREY)
+
+
+## Astroport : aire de lancement marquée, fusée sur son socle, tour de service et réservoir.
+static func _spaceport(r: Node3D) -> void:
+	_pad(r, 1.9)
+	cylinder(r, Vector3(0.1, 0.09, 0.1), 0.7, 0.05, CONCRETE.darkened(0.25), Vector3.ZERO, -1.0, 32)
+	for k in 8:
+		var a := TAU * k / 8.0
+		box(r, Vector3(0.1 + cos(a) * 0.6, 0.12, 0.1 + sin(a) * 0.6), Vector3(0.12, 0.01, 0.04), ORANGE, Vector3(0, -rad_to_deg(a), 0), 1.2)
+	var ship := rocket()
+	ship.scale = Vector3.ONE * 1.25
+	ship.position = Vector3(0.1, 0.3, 0.1)
+	ship.get_child(ship.get_child_count() - 1).name = "Flame"
+	r.add_child(ship)
+	strut(r, Vector3(-0.65, 0.1, -0.6), Vector3(-0.65, 1.9, -0.6), 0.05, GREY)
+	for y in [0.5, 1.0, 1.5]:
+		strut(r, Vector3(-0.65, y, -0.6), Vector3(-0.15, y + 0.1, -0.15), 0.025, GREY)
+	light(r, Vector3(-0.65, 1.95, -0.6), Color("#ff6f61"), 0.04, 3.0)
+	cylinder(r, Vector3(0.65, 0.35, -0.6), 0.2, 0.55, WHITE, Vector3.ZERO, -1.0, 16)
+	box(r, Vector3(0.6, 0.2, 0.7), Vector3(0.45, 0.3, 0.35), WHITE)
+	light(r, Vector3(0.6, 0.3, 0.88), LIGHT, 0.025, 2.0)
 
 
 ## Habitat enterré : un tumulus de régolithe, un sas en façade et des puits de lumière.

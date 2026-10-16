@@ -451,7 +451,19 @@ func land_capsule() -> void:
 
 ## Une fusée d'évacuation décolle de l'atterrisseur.
 func launch_evacuation() -> void:
-	var start := cell_center(_engine.map.lander_cell) + Vector3(-1.2, 0, 1.5)
+	launch_rocket(cell_center(_engine.map.lander_cell) + Vector3(-1.2, 0, 1.5))
+
+
+## Une fusée décolle de l'astroport (ou de l'atterrisseur à défaut).
+func launch_from_spaceport() -> void:
+	for i in _engine.state.buildings.size():
+		if _engine.state.buildings[i].id == "spaceport":
+			launch_rocket(footprint_center(_engine.cell_of(i), Vector2i(2, 2)) + Vector3(0.1, 0.3, 0.1))
+			return
+	launch_evacuation()
+
+
+func launch_rocket(start: Vector3) -> void:
 	var rocket := ModelBuilder.rocket()
 	rocket.position = start
 	add_child(rocket)

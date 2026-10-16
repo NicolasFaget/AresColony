@@ -153,6 +153,11 @@ static func buildings() -> Array[Defs.Building]:
 			"card": "worms",
 			"description": "Une grande serre sur un vrai sol vivant : régolithe lavé, compost et vers de terre.",
 		}),
+		Defs.Building.new({
+			"id": "spaceport", "name": "Astroport", "size": Vector2i(2, 2), "cost": 150.0, "research": "spaceport",
+			"storage": { METHANE: 100.0 }, "card": "hohmann",
+			"description": "Un pas de tir et sa fusée : fonder de nouvelles colonies, expédier des cargaisons entre elles.",
+		}),
 	]
 
 
@@ -161,6 +166,7 @@ const ERAS := {
 	1: "Ère 1 · Survie : tenir sans dépendre de la Terre.",
 	2: "Ère 2 · Expansion : explorer les environs et préparer le retour.",
 	3: "Ère 3 · Racines : vivre durablement sur Mars.",
+	4: "Ère 4 · Interplanétaire : relier plusieurs colonies.",
 }
 
 ## Régions d'atterrissage, choisies à la création de la colonie.
@@ -169,13 +175,13 @@ const REGIONS := {
 	"jezero": {
 		"name": "Cratère Jezero", "tagline": "Un ancien lac, au bord du grand bassin d'Isidis.",
 		"traits": ["Équilibré : soleil et glace modérés", "4 sites célèbres à explorer"],
-		"effects": {}, "sites": ["delta", "meteorite", "rochette", "nili"], "card": "",
+		"planet": "Mars", "effects": {}, "sites": ["delta", "meteorite", "rochette", "nili"], "card": "",
 		"rim": "Le rebord du cratère Jezero. Superbe vue, mais trop pentu pour bâtir.",
 	},
 	"arcadia": {
 		"name": "Arcadia Planitia", "tagline": "Une plaine du nord où la glace affleure sous la poussière.",
 		"traits": ["Beaucoup de glace, presque pas de rochers", "Plus au nord : −20 % de soleil, +25 % de chauffage"],
-		"effects": { "solar": 0.8, "heating": 1.25 }, "sites": ["ice_impact", "meteorite"], "card": "arcadia",
+		"planet": "Mars", "effects": { "solar": 0.8, "heating": 1.25 }, "sites": ["ice_impact", "meteorite"], "card": "arcadia",
 		"rim": "Le terrain se soulève ici : trop accidenté pour bâtir.",
 	},
 }
@@ -356,6 +362,9 @@ static func research() -> Array[Defs.Research]:
 		Defs.Research.new({ "id": "soil", "name": "Sol vivant", "cost": 70.0, "duration": 2.0, "era": 3,
 				"requires": ["perchlorate"], "card": "worms",
 				"summary": "Débloque la serre géante, sur un sol enrichi de compost et de vers de terre." }),
+		Defs.Research.new({ "id": "spaceport", "name": "Astroport", "cost": 100.0, "duration": 3.0, "era": 4,
+				"card": "hohmann",
+				"summary": "Débloque l'astroport : fonder d'autres colonies et leur envoyer des cargaisons." }),
 	]
 
 
@@ -404,6 +413,15 @@ static func objectives() -> Array[Defs.Objective]:
 		Defs.Objective.new({ "id": "rooted", "title": "Enracinés", "era": 3,
 				"description": "Accueillir 20 colons, tous à l'abri, avec la note d'efficacité A (85 / 100).",
 				"reward": { DATA: 100.0 } }),
+		Defs.Objective.new({ "id": "spaceport", "title": "Porte des étoiles", "era": 4,
+				"description": "Construire un astroport (recherche « Astroport »).",
+				"reward": { DATA: 50.0 } }),
+		Defs.Objective.new({ "id": "outpost", "title": "Deuxième foyer", "era": 4,
+				"description": "Fonder une deuxième colonie : bouton planète, en haut de l'écran.",
+				"reward": { MATERIALS: 150.0 } }),
+		Defs.Objective.new({ "id": "cargo", "title": "Pont aérien", "era": 4,
+				"description": "Livrer une première cargaison d'une colonie à l'autre.",
+				"reward": { DATA: 60.0 } }),
 	]
 
 
@@ -568,6 +586,13 @@ static func cards() -> Array[Defs.Card]:
 			"in_game": "Votre rover a trouvé de la glace fraîchement exposée : de l'eau et des données.",
 			"sources": [["Sci.News", "https://www.sci.news/space/mars-meteoroid-impact-water-ice-11343.html"],
 				["Solar Daily", "https://www.solardaily.com/reports/Meteorite_impact_provides_a_glimpse_beneath_Mars_surface_999.html"]] }),
+		Defs.Card.new({ "id": "hohmann", "figure": "26 mois", "figure_label": "entre deux fenêtres de tir Terre-Mars", "visual": "spaceport",
+			"quiz": "Pourquoi ne peut-on pas partir vers Mars n'importe quand ?", "choices": ["Les planètes doivent être bien placées", "Il fait trop froid en hiver", "Les fusées ne volent que la nuit"], "answer": 0,
+			"title": "Les fenêtres de tir", "status": "Mesuré",
+			"fact": "Pour aller d'une planète à l'autre avec le moins de carburant, on suit une orbite de transfert de Hohmann : une demi-ellipse autour du Soleil. Encore faut-il que les planètes soient bien placées : entre la Terre et Mars, ces « fenêtres de tir » reviennent environ tous les 26 mois, et le voyage dure de 7 à 9 mois. Perseverance a mis environ 6 mois et demi.",
+			"in_game": "Entre deux sites de Mars, une fusée fait un saut d'un sol. Vers les autres mondes, il faudra attendre les fenêtres de tir.",
+			"sources": [["Wikipedia – orbite de Hohmann", "https://en.wikipedia.org/wiki/Hohmann_transfer_orbit"],
+				["NSTA (Science Scope, 2020)", "https://www.nsta.org/science-scope/science-scope-julyaugust-2020/back-mars"]] }),
 	]
 
 

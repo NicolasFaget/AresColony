@@ -95,6 +95,7 @@ func _build_layout() -> void:
 
 	_status = StatusPanel.new()
 	_status.settings_requested.connect(_show_settings)
+	_status.network_requested.connect(_show_network)
 	_status.resource_requested.connect(_show_resource)
 	root.add_child(_status)
 	_alert = AlertBanner.new()
@@ -209,6 +210,10 @@ func _connect_engine() -> void:
 		GameManager.vibrate(60)
 		_news.post(Tr.t("Panne ! ") + Tr.t(ColonyContent.BREAKDOWN_LINES.get(_engine.state.buildings[i].id, Tr.t("Une machine s'est arrêtée.")))))
 	_engine.era_started.connect(_on_era_started)
+	var campaign := GameManager.campaign
+	if campaign != null:
+		campaign.shipment_arrived.connect(_on_shipment_arrived)
+		campaign.colony_founded.connect(_on_colony_founded)
 	_engine.flare_warning.connect(func() -> void:
 		AudioManager.play("alert")
 		GameManager.vibrate(40)
@@ -557,6 +562,16 @@ func _show_building(index: int) -> void:
 			UiFx.paragraph("\n".join(lines), "BodyLabel", HORIZONTAL_ALIGNMENT_CENTER)])
 	(extra.get_child(0) as Control).size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var holder: Array[Modal] = []
+	if def.id == "spaceport":
+		var network := Button.new()
+		network.theme_type_variation = "GoldButton"
+		network.text = Tr.t("Réseau de colonies…")
+		network.custom_minimum_size = Vector2(0, 60)
+		network.focus_mode = Control.FOCUS_NONE
+		network.pressed.connect(func() -> void:
+			holder[0].close()
+			_show_network.call_deferred())
+		extra.add_child(network)
 	if def.id == "garage":
 		var trips := Button.new()
 		trips.theme_type_variation = "PurpleButton"
@@ -608,10 +623,272 @@ func _show_building(index: int) -> void:
 				AudioManager.play("whoosh"))
 
 
+# ---------- Réseau de colonies ----------
+
+func _on_shipment_arrived(shipment: Dictionary) -> void:
+	var campaign := GameManager.campaign
+	if shipment.kind == "colony":
+		return
+	if shipment.to == campaign.active:
+		_world.land_capsule()
+		AudioManager.play("landing")
+	_news.post(Tr.t("Cargaison livrée : %s → %s.") % [campaign.colony_name(shipment.from), campaign.colony_name(shipment.to)])
+
+
+func _on_colony_founded(index: int) -> void:
+	var campaign := GameManager.campaign
+	AudioManager.play("milestone")
+	GameManager.vibrate(40)
+	Modal.open(_modal_layer, {
+		"icon": "planet", "title": Tr.t("Nouvelle colonie : %s") % campaign.colony_name(index),
+		"body": Tr.t("L'équipage s'est posé et a déployé son atterrisseur. La colonie partage tout votre savoir, mais elle part de presque rien : envoyez-lui des cargaisons depuis l'astroport."),
+		"confirm_text": Tr.t("Y aller"), "confirm_style": "GoldButton",
+		"on_confirm": func() -> void: GameManager.switch_colony(index),
+		"cancel_text": Tr.t("Plus tard"),
+	})
+
+
+## Réseau de colonies : chaque colonie, les fusées en vol, et les actions de l'astroport.
+func _show_network() -> void:
+	var campaign := GameManager.campaign
+	var holder: Array[Modal] = []
+	var box := UiFx.vbox(10)
+	for i in campaign.colonies.size():
+		var state := campaign.colonies[i]
+		var name := UiFx.label(campaign.colony_name(i), "HeadingLabel")
+		var info := UiFx.label(Tr.t("%s · Sol %d · %d colons · ère %d") % [Tr.t(ColonyContent.REGIONS[state.region].planet),
+				int(state.sol) + 1, state.colonists.size(), state.era], "SmallLabel")
+		var status := UiFx.paragraph("", "SmallLabel")
+		var alerts := ColonyAdvisor.alerts(campaign.engines[i])
+		if campaign.standby.has(i):
+			status.text = Tr.t("En veille : la réserve %s est trop basse.") % Tr.t(ColonyContent.RESOURCE_PARTITIVE[campaign.standby[i]])
+			status.add_theme_color_override("font_color", Palette.WARNING)
+		elif not alerts.is_empty():
+			status.text = alerts[0].title
+			status.add_theme_color_override("font_color", Palette.DANGER if alerts[0].level == "danger" else Palette.WARNING)
+		else:
+			status.text = Tr.t("Tout va bien.")
+			status.add_theme_color_override("font_color", Palette.SUCCESS)
+		var text := UiFx.vbox(2, [name, info, status])
+		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var row := UiFx.hbox(8, [UiFx.image(UiFx.icon("planet"), 30, Palette.MONEY if i == campaign.active else Palette.TEXT_MUTED), text])
+		if i == campaign.active:
+			var here := UiFx.label(Tr.t("Ici"), "CaptionLabel")
+			here.add_theme_color_override("font_color", Palette.ACCENT)
+			row.add_child(here)
+		else:
+			var go := Button.new()
+			go.text = Tr.t("Y aller")
+			go.theme_type_variation = "GreenButton"
+			go.custom_minimum_size = Vector2(110, 52)
+			go.focus_mode = Control.FOCUS_NONE
+			go.pressed.connect(func() -> void:
+				AudioManager.play("whoosh")
+				GameManager.switch_colony(i))
+			row.add_child(go)
+		box.add_child(UiFx.panel("Row", row))
+	if not campaign.shipments.is_empty():
+		box.add_child(UiFx.label(Tr.t("En vol"), "HeadingLabel"))
+		for shipment: Dictionary in campaign.shipments:
+			var target: String = campaign.colony_name(shipment.to) if shipment.to >= 0 \
+					else Tr.t(ColonyContent.REGIONS[shipment.region].name)
+			var what := Tr.t("Vaisseau de fondation") if shipment.kind == "colony" else Tr.t("Cargaison")
+			var left := maxf(0.0, shipment.arrive - campaign.time)
+			box.add_child(UiFx.paragraph(Tr.t("%s : %s → %s, arrivée dans %s sol%s.") % [what, campaign.colony_name(shipment.from),
+					target, NumberFormatter.format(left), "s" if left >= 2.0 else ""], "SmallLabel"))
+	var actions := UiFx.hbox(8)
+	var cargo := Button.new()
+	cargo.text = Tr.t("Expédier une cargaison")
+	cargo.custom_minimum_size = Vector2(0, 60)
+	cargo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cargo.focus_mode = Control.FOCUS_NONE
+	cargo.disabled = campaign.colonies.size() < 2
+	cargo.pressed.connect(func() -> void:
+		holder[0].close()
+		_show_cargo.call_deferred())
+	var found := Button.new()
+	found.theme_type_variation = "GoldButton"
+	found.text = Tr.t("Fonder une colonie")
+	found.custom_minimum_size = Vector2(0, 60)
+	found.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	found.focus_mode = Control.FOCUS_NONE
+	found.pressed.connect(func() -> void:
+		holder[0].close()
+		_show_founding.call_deferred())
+	actions.add_child(cargo)
+	actions.add_child(found)
+	box.add_child(actions)
+	var later := UiFx.paragraph(Tr.t("Prochaines destinations : Cérès, puis Titan."), "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
+	later.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+	box.add_child(later)
+	var scroll := _fitted_scroll(box)
+	holder.append(Modal.open(_modal_layer, {
+		"icon": "planet", "title": Tr.t("Réseau de colonies"), "extra": scroll, "confirm_text": Tr.t("Fermer"),
+	}))
+
+
+## Zone défilante dont la hauteur suit le contenu, sans dépasser 62 % de l'écran.
+func _fitted_scroll(box: Control) -> ScrollContainer:
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var cap := minf(820.0, size.y * 0.62)
+	scroll.custom_minimum_size.y = cap
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(box)
+	var fit := func() -> void:
+		if is_instance_valid(scroll):
+			scroll.custom_minimum_size.y = minf(cap, box.get_combined_minimum_size().y)
+	box.resized.connect(fit)
+	return scroll
+
+
+## Fonder une colonie : le site d'atterrissage, et ce que le vaisseau emporte.
+func _show_founding() -> void:
+	var campaign := GameManager.campaign
+	var holder: Array[Modal] = []
+	var problem := campaign.founding_problem(campaign.active)
+	var box := UiFx.vbox(10)
+	box.add_child(UiFx.paragraph(Tr.t("Le vaisseau emporte %d colons, %s matériaux et %s kg de méthane de cette colonie. Arrivée : %s sol après le départ.") % [
+			Campaign.FOUNDING_CREW, NumberFormatter.format(Campaign.FOUNDING_MATERIALS),
+			NumberFormatter.format(Campaign.FOUNDING_FUEL), NumberFormatter.format(Campaign.SURFACE_HOP_SOLS)], "SmallLabel"))
+	for id: String in ColonyContent.REGION_ORDER:
+		var region: Dictionary = ColonyContent.REGIONS[id]
+		var title := UiFx.label("%s · %s" % [Tr.t(region.planet), Tr.t(region.name)], "HeadingLabel")
+		var go := Button.new()
+		go.theme_type_variation = "GoldButton"
+		go.text = Tr.t("Se poser ici")
+		go.custom_minimum_size = Vector2(0, 56)
+		go.focus_mode = Control.FOCUS_NONE
+		go.disabled = not problem.is_empty()
+		go.pressed.connect(func() -> void:
+			if campaign.found_colony(campaign.active, id):
+				AudioManager.play("whoosh")
+				GameManager.vibrate(40)
+				_world.launch_from_spaceport()
+				_news.post(Tr.t("Le vaisseau de fondation décolle vers %s !") % Tr.t(region.name))
+				holder[0].close())
+		box.add_child(UiFx.panel("Row", UiFx.vbox(6, [title, UiFx.paragraph(Tr.t(region.tagline), "SmallLabel"), go])))
+	for world_name in ["Cérès", "Titan"]:
+		var soon := UiFx.panel("RowLocked", UiFx.vbox(4, [UiFx.label(Tr.t(world_name), "HeadingLabel"),
+				UiFx.label(Tr.t("Bientôt : il faudra attendre les fenêtres de tir."), "SmallLabel")]))
+		box.add_child(soon)
+	if not problem.is_empty():
+		var reason := UiFx.paragraph(problem, "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
+		reason.add_theme_color_override("font_color", Palette.WARNING)
+		box.add_child(reason)
+	var scroll := _fitted_scroll(box)
+	holder.append(Modal.open(_modal_layer, {
+		"icon": "planet", "title": Tr.t("Fonder une colonie"), "extra": scroll, "confirm_text": Tr.t("Fermer"),
+	}))
+
+
+## Cargaison : destination, quantités (et colons), carburant et arrivée.
+func _show_cargo() -> void:
+	var campaign := GameManager.campaign
+	var origin := campaign.active
+	var holder: Array[Modal] = []
+	var amounts := {}
+	var crew := [0]
+	var destination := [-1]
+	for i in campaign.colonies.size():
+		if i != origin:
+			destination[0] = i
+			break
+	var box := UiFx.vbox(8)
+	box.add_child(UiFx.label(Tr.t("Destination"), "HeadingLabel"))
+	var group := ButtonGroup.new()
+	var targets := UiFx.hbox(6)
+	for i in campaign.colonies.size():
+		if i == origin:
+			continue
+		var target := Button.new()
+		target.text = campaign.colony_name(i)
+		target.toggle_mode = true
+		target.button_group = group
+		target.button_pressed = i == destination[0]
+		target.theme_type_variation = "SegmentButton"
+		target.custom_minimum_size = Vector2(0, 52)
+		target.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		target.focus_mode = Control.FOCUS_NONE
+		target.pressed.connect(func() -> void: destination[0] = i)
+		targets.add_child(target)
+	box.add_child(targets)
+	box.add_child(UiFx.label(Tr.t("Soute"), "HeadingLabel"))
+	var launch := Button.new()
+	var summary := UiFx.paragraph("", "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
+	var refresh := func() -> void:
+		var problem := campaign.shipment_problem(origin, destination[0], amounts, crew[0])
+		launch.disabled = not problem.is_empty()
+		summary.text = problem if not problem.is_empty() else Tr.t("Carburant : %s kg de méthane · arrivée dans %s sol.") % [
+				NumberFormatter.format(campaign.fuel_cost(amounts, crew[0])), NumberFormatter.format(Campaign.SURFACE_HOP_SOLS)]
+		summary.add_theme_color_override("font_color", Palette.WARNING if not problem.is_empty() else Palette.ACCENT)
+	var rows: Array = Campaign.CARGO.duplicate()
+	rows.append("colonists")
+	for r: String in rows:
+		var is_crew := r == "colonists"
+		var value := UiFx.label("0", "NumberLabel", HORIZONTAL_ALIGNMENT_CENTER)
+		value.custom_minimum_size.x = 80
+		var name := UiFx.label(Tr.t("Colons") if is_crew else Tr.t(ColonyContent.RESOURCE_NAMES[r]), "BodyLabel")
+		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var step := 1 if is_crew else 10
+		var change := func(sign: int) -> void:
+			if is_crew:
+				crew[0] = clampi(crew[0] + sign * step, 0, campaign.engines[origin].state.colonists.size())
+				value.text = str(crew[0])
+			else:
+				var have := floorf(campaign.engines[origin].state.amount(r))
+				amounts[r] = clampf(amounts.get(r, 0.0) + sign * step, 0.0, have)
+				if amounts[r] <= 0.0:
+					amounts.erase(r)
+				value.text = NumberFormatter.format(amounts.get(r, 0.0))
+			AudioManager.play("click")
+			refresh.call()
+		var minus := Button.new()
+		minus.text = "−"
+		minus.custom_minimum_size = Vector2(56, 48)
+		minus.focus_mode = Control.FOCUS_NONE
+		minus.pressed.connect(func() -> void: change.call(-1))
+		var plus := Button.new()
+		plus.text = "+"
+		plus.custom_minimum_size = Vector2(56, 48)
+		plus.focus_mode = Control.FOCUS_NONE
+		plus.pressed.connect(func() -> void: change.call(1))
+		var icon := UiFx.image(UiFx.icon("person" if is_crew else r), 24, Palette.TEXT if is_crew else Palette.resource_color(r))
+		box.add_child(UiFx.hbox(8, [icon, name, minus, value, plus]))
+	launch.theme_type_variation = "GoldButton"
+	launch.text = Tr.t("Lancer la fusée")
+	launch.custom_minimum_size = Vector2(0, 64)
+	launch.focus_mode = Control.FOCUS_NONE
+	launch.pressed.connect(func() -> void:
+		if campaign.send_cargo(origin, destination[0], amounts, crew[0]):
+			AudioManager.play("whoosh")
+			GameManager.vibrate(30)
+			_world.launch_from_spaceport()
+			_news.post(Tr.t("Cargaison en route vers %s.") % campaign.colony_name(destination[0]))
+			holder[0].close())
+	box.add_child(summary)
+	box.add_child(launch)
+	refresh.call()
+	holder.append(Modal.open(_modal_layer, {
+		"icon": "planet", "title": Tr.t("Expédier une cargaison"), "extra": box, "confirm_text": Tr.t("Fermer"),
+	}))
+
+
 ## Début d'une nouvelle ère : ce qui change et ce qu'il faut viser.
 func _on_era_started(era: int) -> void:
 	AudioManager.play("milestone")
 	GameManager.vibrate(40)
+	if era == 4:
+		Modal.open(_modal_layer, {
+			"icon": "planet", "title": Tr.t("Ère 4 · Interplanétaire"),
+			"body": Tr.t("Votre colonie est enracinée. Il est temps de s'étendre :\n\n")
+					+ Tr.t("• Recherchez puis construisez un astroport.\n")
+					+ Tr.t("• Fondez une deuxième colonie sur Mars (bouton planète, en haut).\n")
+					+ Tr.t("• Reliez vos colonies par des cargaisons.\n\n")
+					+ Tr.t("Ensuite : Cérès, puis Titan."),
+			"confirm_text": Tr.t("En route !"),
+		})
+		return
 	if era == 3:
 		Modal.open(_modal_layer, {
 			"icon": "target", "title": Tr.t("Ère 3 · Racines"),

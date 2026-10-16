@@ -72,6 +72,9 @@ icons["methane"] = ui(f'<path d="M32 4 C40 18 52 26 52 42 a20 20 0 0 1 -40 0 C12
 icons["rover"] = ui(f'<rect x="10" y="20" width="44" height="20" rx="5" fill="{W}"/>'
                     f'<circle cx="16" cy="48" r="7" fill="{W}"/><circle cx="32" cy="48" r="7" fill="{W}"/><circle cx="48" cy="48" r="7" fill="{W}"/>'
                     + stroke("M44 20 V8 M38 8 H50", 4))
+icons["planet"] = ui(f'<circle cx="32" cy="32" r="16" fill="{W}"/>'
+                     f'<ellipse cx="32" cy="34" rx="29" ry="9" stroke="{W}" stroke-width="4" fill="none" transform="rotate(-20 32 34)"/>'
+                     f'<circle cx="26" cy="27" r="4" fill="#000" opacity=".3"/><circle cx="37" cy="37" r="3" fill="#000" opacity=".25"/>')
 icons["link"] = ui(stroke("M26 38 L38 26", 6) + stroke("M22 30 L16 36 a8 8 0 0 0 12 12 L34 42 M42 34 L48 28 a8 8 0 0 0 -12 -12 L30 22", 5))
 
 

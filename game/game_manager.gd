@@ -23,7 +23,9 @@ const SETTINGS_PATH := "user://settings.json"
 const MENU_SCENE := "res://ui/menu.tscn"
 const GAME_SCENE := "res://ui/main.tscn"
 
-## Partie en cours, ou null au menu principal.
+## Partie en cours (toutes ses colonies), ou null au menu principal.
+var campaign: Campaign
+## Colonie affichée (celle de la campagne), ou null au menu principal.
 var engine: ColonyEngine
 var current_slot := ""
 var load_result: SaveService.LoadResult
@@ -60,9 +62,9 @@ func _process(delta: float) -> void:
 	if _skip_next_delta:
 		_skip_next_delta = false
 	elif delta > LONG_FRAME_SECONDS:
-		_report(engine.apply_offline_seconds(delta))
+		_report(campaign.apply_offline_seconds(delta))
 	else:
-		engine.tick(delta)
+		campaign.tick(delta)
 
 	_since_last_refresh += delta
 	if _since_last_refresh >= REFRESH_INTERVAL:
@@ -81,7 +83,7 @@ func _notification(what: int) -> void:
 		NOTIFICATION_APPLICATION_RESUMED:
 			if engine != null:
 				_skip_next_delta = true
-				var report := engine.apply_offline(SaveService.now_unix())
+				var report := campaign.apply_offline(SaveService.now_unix())
 				save()
 				_report(report)
 		NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_WM_GO_BACK_REQUEST:
@@ -97,13 +99,15 @@ func _notification(what: int) -> void:
 func start_game(slot: String, new_game := false, region := "jezero") -> void:
 	current_slot = slot
 	_save_service = SaveService.new(FileSaveStorage.new("user://", slot))
-	var state := ColonyState.new() if new_game else _save_service.load_state()
 	if new_game:
+		var state := ColonyState.new()
 		state.region = region
+		campaign = Campaign.from_state(state)
+	else:
+		campaign = _save_service.load_campaign()
 	load_result = SaveService.LoadResult.NEW_GAME if new_game else _save_service.last_result
-	engine = ColonyEngine.new(state)
-	engine.changed.connect(_on_engine_changed)
-	_startup_report = engine.apply_offline(SaveService.now_unix())
+	_attach_engine()
+	_startup_report = campaign.apply_offline(SaveService.now_unix())
 	_since_last_save = 0.0
 	save()
 
@@ -112,8 +116,27 @@ func start_game(slot: String, new_game := false, region := "jezero") -> void:
 func stop_game() -> void:
 	save()
 	engine = null
+	campaign = null
 	_save_service = null
 	current_slot = ""
+
+
+## Affiche une autre colonie de la campagne (l'écran de jeu est reconstruit).
+func switch_colony(index: int) -> void:
+	if campaign == null or index == campaign.active:
+		return
+	save()
+	campaign.switch_to(index)
+	_attach_engine()
+	load_result = SaveService.LoadResult.LOADED
+	get_tree().change_scene_to_file(GAME_SCENE)
+
+
+func _attach_engine() -> void:
+	if engine != null and engine.changed.is_connected(_on_engine_changed):
+		engine.changed.disconnect(_on_engine_changed)
+	engine = campaign.engine()
+	engine.changed.connect(_on_engine_changed)
 
 
 func open_menu() -> void:
@@ -127,8 +150,8 @@ func open_game(slot: String, new_game := false, region := "jezero") -> void:
 
 
 func save() -> void:
-	if engine != null and _save_service != null:
-		_save_service.save_state(engine.state, SaveService.now_unix())
+	if campaign != null and _save_service != null:
+		_save_service.save_campaign(campaign, SaveService.now_unix())
 	_since_last_save = 0.0
 
 
@@ -137,7 +160,7 @@ func slot_summary(slot: String) -> Dictionary:
 	var storage := FileSaveStorage.new("user://", slot)
 	if storage.read().strip_edges().is_empty() and storage.read_backup().strip_edges().is_empty():
 		return {}
-	return SaveService.new(storage).load_state().summary()
+	return SaveService.new(storage).load_campaign().summary()
 
 
 ## Emplacement joué le plus récemment, ou "" s'il n'y a aucune sauvegarde.

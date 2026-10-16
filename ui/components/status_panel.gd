@@ -4,6 +4,7 @@ extends PanelContainer
 ## ressources (valeur et tendance). Toucher une ressource ouvre son explication détaillée.
 
 signal settings_requested
+signal network_requested
 signal resource_requested(resource: String)
 
 const SPEED_STEPS: Array[int] = [1, 2, 4]
@@ -11,6 +12,7 @@ const SPEED_STEPS: Array[int] = [1, 2, 4]
 var _clock: Label
 var _weather_icon: TextureRect
 var _play: Button
+var _network: Button
 var _speed: Button
 var _values := {}
 var _trends := {}
@@ -34,6 +36,8 @@ func _ready() -> void:
 		var index := SPEED_STEPS.find(maxi(engine.state.speed, 1))
 		engine.set_speed(SPEED_STEPS[(index + 1) % SPEED_STEPS.size()]))
 	_speed.custom_minimum_size.x = 64
+	_network = _icon_button("planet", func() -> void: network_requested.emit())
+	_network.add_theme_color_override("icon_normal_color", Palette.MONEY)
 	var settings := _icon_button("gear", func() -> void: settings_requested.emit())
 	settings.add_theme_color_override("icon_normal_color", Palette.TEXT_MUTED)
 
@@ -41,13 +45,15 @@ func _ready() -> void:
 	for r in ColonyContent.RESOURCES:
 		resources.add_child(_resource_chip(r))
 
-	add_child(UiFx.vbox(6, [UiFx.hbox(8, [_weather_icon, _clock, _play, _speed, settings]), resources]))
+	add_child(UiFx.vbox(6, [UiFx.hbox(8, [_weather_icon, _clock, _network, _play, _speed, settings]), resources]))
 	refresh()
 
 
 @warning_ignore("integer_division")
 func refresh() -> void:
 	var engine := GameManager.engine
+	var campaign := GameManager.campaign
+	_network.visible = campaign != null and (campaign.colonies.size() > 1 or campaign.interplanetary_unlocked())
 	var minutes := int(engine.time_of_day() * (24.0 * 60.0 + 39.0))
 	_clock.text = Tr.t("Sol %d · %02d:%02d") % [engine.sol_number(), minutes / 60, minutes % 60]
 	if engine.is_flare():

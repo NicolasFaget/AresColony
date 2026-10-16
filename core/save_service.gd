@@ -45,6 +45,35 @@ func load_state() -> ColonyState:
 	return ColonyState.new()
 
 
+## Charge une campagne (plusieurs colonies). Une ancienne sauvegarde à une colonie est convertie.
+func load_campaign() -> Campaign:
+	for text in [_storage.read(), _storage.read_backup()]:
+		var data: Variant = _parse_json(text)
+		if data is Dictionary:
+			last_result = LoadResult.LOADED if text == _storage.read() else LoadResult.RESTORED_FROM_BACKUP
+			return Campaign.from_dict(data)
+		if text == _storage.read() and not text.strip_edges().is_empty():
+			push_warning("Sauvegarde illisible, mise de côté.")
+			_storage.quarantine()
+	last_result = LoadResult.NEW_GAME
+	return Campaign.from_state(ColonyState.new())
+
+
+func save_campaign(campaign: Campaign, now_unix: int) -> void:
+	for state in campaign.colonies:
+		state.last_saved_unix = now_unix
+	_storage.write(JSON.stringify(campaign.to_dict(), "", true, true))
+
+
+static func _parse_json(text: String) -> Variant:
+	if text.strip_edges().is_empty():
+		return null
+	var json := JSON.new()
+	if json.parse(text) != OK or not json.data is Dictionary:
+		return null
+	return json.data
+
+
 func save_state(state: ColonyState, now_unix: int) -> void:
 	state.last_saved_unix = now_unix
 	# full_precision : sans lui, les grands montants perdraient des chiffres significatifs.

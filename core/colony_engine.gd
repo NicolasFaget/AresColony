@@ -104,6 +104,9 @@ var _synergies: Array = []
 var _efficiency: Array[float] = []
 ## Réglables par les tests (0 = aucune poussière, aucune panne).
 var dust_rate := DUST_RATE
+## Ce que la campagne dit à la colonie (objectifs de l'ère 4).
+var campaign_colonies := 1
+var campaign_deliveries := 0
 # Caches (le jeu avance d'un tout petit pas à chaque image : chaque microseconde compte).
 ## Par module : [niveau, multiplicateurs d'entrée, multiplicateurs de sortie] (synergies et améliorations).
 var _factor_cache: Array = []
@@ -1149,6 +1152,12 @@ func _objective_met(objective_id: String) -> bool:
 			return _has_connected("reactor")
 		"garden":
 			return _has_connected("biodome")
+		"spaceport":
+			return has_spaceport()
+		"outpost":
+			return campaign_colonies >= 2
+		"cargo":
+			return campaign_deliveries >= 1
 		"rooted":
 			for other in ["shelter", "nuclear", "garden"]:
 				if not state.objectives_done.has(other):
@@ -1205,6 +1214,97 @@ func apply_offline(now_unix: int) -> Dictionary:
 	return apply_offline_seconds(elapsed)
 
 
+## Arrière-plan d'une campagne : la colonie avance en pilote automatique (sans événements),
+## et s'arrête en veille sécurisée si une réserve vitale devient trop basse.
+func run_autopilot(sols: float) -> String:
+	var low := _vital_low()
+	if not low.is_empty():
+		return low
+	var start := state.sol
+	_autopilot = true
+	var simulated := 0.0
+	while simulated < sols - 1e-9:
+		var ds := minf(STEP, sols - simulated)
+		_step(ds)
+		simulated += ds
+		low = _vital_low()
+		if not low.is_empty():
+			break
+	_autopilot = false
+	_shift_schedule(state.sol - start)
+	return low
+
+
+## Réserve vitale sous un quart de sol de consommation (veille sécurisée), ou "".
+func _vital_low() -> String:
+	var needs := colonist_needs()
+	for r in ColonyContent.VITAL:
+		if state.colonists.size() > 0 and state.amount(r) <= needs[r] * state.colonists.size() * 0.25:
+			return r
+	return ""
+
+
+## Aucun événement en pilote automatique : les échéances se décalent d'autant.
+func _shift_schedule(shift: float) -> void:
+	if shift <= 0.0:
+		return
+	state.next_storm += shift
+	state.next_resupply += shift
+	state.next_dust_devil += shift
+	if state.next_flare < 1e8:
+		state.next_flare += shift
+	if state.storm_until > 0.0:
+		state.storm_until += shift
+	if state.flare_until > 0.0:
+		state.flare_until += shift
+
+
+# ---------- Campagne : astroport, cargaisons ----------
+
+func has_spaceport() -> bool:
+	return _has_connected("spaceport")
+
+
+func withdraw(resource: String, amount: float) -> void:
+	_add(resource, -amount)
+	changed.emit()
+
+
+## Retire `count` colons (les derniers arrivés) pour un vol ; renvoie leurs fiches.
+func release_colonists(count: int) -> Array:
+	var crew := []
+	for k in mini(count, state.colonists.size()):
+		crew.append(state.colonists.pop_back())
+	changed.emit()
+	return crew
+
+
+## Arrivée d'une cargaison : ressources (dans la limite des réserves) et colons.
+func receive(cargo: Dictionary, crew: Array) -> void:
+	for r: String in cargo:
+		_add(r, cargo[r])
+	for colonist: Dictionary in crew:
+		state.colonists.append(colonist)
+		colonist_arrived.emit(colonist.name)
+	changed.emit()
+
+
+## Nouvelle colonie fondée par un vaisseau : son équipage, sa cargaison, et pas de ravitaillements
+## de matériaux depuis la Terre (le réseau de colonies s'en charge).
+func setup_outpost(crew: Array, cargo: Dictionary) -> void:
+	state.colonists.clear()
+	for colonist: Dictionary in crew:
+		state.colonists.append(colonist)
+	state.resources[ColonyContent.MATERIALS] = cargo.get(ColonyContent.MATERIALS, 0.0)
+	state.resupply_count = RESUPPLY_LIMIT
+	state.recruits_sent = ColonyContent.RECRUITS.size()
+	state.tutorial_done = true
+	state.next_storm += state.sol
+	state.next_resupply += state.sol
+	state.next_dust_devil += state.sol
+	changed.emit()
+
+
 func apply_offline_seconds(elapsed: float) -> Dictionary:
 	var report := { "elapsed": maxf(0.0, elapsed), "sols": 0.0, "standby": "", "gains": {} }
 	var sols := clampf(elapsed, 0.0, OFFLINE_CAP_SECONDS) / OFFLINE_SECONDS_PER_SOL
@@ -1227,10 +1327,7 @@ func apply_offline_seconds(elapsed: float) -> Dictionary:
 	_autopilot = false
 	# Aucun événement pendant l'absence : on décale les échéances.
 	var shift := state.sol - start
-	state.next_storm += shift
-	state.next_resupply += shift
-	if state.storm_until > 0.0:
-		state.storm_until += shift
+	_shift_schedule(shift)
 	report.sols = shift
 	for r in ColonyContent.RESOURCES:
 		report.gains[r] = state.amount(r) - before.get(r, 0.0)

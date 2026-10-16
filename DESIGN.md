@@ -112,6 +112,19 @@ Sans évacuation pour un joueur raisonnable. Un joueur qui ne fait rien perd son
 sol 9 environ : le danger est réel mais laisse le temps d'apprendre. Les tests vérifient ces
 fourchettes.
 
+## Campagne : plusieurs colonies
+
+- `Campaign` (core/campaign.gd) : colonies (un `ColonyEngine` chacune), horloge commune, fusées en
+  vol, savoir partagé (recherches, fiches, quiz : `sync_knowledge`). Seule la colonie affichée est
+  simulée image par image ; les autres en pilote automatique (`run_autopilot`, veille si une réserve
+  vitale baisse). Sauvegarde v2 = `Campaign.to_dict()` ; une ancienne sauvegarde devient une campagne.
+- Ère 4 « Interplanétaire » (après « Racines ») : astroport, fondation d'une colonie (4 colons,
+  150 matériaux, 60 kg de méthane), cargaisons (soute 300 unités, un colon = 10 ; carburant
+  20 kg + 0,1 kg par unité). Saut entre deux sites de Mars : 1 sol.
+- Une nouvelle colonie : savoir partagé, pas de ravitaillement de matériaux depuis la Terre ni de
+  volontaires (le réseau s'en charge), calendrier de la colonie de départ, carte propre.
+- À venir : Cérès puis Titan, avec de vraies fenêtres de tir (orbites de Hohmann).
+
 ## Performances
 
 - Le jeu avance d'un tout petit pas à chaque image : tout ce qui est appelé dans `_step` doit être

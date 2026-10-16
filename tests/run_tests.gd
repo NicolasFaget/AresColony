@@ -23,6 +23,7 @@ func _init() -> void:
 	_test_era2()
 	_test_era3()
 	_test_guides()
+	_test_campaign()
 	_test_regions()
 	_test_night_and_batteries()
 	_test_colonists()
@@ -97,6 +98,70 @@ func _test_regions() -> void:
 	_check(_near(arcadia._input_rate(home, R.ENERGY), arcadia.def_of(home).inputs[R.ENERGY] * 1.25), "Arcadia : chauffage +25 %")
 	var copy := ColonyState.from_dict(JSON.parse_string(JSON.stringify(arcadia.state.to_dict())))
 	_check(copy.region == "arcadia" and ColonyEngine.new(copy).map.tiles == arcadia.map.tiles, "région sauvegardée")
+
+
+# ---------- Campagne : plusieurs colonies ----------
+
+func _test_campaign() -> void:
+	# Une ancienne sauvegarde (une seule colonie) devient une campagne.
+	var old := _engine().state.to_dict()
+	var migrated := Campaign.from_dict(old)
+	_check(migrated.colonies.size() == 1 and migrated.active == 0, "ancienne sauvegarde convertie en campagne")
+
+	var state := ColonyState.new()
+	var campaign := Campaign.from_state(state)
+	var mars := campaign.engine()
+	mars.state.next_storm = 1e9
+	mars.state.next_resupply = 1e9
+	mars.state.next_dust_devil = 1e9
+	mars.dust_rate = 0.0
+	mars.breakdown_rate = 0.0
+	for r: Defs.Research in mars.research_defs.values():
+		mars.state.research_done.append(r.id)
+	var lander := mars.map.lander_cell
+	for x in range(lander.x + 2, lander.x + 9):
+		for y in range(lander.y - 1, lander.y + 3):
+			mars.map.set_tile(Vector2i(x, y), ColonyMap.Tile.PLAIN)
+	mars.state.resources[R.MATERIALS] = 400.0
+	_check(not campaign.founding_problem(0).is_empty(), "fondation : il faut finir les ères de Mars")
+	mars.state.era = 4
+	_check(campaign.founding_problem(0).begins_with("Il faut un astroport"), "fondation : il faut un astroport")
+	_check(mars.place("spaceport", lander + Vector2i(2, 0)), "pose d'un astroport")
+	_check("spaceport" in mars.state.objectives_done, "objectif « Porte des étoiles »")
+	mars.state.resources[R.METHANE] = 100.0
+	for k in 6:
+		mars.state.colonists.append({ "name": "Recrue %d" % k, "role": "pilote", "health": 1.0 })
+	var crew_before := mars.state.colonists.size()
+	_check(campaign.found_colony(0, "arcadia"), "départ d'un vaisseau de fondation")
+	_check(mars.state.colonists.size() == crew_before - Campaign.FOUNDING_CREW, "l'équipage quitte la colonie")
+	_check(campaign.shipments.size() == 1 and campaign.colonies.size() == 1, "vaisseau en vol, colonie pas encore fondée")
+	var founded := [0]
+	campaign.colony_founded.connect(func(_i: int) -> void: founded[0] += 1)
+	campaign.advance(Campaign.SURFACE_HOP_SOLS + 0.05)
+	_check(founded[0] == 1 and campaign.colonies.size() == 2, "colonie fondée à l'arrivée")
+	var outpost := campaign.engines[1]
+	_check(outpost.state.colonists.size() == Campaign.FOUNDING_CREW and outpost.state.region == "arcadia", "équipage et région de la nouvelle colonie")
+	_check(outpost.state.research_done.size() == mars.state.research_done.size(), "le savoir est partagé")
+	_check(outpost.state.name == "Arcadia Planitia" and outpost.map.tiles != mars.map.tiles, "nom et carte propres")
+	_check("outpost" in mars.state.objectives_done or mars.campaign_colonies == 2, "objectif « Deuxième foyer »")
+	# Arrière-plan : la colonie non affichée avance aussi.
+	var sol := outpost.state.sol
+	campaign.advance(0.5)
+	_check(outpost.state.sol > sol + 0.4, "la colonie en arrière-plan avance")
+	# Cargaison.
+	mars.state.resources[R.METHANE] = 100.0
+	var stock := outpost.state.amount(R.MATERIALS)
+	_check(campaign.shipment_problem(0, 1, { R.MATERIALS: 500.0 }, 0).begins_with("Trop lourd"), "cargaison trop lourde")
+	_check(campaign.send_cargo(0, 1, { R.MATERIALS: 50.0 }, 0), "envoi d'une cargaison")
+	campaign.advance(Campaign.SURFACE_HOP_SOLS + 0.1)
+	_check(outpost.state.amount(R.MATERIALS) > stock + 40.0 and campaign.deliveries == 1, "cargaison livrée")
+	# Bascule et sauvegarde.
+	campaign.switch_to(1)
+	_check(campaign.engine() == outpost, "bascule vers la nouvelle colonie")
+	campaign.found_colony(0, "jezero") if campaign.founding_problem(0).is_empty() else null
+	var copy := Campaign.from_dict(JSON.parse_string(JSON.stringify(campaign.to_dict())))
+	_check(copy.colonies.size() == 2 and copy.active == 1 and copy.shipments.size() == campaign.shipments.size(), "campagne sauvegardée")
+	_check(copy.colonies[1].name == "Arcadia Planitia", "nom de colonie sauvegardé")
 
 
 # ---------- Guides des ères ----------
@@ -719,7 +784,12 @@ func _simulate_campaign() -> void:
 		var flows := engine.average_flows()
 		print("  évacuation de %s au sol %.1f (O₂ %.1f, eau %.1f, nourriture %.1f, énergie %.1f/sol, matériaux %.0f, O₂ stock %.1f) : %s" % [
 			n, engine.state.sol, flows[R.OXYGEN], flows[R.WATER], flows[R.FOOD], flows[R.ENERGY], engine.state.amount(R.MATERIALS), engine.state.amount(R.OXYGEN), c.left(20)]))
-	while engine.state.sol < 260.0 and done.size() < engine.objectives.size():
+	# Les objectifs de l'ère 4 demandent plusieurs colonies : testés à part (_test_campaign).
+	var mars_objectives := 0
+	for objective in engine.objectives:
+		if objective.era <= 3:
+			mars_objectives += 1
+	while engine.state.sol < 260.0 and done.size() < mars_objectives:
 		ColonyBot.research(engine)
 		ColonyBot.maintain(engine)
 		ColonyBot.build(engine)
@@ -742,7 +812,7 @@ func _simulate_campaign() -> void:
 		if objective.era == 2:
 			era2 = maxf(era2, done.get(objective.id, INF))
 	_check(era2 <= 160.0, "ère 2 accomplie avant le sol 160")
-	_check(done.size() == engine.objectives.size() and done.values().max() <= 250.0, "ère 3 accomplie avant le sol 250")
+	_check(done.size() >= mars_objectives and done.values().max() <= 250.0, "ère 3 accomplie avant le sol 250")
 	_check(evacuations[0] == 0, "un joueur raisonnable ne perd aucun colon")
 
 	# Un joueur qui ne fait rien finit par mettre la colonie en danger, mais pas tout de suite.
