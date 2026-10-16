@@ -89,7 +89,8 @@ func _build_layout() -> void:
 		_continue,
 		_menu_button(Tr.t("Nouvelle colonie"), "GoldButton", _on_new_game),
 		_menu_button(Tr.t("Sauvegardes"), "Button", _show_slots),
-		UiFx.hbox(12, [_menu_button(Tr.t("Réglages"), "Button", _show_settings), _menu_button(Tr.t("À propos"), "Button", _show_about)]),
+		UiFx.hbox(12, [_menu_button(Tr.t("Réglages"), "Button", _show_settings), _menu_button(Tr.t("À propos"), "Button", _show_about),
+				_menu_button(Tr.t("Quitter"), "Button", _quit)]),
 	])
 	for row in buttons.get_children():
 		if row is HBoxContainer:
@@ -251,6 +252,11 @@ func _confirm_erase(slot: String, then_start: bool, list_modal: Modal) -> void:
 	})
 
 
+func _quit() -> void:
+	GameManager.save()
+	get_tree().quit()
+
+
 func _show_settings() -> void:
 	Modal.open(_modal_layer, { "icon": "gear", "title": Tr.t("Réglages"), "extra": SettingsPanel.build(), "confirm_text": Tr.t("Fermer") })
 
@@ -262,6 +268,6 @@ func _show_about() -> void:
 				+ Tr.t("Conception : Nicolas Faget.\n")
 				+ Tr.t("Faits scientifiques : NASA (JPL, Perseverance, Phoenix, Curiosity), université de Wageningen, ")
 				+ Tr.t("université d'Arizona, Station spatiale internationale. Chaque fiche de l'encyclopédie cite ses sources.\n\n")
-				+ Tr.t("Moteur : Godot Engine. Modèles, sons et musique générés par programme."),
+				+ Tr.t("Moteur : Godot Engine. Modèles et sons générés par programme. Musique : « Cradle of the Red Horizon »."),
 		"confirm_text": Tr.t("Fermer"),
 	})

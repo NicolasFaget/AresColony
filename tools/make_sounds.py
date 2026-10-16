@@ -223,9 +223,7 @@ def wind(seconds=12.0, overlap=1.5):
 def main():
     for name, samples in effects().items():
         write(name, samples)
-    write("music_kalimba", kalimba(freq(72)))      # do 5
-    write("music_pad", pad(freq(48)))              # do 3
-    write("music_bass", bass(freq(36)))            # do 2
+    # Musique : bande son « Cradle of the Red Horizon » (art/audio/music_red_horizon.mp3).
     write("ambience_wind", wind(), 0.8)
     print("Sons écrits dans %s" % OUT)
 
