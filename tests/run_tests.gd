@@ -215,6 +215,25 @@ func _test_hazards() -> void:
 	var materials := engine.state.amount(R.MATERIALS)
 	_check(engine.repair(machine) and not engine.is_broken(machine), "réparation")
 	_check(_near(engine.state.amount(R.MATERIALS), materials - 9.0), "réparation : 30 % du prix")
+	# En temps réel, le jeu avance par tout petits pas (une image) : la fréquence doit rester la même.
+	var rates: Array[float] = []
+	for step in [0.02, 0.0005]:
+		var sim := _rich_engine()
+		sim.state.sol = ColonyEngine.BREAKDOWN_START
+		sim.breakdown_rate = 0.5
+		for k in 20:
+			sim.state.buildings.append({ "id": "moxie", "x": 1 + k, "y": 1, "level": 1 })
+		sim._rebuild()
+		for k in 20:
+			sim._connected[sim.state.buildings.size() - 1 - k] = true
+		var elapsed := 0.0
+		while elapsed < 1.0:
+			sim.advance(step)
+			elapsed += step
+		rates.append(float(sim.broken_count()))
+	# Attendu : 20 × (1 − e^−0,5) ≈ 8 machines en panne, quel que soit le pas.
+	_check(rates[0] >= 3.0 and rates[0] <= 14.0 and rates[1] >= 3.0 and rates[1] <= 14.0,
+			"pannes indépendantes de la taille des pas (%d et %d sur 20)" % [rates[0], rates[1]])
 	engine.breakdown_rate = 50.0
 	engine.state.sol = maxf(engine.state.sol, ColonyEngine.BREAKDOWN_START)
 	engine.advance(0.5)
@@ -231,6 +250,12 @@ func _test_hazards() -> void:
 	var stock := earth.state.amount(R.MATERIALS)
 	earth.advance(0.2)
 	_check(_near(earth.state.amount(R.MATERIALS), stock) and earth.resupplies_left() == 0, "après six ravitaillements : plus de matériaux")
+	# Sans four et sans matériaux : envoi de secours pour en construire un.
+	earth.state.resources[R.MATERIALS] = 5.0
+	earth.state.next_resupply = earth.state.sol + 0.1
+	earth.advance(0.2)
+	_check(_near(earth.state.amount(R.MATERIALS), earth.building_defs["kiln"].cost) and reports.back().rescue,
+			"envoi de secours : de quoi construire un four")
 
 	var kiln := _rich_engine()
 	_check(kiln.place("kiln", kiln.map.lander_cell + Vector2i(2, 0)), "pose d'un four à régolithe")

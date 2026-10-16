@@ -476,7 +476,9 @@ func _on_resupply(report: Dictionary) -> void:
 	_world.land_capsule()
 	AudioManager.play("landing")
 	var text := ""
-	if report.materials > 0.0:
+	if report.get("rescue", false):
+		text = Tr.t("Envoi de secours : la Terre fournit %s matériaux, juste de quoi construire un four à régolithe.") % NumberFormatter.format(report.materials)
+	elif report.materials > 0.0:
 		text = Tr.t("Ravitaillement de la Terre : +%s matériaux") % NumberFormatter.format(report.materials)
 		if report.food > 0.0:
 			text += Tr.t(", +%s rations") % NumberFormatter.format(report.food)

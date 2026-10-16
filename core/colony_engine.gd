@@ -672,7 +672,7 @@ func _step(ds: float) -> void:
 	_advance_research(ds)
 	state.sol += ds
 	if not _autopilot:
-		_events()
+		_events(ds)
 	_update_autonomy(ds)
 	_check_shortages(demand)
 	_check_objectives()
@@ -761,7 +761,7 @@ func _arrive(member: Array) -> void:
 
 # ---------- Événements ----------
 
-func _events() -> void:
+func _events(ds: float) -> void:
 	if not is_storm() and not _storm_warned and state.sol >= state.next_storm - STORM_WARNING_SOLS:
 		_storm_warned = true
 		storm_warning.emit()
@@ -781,6 +781,11 @@ func _events() -> void:
 		state.resupply_count += 1
 		var supplies := state.resupply_count <= RESUPPLY_LIMIT
 		var materials := RESUPPLY_MATERIALS if supplies else 0.0
+		# Filet de sécurité : sans four ni de quoi en construire un, la Terre envoie juste ce qu'il faut.
+		var kiln_cost: float = building_defs["kiln"].cost
+		var rescue := not supplies and not _has_connected("kiln") and state.amount(ColonyContent.MATERIALS) < kiln_cost
+		if rescue:
+			materials = kiln_cost - state.amount(ColonyContent.MATERIALS)
 		var food := maxf(0.0, 30.0 - 6.0 * state.resupply_count) if supplies else 0.0
 		_add(ColonyContent.MATERIALS, materials)
 		_add(ColonyContent.FOOD, food)
@@ -791,12 +796,12 @@ func _events() -> void:
 			state.recruits_sent += 1
 			_arrive(member)
 			arrived.append(member[0])
-		if supplies or not arrived.is_empty():
+		if supplies or rescue or not arrived.is_empty():
 			resupply_arrived.emit({ "materials": materials, "food": food, "colonists": arrived,
-					"last": state.resupply_count == RESUPPLY_LIMIT })
+					"last": state.resupply_count == RESUPPLY_LIMIT, "rescue": rescue })
 
 	_dust_devils()
-	_breakdowns()
+	_breakdowns(ds)
 	_finish_expedition()
 	_flares()
 
@@ -914,7 +919,7 @@ func repair(index: int) -> bool:
 	return true
 
 
-func _breakdowns() -> void:
+func _breakdowns(ds: float) -> void:
 	if breakdown_rate <= 0.0 or state.sol < BREAKDOWN_START:
 		return
 	var drew := false
@@ -922,7 +927,7 @@ func _breakdowns() -> void:
 		if not _connected[i] or is_broken(i) or not state.buildings[i].id in ColonyContent.BREAKABLE:
 			continue
 		drew = true
-		if _rng.randf() < breakdown_rate * STEP:
+		if _rng.randf() < breakdown_rate * ds:
 			state.buildings[i].broken = true
 			breakdown.emit(i)
 	if drew:
