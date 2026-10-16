@@ -1010,10 +1010,11 @@ func _show_settings() -> void:
 	to_menu.text = Tr.t("Menu principal")
 	to_menu.custom_minimum_size.y = 60
 	to_menu.focus_mode = Control.FOCUS_NONE
-	var modal: Modal
+	# Partagée avec les boutons, créés avant la fenêtre (voir DESIGN.md, Pièges).
+	var holder: Array[Modal] = []
 	to_menu.pressed.connect(func() -> void:
 		AudioManager.play("click")
-		modal.close()
+		holder[0].close()
 		GameManager.open_menu())
 	var extra := SettingsPanel.build()
 	extra.add_child(UiFx.paragraph(Tr.t("Glissez pour parcourir le cratère, pincez (ou molette) pour zoomer.\n")
@@ -1022,9 +1023,9 @@ func _show_settings() -> void:
 			"SmallLabel", HORIZONTAL_ALIGNMENT_CENTER))
 	extra.add_child(to_menu)
 	extra.add_child(UiFx.label(Tr.t("La partie est sauvegardée automatiquement."), "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER))
-	modal = Modal.open(_modal_layer, {
+	holder.append(Modal.open(_modal_layer, {
 		"icon": "gear", "title": Tr.t("Réglages"), "extra": extra, "confirm_text": Tr.t("Fermer"),
-	})
+	}))
 
 
 func _show_load_problem() -> void:

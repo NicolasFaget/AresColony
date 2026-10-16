@@ -151,7 +151,8 @@ func _on_new_game() -> void:
 ## Choix du site d'atterrissage d'une nouvelle colonie.
 func _choose_region(slot: String) -> void:
 	var list := UiFx.vbox(12)
-	var modal: Modal
+	# Partagée avec les boutons, créés avant la fenêtre (voir DESIGN.md, Pièges).
+	var holder: Array[Modal] = []
 	for id: String in ColonyContent.REGION_ORDER:
 		var region: Dictionary = ColonyContent.REGIONS[id]
 		var title := UiFx.label(region.name, "HeadingLabel")
@@ -162,19 +163,20 @@ func _choose_region(slot: String) -> void:
 			point.add_theme_color_override("font_color", Palette.ACCENT)
 			traits.add_child(point)
 		var go := _slot_button(Tr.t("Se poser ici"), "GoldButton", func() -> void:
-			modal.close()
+			holder[0].close()
 			GameManager.open_game(slot, true, id))
 		list.add_child(UiFx.panel("Row", UiFx.vbox(6, [title, tagline, traits, go])))
-	modal = Modal.open(_modal_layer, {
+	holder.append(Modal.open(_modal_layer, {
 		"icon": "rocket", "title": Tr.t("Choisir le site d'atterrissage"), "extra": list,
 		"confirm_text": Tr.t("Retour"), "confirm_style": "Button",
-	})
+	}))
 
 
 ## Liste des emplacements. En mode « remplacer », chaque emplacement propose d'y recommencer.
 func _show_slots(replacing := false) -> void:
 	var list := UiFx.vbox(10)
-	var modal: Modal
+	# Partagée avec les boutons, créés avant la fenêtre (voir DESIGN.md, Pièges).
+	var holder: Array[Modal] = []
 	for slot: String in GameManager.SLOTS:
 		var summary := GameManager.slot_summary(slot)
 		var name := UiFx.label(SLOT_NAMES[slot], "HeadingLabel")
@@ -182,24 +184,24 @@ func _show_slots(replacing := false) -> void:
 		var actions := UiFx.hbox(8)
 		if summary.is_empty():
 			actions.add_child(_slot_button(Tr.t("Commencer"), "GoldButton", func() -> void:
-				modal.close()
+				holder[0].close()
 				_choose_region(slot)))
 		else:
 			if not replacing:
 				actions.add_child(_slot_button(Tr.t("Charger"), "GreenButton", func() -> void:
-					modal.close()
+					holder[0].close()
 					GameManager.open_game(slot)))
 			actions.add_child(_slot_button(Tr.t("Recommencer") if replacing else Tr.t("Supprimer"), "Button", func() -> void:
-				_confirm_erase(slot, replacing, modal)))
+				_confirm_erase(slot, replacing, holder[0])))
 		var row := UiFx.panel("Row", UiFx.vbox(6, [name, info, actions]))
 		list.add_child(row)
-	modal = Modal.open(_modal_layer, {
+	holder.append(Modal.open(_modal_layer, {
 		"icon": "tab_knowledge",
 		"title": Tr.t("Choisir un emplacement à remplacer") if replacing else Tr.t("Sauvegardes"),
 		"body": Tr.t("Les 3 emplacements sont occupés. Recommencer efface la colonie choisie.") if replacing else "",
 		"extra": list,
 		"confirm_text": Tr.t("Fermer"),
-	})
+	}))
 
 
 func _slot_button(text: String, style: String, action: Callable) -> Button:

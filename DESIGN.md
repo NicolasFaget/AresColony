@@ -122,6 +122,8 @@ fourchettes.
 
 ## Pièges
 
+- Une lambda GDScript capture la *valeur* d'une variable à sa création : une fenêtre ouverte après
+  la création de ses boutons se partage via un tableau (`var holder: Array[Modal] = []`).
 - `trait` est un mot réservé de GDScript (ne pas l'utiliser comme nom de variable).
 - `is_connected` est une méthode native de `Object` : d'où `is_linked`.
 - Un script lancé par `-s` ne doit pas typer une classe qui utilise un autoload (`GameManager`).
