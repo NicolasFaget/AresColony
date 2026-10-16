@@ -58,6 +58,37 @@ const TUTORIAL := [
 		"text": "Recherchez « Sol vivant » pour cultiver une grande serre sur un vrai sol." },
 	{ "id": "build_biodome", "era": 3, "tab": TAB_BUILD, "target": "biodome",
 		"text": "Construisez une serre géante : beaucoup de nourriture pour accueillir 20 colons." },
+	# Ère 4 · Interplanétaire.
+	{ "id": "research_spaceport", "era": 4, "tab": TAB_RESEARCH, "target": "spaceport",
+		"text": "Ère 4 : recherchez « Astroport » pour relier vos colonies." },
+	{ "id": "build_spaceport", "era": 4, "tab": TAB_BUILD, "target": "spaceport",
+		"text": "Construisez l'astroport : un pas de tir et sa fusée." },
+	{ "id": "found_outpost", "era": 4, "tab": TAB_COLONY, "target": "network",
+		"text": "Fondez une deuxième colonie : bouton planète, en haut de l'écran." },
+	{ "id": "first_cargo", "era": 4, "tab": TAB_COLONY, "target": "network",
+		"text": "Envoyez une première cargaison vers votre nouvelle colonie." },
+	# Cérès.
+	{ "id": "build_electrolyser", "planet": "ceres", "tab": TAB_BUILD, "target": "electrolyser",
+		"text": "Pas de CO₂ sur Cérès : construisez un électrolyseur d'eau pour l'oxygène." },
+	{ "id": "build_extractor", "planet": "ceres", "tab": TAB_BUILD, "target": "extractor",
+		"text": "L'électrolyseur boit de l'eau : posez un extracteur sur une plaque de glace, avec des conduites." },
+	{ "id": "build_kiln", "planet": "ceres", "tab": TAB_BUILD, "target": "kiln",
+		"text": "Aucun ravitaillement ici : un four à régolithe fabriquera vos matériaux." },
+	{ "id": "build_brine", "planet": "ceres", "tab": TAB_BUILD, "target": "brine",
+		"text": "Posez une raffinerie de saumure sur la glace : de l'eau et des sels pour les matériaux." },
+	{ "id": "build_garage", "planet": "ceres", "tab": TAB_BUILD, "target": "garage",
+		"text": "Construisez un garage à rovers. Les expéditions roulent au méthane : faites-en venir de Mars." },
+	# Titan.
+	{ "id": "build_electrolyser", "planet": "titan", "tab": TAB_BUILD, "target": "electrolyser",
+		"text": "Pas de CO₂ sur Titan : construisez un électrolyseur d'eau pour l'oxygène." },
+	{ "id": "build_extractor", "planet": "titan", "tab": TAB_BUILD, "target": "extractor",
+		"text": "Le sol de Titan est de la glace d'eau : posez un extracteur n'importe où." },
+	{ "id": "build_kiln", "planet": "titan", "tab": TAB_BUILD, "target": "kiln",
+		"text": "Aucun ravitaillement ici : un four à régolithe fabriquera vos matériaux. Il est gourmand en énergie." },
+	{ "id": "build_methane_pump", "planet": "titan", "tab": TAB_BUILD, "target": "methane_pump",
+		"text": "Posez une pompe à méthane au bord d'un lac (les zones sombres)." },
+	{ "id": "first_expedition", "planet": "titan", "tab": TAB_BUILD, "target": "garage",
+		"text": "Construisez un garage à rovers, puis partez vers le cratère Selk." },
 ]
 
 
@@ -173,19 +204,20 @@ static func _step(text: String, tab: int, target: String) -> Dictionary:
 ## ou -1 si ce guide est terminé ou passé.
 static func tutorial_step(engine: ColonyEngine) -> int:
 	var era := engine.state.era
-	if (era == 1 and engine.state.tutorial_done) or engine.state.guides_skipped.has(era):
+	var planet := engine.planet_id()
+	if (planet == "mars" and era == 1 and engine.state.tutorial_done) or engine.state.guides_skipped.has(era):
 		return -1
-	for i in TUTORIAL.size():
-		if TUTORIAL[i].get("era", 1) == era and not is_step_done(engine, TUTORIAL[i].id):
+	for i in era_steps(era, planet):
+		if not is_step_done(engine, TUTORIAL[i].id):
 			return i
 	return -1
 
 
-## Étapes du guide d'une ère (index dans TUTORIAL).
-static func era_steps(era: int) -> Array[int]:
+## Étapes du guide d'une ère sur un monde (index dans TUTORIAL).
+static func era_steps(era: int, planet := "mars") -> Array[int]:
 	var list: Array[int] = []
 	for i in TUTORIAL.size():
-		if TUTORIAL[i].get("era", 1) == era:
+		if TUTORIAL[i].get("era", 1) == era and TUTORIAL[i].get("planet", "mars") == planet:
 			list.append(i)
 	return list
 
@@ -209,6 +241,10 @@ static func is_step_done(engine: ColonyEngine, step_id: String) -> bool:
 			return _has_linked(engine, "greenhouse")
 		"first_expedition":
 			return engine.state.expeditions > 0 or not engine.state.expedition.is_empty()
+		"found_outpost":
+			return engine.campaign_colonies >= 2
+		"first_cargo":
+			return engine.campaign_deliveries >= 1
 		"build_bunker":
 			return engine.shelter_capacity() >= mini(engine.state.colonists.size(), 8)
 	# Les autres étapes : « research_x » (lancée ou faite) et « build_x » (module raccordé).

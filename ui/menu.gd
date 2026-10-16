@@ -26,6 +26,7 @@ func _ready() -> void:
 		await get_tree().process_frame
 	_build_background()
 	_build_layout()
+	AudioManager.set_world("mars")
 	AudioManager.set_mood("day")
 	AudioManager.set_wind(0.0)
 	_refresh()

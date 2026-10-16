@@ -25,6 +25,8 @@ var _music: AudioStreamPlayer
 var _music_filter: AudioEffectLowPassFilter
 var _last_play := {}
 var _mood := "day"
+## Cérès n'a pas d'air : pas de vent. Titan : un vent grave, sourd, dans l'air épais.
+var _airless := false
 
 
 func _ready() -> void:
@@ -76,7 +78,15 @@ func set_mood(mood_id: String) -> void:
 ## Vent plus fort pendant les tempêtes.
 func set_wind(strength: float) -> void:
 	if _ambience != null:
-		_ambience.volume_db = lerpf(-8.0, 4.0, clampf(strength, 0.0, 1.0))
+		_ambience.volume_db = -80.0 if _airless else lerpf(-8.0, 4.0, clampf(strength, 0.0, 1.0))
+
+
+## Ambiance du monde affiché : air (vent) ou vide, timbre du vent.
+func set_world(planet: String) -> void:
+	_airless = not ColonyContent.PLANETS[planet].atmosphere
+	if _ambience != null:
+		_ambience.pitch_scale = 0.55 if planet == "titan" else 1.0
+	set_wind(0.0)
 
 
 ## Active ou coupe musique, ambiance et effets selon les préférences du joueur.

@@ -299,6 +299,14 @@ func _test_guides() -> void:
 	_check(ColonyAdvisor.TUTORIAL[ColonyAdvisor.tutorial_step(engine)].era == 3, "guide de l'ère 3")
 	var copy := ColonyState.from_dict(JSON.parse_string(JSON.stringify(engine.state.to_dict())))
 	_check(copy.guides_skipped == [2], "guides passés sauvegardés")
+	_check(ColonyAdvisor.era_steps(4).size() == 4, "guide de l'ère 4")
+	var outpost_state := ColonyState.new()
+	outpost_state.region = "ceres"
+	var outpost := ColonyEngine.new(outpost_state)
+	outpost.setup_outpost([{ "name": "A", "role": "x", "health": 1.0 }], { R.MATERIALS: 250.0 })
+	var first := ColonyAdvisor.tutorial_step(outpost)
+	_check(first >= 0 and ColonyAdvisor.TUTORIAL[first].get("planet", "mars") == "ceres", "guide de Cérès dans l'avant-poste")
+	_check(ColonyAdvisor.era_steps(1, "titan").size() == 5, "guide de Titan")
 
 
 # ---------- Ère 3 ----------

@@ -62,6 +62,7 @@ func _ready() -> void:
 	_world.ghost_moved.connect(func(_c: Vector2i) -> void: _refresh_placement())
 	_build_layout()
 	_connect_engine()
+	AudioManager.set_world(_engine.planet_id())
 
 	GameManager.state_changed.connect(_refresh)
 	GameManager.offline_report.connect(_show_offline_report)
@@ -107,7 +108,7 @@ func _build_layout() -> void:
 	_coach = CoachCard.new()
 	_coach.show_requested.connect(_go_to)
 	_coach.skip_requested.connect(func() -> void:
-		if _engine.state.era == 1:
+		if _engine.state.era == 1 and _engine.planet_id() == "mars":
 			_engine.state.tutorial_done = true
 		elif not _engine.state.guides_skipped.has(_engine.state.era):
 			_engine.state.guides_skipped.append(_engine.state.era)
@@ -291,7 +292,7 @@ func _refresh_guidance() -> void:
 		AudioManager.play("milestone")
 		if step >= 0:
 			_news.post(Tr.t("Étape du guide réussie !"))
-		elif _engine.state.era == 1:
+		elif _engine.state.era == 1 and _engine.planet_id() == "mars":
 			_news.post(Tr.t("Guide terminé : votre colonie respire, boit et mange. Bravo !"))
 		else:
 			_news.post(Tr.t("Guide de l'ère terminé. Bravo, commandant !"))
@@ -308,6 +309,9 @@ func _go_to(tab: int, target: String) -> void:
 		return
 	if target == "expeditions":
 		_show_expeditions()
+		return
+	if target == "network":
+		_show_network()
 		return
 	_select_tab(tab)
 	_pages[tab].highlight(target)

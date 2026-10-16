@@ -539,6 +539,9 @@ func _update_airless_sky() -> void:
 	_env.fog_density = 0.0
 	_motes.emitting = false
 	_dust.emitting = false
+	# Vu de Cérès (2,8 fois plus loin que la Terre), le Soleil n'est qu'un petit disque très vif.
+	_sky_mat.sun_angle_max = 4.0
+	_sky_mat.sun_curve = 0.02
 	_sky_mat.sky_top_color = Color(0.0, 0.0, 0.01)
 	_sky_mat.sky_horizon_color = Color(0.04, 0.04, 0.06)
 	_sky_mat.ground_horizon_color = Color(0.05, 0.05, 0.06)
