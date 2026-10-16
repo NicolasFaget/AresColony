@@ -37,6 +37,7 @@ func _init() -> void:
 	_test_number_formatter()
 	_simulate_campaign()
 	_simulate_realtime()
+	_simulate_outposts()
 	print("\n%d vérifications, %d échec(s)" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
 
@@ -972,3 +973,40 @@ func _simulate_realtime() -> void:
 	_check(engine.state.objectives_done.has("autonomy") and engine.state.sol <= 75.0, "temps réel : autonomie atteinte")
 	_check(evacuations[0] == 0, "temps réel : aucune évacuation")
 	_check(breakdowns[0] <= expected * 2.5 + 3.0, "temps réel : pannes à la fréquence prévue")
+
+
+## Avant-postes de Cérès et de Titan joués par le joueur simulé, seuls, pendant 60 sols :
+## ils doivent survivre et atteindre leurs premiers objectifs sans aide du réseau.
+func _simulate_outposts() -> void:
+	print("\n--- Avant-postes (60 sols, sans aide) ---")
+	for region in ["ceres", "titan"]:
+		var mars := _engine()
+		for r: Defs.Research in mars.research_defs.values():
+			mars.state.research_done.append(r.id)
+		var campaign := Campaign.from_engine(mars)
+		var state := ColonyState.new()
+		state.region = region
+		state.map_seed = 7920
+		state.sol = 150.0
+		campaign._add_colony(state)
+		var outpost: ColonyEngine = campaign.engines[1]
+		var crew := []
+		for k in Campaign.FOUNDING_CREW:
+			crew.append({ "name": "Colon %d" % k, "role": "pilote", "health": 1.0 })
+		outpost.setup_outpost(crew, { R.MATERIALS: Campaign.FOUNDING_MATERIALS_FAR })
+		campaign.sync_knowledge()
+		var evacuations := [0]
+		outpost.colonist_evacuated.connect(func(_n: String, _c: String) -> void: evacuations[0] += 1)
+		var done := {}
+		while outpost.state.sol < 210.0:
+			ColonyBot.research(outpost)
+			ColonyBot.maintain(outpost)
+			ColonyBot.build(outpost)
+			outpost.advance(0.25)
+			for id in outpost.state.objectives_done:
+				if not done.has(id):
+					done[id] = outpost.state.sol - 150.0
+		print("%-6s objectifs %s · évacuations %d" % [region, done, evacuations[0]])
+		_check(evacuations[0] == 0, "%s : l'avant-poste survit seul" % region)
+		_check(done.has(region + "_breath"), "%s : premier oxygène" % region)
+		_check(done.has("ceres_brine" if region == "ceres" else "titan_pump"), "%s : premier module du monde" % region)

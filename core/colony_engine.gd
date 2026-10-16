@@ -1346,6 +1346,8 @@ func setup_outpost(crew: Array, cargo: Dictionary) -> void:
 	for colonist: Dictionary in crew:
 		state.colonists.append(colonist)
 	state.resources[ColonyContent.MATERIALS] = cargo.get(ColonyContent.MATERIALS, 0.0)
+	for r in [ColonyContent.OXYGEN, ColonyContent.WATER, ColonyContent.FOOD, ColonyContent.ENERGY]:
+		state.resources[r] = capacity(r)
 	state.resupply_count = RESUPPLY_LIMIT
 	state.recruits_sent = ColonyContent.RECRUITS.size()
 	state.tutorial_done = true

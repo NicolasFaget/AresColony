@@ -52,14 +52,27 @@ static func build(engine: ColonyEngine) -> void:
 	for r in [R.OXYGEN, R.WATER, R.FOOD]:
 		if flows[r] < margin[r]:
 			var days: float = engine.state.amount(r) / maxf(0.01, -flows[r])
-			var producer: String = { R.OXYGEN: "moxie", R.WATER: "extractor", R.FOOD: "greenhouse" }[r]
+			var producer: String = { R.OXYGEN: _oxygen_maker(engine), R.WATER: "extractor", R.FOOD: "greenhouse" }[r]
 			if days < shortest and engine.is_unlocked(engine.building_defs[producer]):
 				shortest = days
 				urgent = r
+	var outpost := _is_outpost(engine)
+	# Avant-poste sans source de matériaux : le four d'abord, sauf urgence vitale imminente.
+	if outpost and shortest > 3.0 and _count(engine, "kiln") == 0 and _count(engine, "brine") == 0 			and engine.is_unlocked(engine.building_defs["kiln"]):
+		var spot := connected_spot(engine, "kiln")
+		if spot.x >= 0:
+			engine.place("kiln", spot)
+		return
 	if flows[R.ENERGY] < 4.0 and not engine.is_storm():
-		want = "solar"
+		want = _energy_maker(engine)
+		if want.is_empty():
+			return
 	elif urgent == R.OXYGEN:
-		want = "electrolyser" if engine.is_unlocked(engine.building_defs["electrolyser"]) and flows[R.WATER] > 4.0 else "moxie"
+		if engine.planet().forbidden.has("moxie"):
+			# Sans CO₂ : l'oxygène vient de l'eau, il faut donc d'abord de l'eau.
+			want = "electrolyser" if flows[R.WATER] > 4.0 else "extractor"
+		else:
+			want = "electrolyser" if engine.is_unlocked(engine.building_defs["electrolyser"]) and flows[R.WATER] > 4.0 else "moxie"
 	elif urgent == R.WATER:
 		want = "extractor"
 		for i in engine.state.buildings.size():
@@ -68,6 +81,19 @@ static func build(engine: ColonyEngine) -> void:
 				return
 	elif urgent == R.FOOD:
 		want = "greenhouse"
+	elif outpost and engine.planet_id() == "ceres" and engine.is_unlocked(engine.building_defs["brine"]) and _count(engine, "brine") < 2:
+		want = "brine"
+	elif outpost and engine.planet_id() == "titan" and engine.is_unlocked(engine.building_defs["methane_pump"]) and _count(engine, "methane_pump") < 2:
+		want = "methane_pump"
+	elif outpost and engine.is_unlocked(engine.building_defs["garage"]) and _count(engine, "garage") == 0 \
+			and engine.state.amount(R.MATERIALS) >= 130.0:
+		want = "garage"
+	elif outpost and engine.is_unlocked(engine.building_defs["kiln"]) and _count(engine, "kiln") < 2:
+		want = "kiln"
+	elif outpost and engine.capacity(R.ENERGY) < 150.0 and engine.is_unlocked(engine.building_defs["battery"]):
+		want = "battery"
+	elif outpost:
+		want = ""
 	elif engine.is_unlocked(engine.building_defs["kiln"]) and engine.resupplies_left() <= 2 \
 			and _count(engine, "kiln") < 1 + engine.state.colonists.size() / 4:
 		want = "kiln"
@@ -92,15 +118,17 @@ static func build(engine: ColonyEngine) -> void:
 	elif engine.capacity(R.ENERGY) < 150.0 and engine.is_unlocked(engine.building_defs["battery"]):
 		want = "battery"
 	if want.is_empty():
-		upgrade(engine)
+		# Un avant-poste garde ses matériaux pour l'essentiel avant d'améliorer.
+		if not outpost or engine.state.amount(R.MATERIALS) >= 200.0:
+			upgrade(engine)
 		return
 	if not engine.is_unlocked(engine.building_defs[want]):
 		return
 	# Confort (habitat, batteries) : seulement si une réserve reste pour les urgences vitales.
 	if want in ["habitat", "battery", "garage", "erv", "sabatier", "bunker", "reactor", "biodome"] and engine.state.amount(R.MATERIALS) < engine.building_defs[want].cost + 50.0:
 		return
-	if want == "extractor":
-		reach_ice(engine)
+	if want in ["extractor", "brine", "methane_pump"] and not (want == "extractor" and engine.planet().ice_everywhere):
+		reach_ice(engine, want)
 		return
 	var spot := connected_spot(engine, want)
 	if spot.x >= 0:
@@ -144,19 +172,39 @@ static func upgrade(engine: ColonyEngine) -> void:
 
 
 ## Pose l'extracteur sur la glace si possible, sinon prolonge les conduites vers la glace.
-static func reach_ice(engine: ColonyEngine) -> void:
+## Monde sans CO₂ (Cérès, Titan) : l'oxygène vient de l'électrolyse de l'eau.
+static func _oxygen_maker(engine: ColonyEngine) -> String:
+	return "electrolyser" if engine.planet().forbidden.has("moxie") else "moxie"
+
+
+## Énergie : des panneaux, ou un réacteur quand le soleil est trop faible ("" : attendre).
+static func _energy_maker(engine: ColonyEngine) -> String:
+	if engine.effect("solar") >= 0.5:
+		return "solar"
+	if engine.is_unlocked(engine.building_defs["reactor"]) \
+			and engine.state.amount(R.MATERIALS) >= engine.building_defs["reactor"].cost:
+		return "reactor"
+	return "solar" if engine.effect("solar") >= 0.2 else ""
+
+
+## Avant-poste d'un autre monde (fondé par le réseau, sans ravitaillement ni volontaires de la Terre).
+static func _is_outpost(engine: ColonyEngine) -> bool:
+	return engine.planet_id() != "mars" and engine.state.recruits_sent >= R.RECRUITS.size()
+
+
+static func reach_ice(engine: ColonyEngine, def_id := "extractor") -> void:
 	var ice := engine.map.ice_cells()
 	var lander := Vector2(engine.map.lander_cell)
 	ice.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return Vector2(a).distance_to(lander) < Vector2(b).distance_to(lander))
 	for cell in ice:
-		if engine.placement_problem("extractor", cell).is_empty() and engine.would_connect("extractor", cell):
-			engine.place("extractor", cell)
+		if engine.placement_problem(def_id, cell).is_empty() and engine.would_connect(def_id, cell):
+			engine.place(def_id, cell)
 			return
 	# Conduites vers la plaque de glace libre la plus proche (et pas de réseau sans fin).
 	if _count(engine, "link") >= 30:
 		return
 	for cell in ice:
-		if engine.placement_problem("extractor", cell).is_empty():
+		if engine.placement_problem(def_id, cell).is_empty():
 			var spot := connected_spot(engine, "link", cell)
 			if spot.x >= 0:
 				engine.place("link", spot)
