@@ -106,7 +106,10 @@ func _build_layout() -> void:
 	_coach = CoachCard.new()
 	_coach.show_requested.connect(_go_to)
 	_coach.skip_requested.connect(func() -> void:
-		_engine.state.tutorial_done = true
+		if _engine.state.era == 1:
+			_engine.state.tutorial_done = true
+		elif not _engine.state.guides_skipped.has(_engine.state.era):
+			_engine.state.guides_skipped.append(_engine.state.era)
 		_news.post(Tr.t("Guide masqué. Les alertes restent là pour vous prévenir."))
 		_refresh())
 	root.add_child(_coach)
@@ -281,7 +284,12 @@ func _refresh_guidance() -> void:
 	var coach_was_visible := _coach.visible
 	if _coach.show_step(step) and coach_was_visible and _placing.is_empty():
 		AudioManager.play("milestone")
-		_news.post(Tr.t("Étape du guide réussie !") if step >= 0 else Tr.t("Guide terminé : votre colonie respire, boit et mange. Bravo !"))
+		if step >= 0:
+			_news.post(Tr.t("Étape du guide réussie !"))
+		elif _engine.state.era == 1:
+			_news.post(Tr.t("Guide terminé : votre colonie respire, boit et mange. Bravo !"))
+		else:
+			_news.post(Tr.t("Guide de l'ère terminé. Bravo, commandant !"))
 	if _alert.visible != was_visible or _coach.visible != coach_was_visible:
 		_layout_changed.call_deferred()
 
@@ -292,6 +300,9 @@ func _go_to(tab: int, target: String) -> void:
 		_stop_placement()
 	if target == "maintenance":
 		_show_maintenance()
+		return
+	if target == "expeditions":
+		_show_expeditions()
 		return
 	_select_tab(tab)
 	_pages[tab].highlight(target)

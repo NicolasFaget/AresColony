@@ -55,6 +55,8 @@ var music_enabled: bool = true
 var sound_enabled: bool = true
 ## Tutoriel terminé ou passé.
 var tutorial_done: bool = false
+## Ères dont le guide a été passé (le guide de l'ère 1 suit tutorial_done).
+var guides_skipped: Array[int] = []
 
 
 func amount(resource: String) -> float:
@@ -107,7 +109,7 @@ func to_dict() -> Dictionary:
 		"last_saved_unix": last_saved_unix,
 		"settings": {
 			"speed": speed, "haptics": haptics_enabled, "music": music_enabled, "sound": sound_enabled,
-			"tutorial_done": tutorial_done,
+			"tutorial_done": tutorial_done, "guides_skipped": guides_skipped.duplicate(),
 		},
 	}
 
@@ -177,6 +179,11 @@ static func from_dict(data: Dictionary) -> ColonyState:
 		state.music_enabled = settings.get("music") if settings.get("music") is bool else true
 		state.sound_enabled = settings.get("sound") if settings.get("sound") is bool else true
 		state.tutorial_done = settings.get("tutorial_done") if settings.get("tutorial_done") is bool else false
+		var skipped: Variant = settings.get("guides_skipped")
+		if skipped is Array:
+			for era: Variant in skipped:
+				if era is float or era is int:
+					state.guides_skipped.append(int(era))
 	return state
 
 

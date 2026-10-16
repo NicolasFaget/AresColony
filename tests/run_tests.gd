@@ -22,6 +22,7 @@ func _init() -> void:
 	_test_hazards()
 	_test_era2()
 	_test_era3()
+	_test_guides()
 	_test_regions()
 	_test_night_and_batteries()
 	_test_colonists()
@@ -32,6 +33,7 @@ func _init() -> void:
 	_test_advisor()
 	_test_number_formatter()
 	_simulate_campaign()
+	_simulate_realtime()
 	print("\n%d vérifications, %d échec(s)" % [_checks, _failures])
 	quit(1 if _failures > 0 else 0)
 
@@ -95,6 +97,27 @@ func _test_regions() -> void:
 	_check(_near(arcadia._input_rate(home, R.ENERGY), arcadia.def_of(home).inputs[R.ENERGY] * 1.25), "Arcadia : chauffage +25 %")
 	var copy := ColonyState.from_dict(JSON.parse_string(JSON.stringify(arcadia.state.to_dict())))
 	_check(copy.region == "arcadia" and ColonyEngine.new(copy).map.tiles == arcadia.map.tiles, "région sauvegardée")
+
+
+# ---------- Guides des ères ----------
+
+func _test_guides() -> void:
+	var engine := _rich_engine()
+	engine.state.tutorial_done = true
+	_check(ColonyAdvisor.tutorial_step(engine) == -1, "guide de l'ère 1 passé")
+	engine.state.era = 2
+	engine.state.research_done.erase("sabatier")
+	var step := ColonyAdvisor.tutorial_step(engine)
+	_check(step >= 0 and ColonyAdvisor.TUTORIAL[step].id == "research_sabatier", "guide de l'ère 2 : première étape")
+	_check(ColonyAdvisor.era_steps(2).size() == 7 and ColonyAdvisor.era_steps(3).size() == 6, "étapes des guides des ères 2 et 3")
+	engine.state.research_done.append("sabatier")
+	_check(ColonyAdvisor.TUTORIAL[ColonyAdvisor.tutorial_step(engine)].id == "build_sabatier", "guide : étape suivante")
+	engine.state.guides_skipped.append(2)
+	_check(ColonyAdvisor.tutorial_step(engine) == -1, "guide de l'ère 2 passé")
+	engine.state.era = 3
+	_check(ColonyAdvisor.TUTORIAL[ColonyAdvisor.tutorial_step(engine)].era == 3, "guide de l'ère 3")
+	var copy := ColonyState.from_dict(JSON.parse_string(JSON.stringify(engine.state.to_dict())))
+	_check(copy.guides_skipped == [2], "guides passés sauvegardés")
 
 
 # ---------- Ère 3 ----------
@@ -731,3 +754,36 @@ func _simulate_campaign() -> void:
 	idle.advance(20.0)
 	print("Sans rien faire : première évacuation au sol %.1f" % first[0])
 	_check(first[0] >= 5.0 and first[0] <= 15.0, "sans rien faire : danger réel, mais pas avant le sol 5")
+
+
+## Ère 1 jouée comme sur le téléphone : vitesse ×4, un tout petit pas par image (60 images/s).
+## Les événements aléatoires doivent garder la même fréquence qu'en gros pas (bug des pannes, sol 83).
+func _simulate_realtime() -> void:
+	var engine := _engine()
+	var frame := 4.0 / (60.0 * ColonyEngine.SECONDS_PER_SOL)
+	var breakdowns := [0]
+	var evacuations := [0]
+	engine.breakdown.connect(func(_i: int) -> void: breakdowns[0] += 1)
+	engine.colonist_evacuated.connect(func(_n: String, _c: String) -> void: evacuations[0] += 1)
+	var machine_sols := 0.0
+	var started := Time.get_ticks_msec()
+	while engine.state.sol < 80.0 and not engine.state.objectives_done.has("autonomy"):
+		ColonyBot.research(engine)
+		ColonyBot.maintain(engine)
+		ColonyBot.build(engine)
+		var machines := 0
+		for building in engine.state.buildings:
+			if building.id in R.BREAKABLE:
+				machines += 1
+		var until := engine.state.sol + 0.25
+		while engine.state.sol < until:
+			engine.advance(frame)
+		if engine.state.sol > ColonyEngine.BREAKDOWN_START:
+			machine_sols += machines * 0.25
+	var expected := machine_sols * ColonyEngine.BREAKDOWN_RATE
+	print("\n--- Ère 1 en temps réel (×4, une image = %.5f sol) : %.1f s ---" % [frame, (Time.get_ticks_msec() - started) / 1000.0])
+	print("Autonomie au sol %.1f · pannes %d (attendu ≈ %.1f) · évacuations %d" % [
+		engine.state.sol, breakdowns[0], expected, evacuations[0]])
+	_check(engine.state.objectives_done.has("autonomy") and engine.state.sol <= 75.0, "temps réel : autonomie atteinte")
+	_check(evacuations[0] == 0, "temps réel : aucune évacuation")
+	_check(breakdowns[0] <= expected * 2.5 + 3.0, "temps réel : pannes à la fréquence prévue")

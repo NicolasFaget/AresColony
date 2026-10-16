@@ -30,6 +30,34 @@ const TUTORIAL := [
 		"text": "Tracez des conduites jusqu'à une plaque de glace (zones bleutées) et posez-y un extracteur." },
 	{ "id": "build_greenhouse", "tab": TAB_RESEARCH, "target": "greenhouse",
 		"text": "Les ravitaillements de nourriture diminuent. Recherchez puis construisez une serre." },
+	# Ère 2 · Expansion.
+	{ "id": "research_sabatier", "era": 2, "tab": TAB_RESEARCH, "target": "sabatier",
+		"text": "Place à l'expansion ! Recherchez « Réaction de Sabatier » : du méthane avec l'eau et le CO₂ martien." },
+	{ "id": "build_sabatier", "era": 2, "tab": TAB_BUILD, "target": "sabatier",
+		"text": "Construisez un réacteur Sabatier. Collé à un électrolyseur d'eau, il consomme moins d'eau." },
+	{ "id": "research_rovers", "era": 2, "tab": TAB_RESEARCH, "target": "rovers",
+		"text": "Recherchez « Rovers pressurisés » pour partir explorer les environs." },
+	{ "id": "build_garage", "era": 2, "tab": TAB_BUILD, "target": "garage",
+		"text": "Construisez un garage à rovers, relié à la colonie." },
+	{ "id": "first_expedition", "era": 2, "tab": TAB_COLONY, "target": "expeditions",
+		"text": "Lancez une première expédition (20 kg de méthane) : elle rapporte une fiche et des ressources." },
+	{ "id": "research_erv", "era": 2, "tab": TAB_RESEARCH, "target": "erv",
+		"text": "Recherchez « Mars Direct » : la fusée du retour se remplira de votre méthane." },
+	{ "id": "build_erv", "era": 2, "tab": TAB_BUILD, "target": "erv",
+		"text": "Construisez le véhicule de retour, puis réunissez 200 kg de méthane." },
+	# Ère 3 · Racines.
+	{ "id": "research_shielding", "era": 3, "tab": TAB_RESEARCH, "target": "shielding",
+		"text": "Des éruptions solaires vont frapper la colonie. Recherchez « Blindage en régolithe »." },
+	{ "id": "build_bunker", "era": 3, "tab": TAB_BUILD, "target": "bunker",
+		"text": "Construisez des habitats enterrés : chacun abrite 4 colons pendant une éruption." },
+	{ "id": "research_fission", "era": 3, "tab": TAB_RESEARCH, "target": "fission",
+		"text": "Recherchez « Réacteur à fission » : de l'énergie même la nuit et pendant les tempêtes." },
+	{ "id": "build_reactor", "era": 3, "tab": TAB_BUILD, "target": "reactor",
+		"text": "Construisez un réacteur à fission : collé au four à régolithe, il lui donne sa chaleur." },
+	{ "id": "research_soil", "era": 3, "tab": TAB_RESEARCH, "target": "soil",
+		"text": "Recherchez « Sol vivant » pour cultiver une grande serre sur un vrai sol." },
+	{ "id": "build_biodome", "era": 3, "tab": TAB_BUILD, "target": "biodome",
+		"text": "Construisez une serre géante : beaucoup de nourriture pour accueillir 20 colons." },
 ]
 
 
@@ -140,13 +168,25 @@ static func _step(text: String, tab: int, target: String) -> Dictionary:
 # ---------- Tutoriel ----------
 
 ## Index de la première étape non accomplie, ou -1 si le tutoriel est terminé ou passé.
+## Index (dans TUTORIAL) de la première étape non accomplie du guide de l'ère en cours,
+## ou -1 si ce guide est terminé ou passé.
 static func tutorial_step(engine: ColonyEngine) -> int:
-	if engine.state.tutorial_done:
+	var era := engine.state.era
+	if (era == 1 and engine.state.tutorial_done) or engine.state.guides_skipped.has(era):
 		return -1
 	for i in TUTORIAL.size():
-		if not is_step_done(engine, TUTORIAL[i].id):
+		if TUTORIAL[i].get("era", 1) == era and not is_step_done(engine, TUTORIAL[i].id):
 			return i
 	return -1
+
+
+## Étapes du guide d'une ère (index dans TUTORIAL).
+static func era_steps(era: int) -> Array[int]:
+	var list: Array[int] = []
+	for i in TUTORIAL.size():
+		if TUTORIAL[i].get("era", 1) == era:
+			list.append(i)
+	return list
 
 
 static func is_step_done(engine: ColonyEngine, step_id: String) -> bool:
@@ -166,6 +206,16 @@ static func is_step_done(engine: ColonyEngine, step_id: String) -> bool:
 			return _has_linked(engine, "extractor")
 		"build_greenhouse":
 			return _has_linked(engine, "greenhouse")
+		"first_expedition":
+			return engine.state.expeditions > 0 or not engine.state.expedition.is_empty()
+		"build_bunker":
+			return engine.shelter_capacity() >= mini(engine.state.colonists.size(), 8)
+	# Les autres étapes : « research_x » (lancée ou faite) et « build_x » (module raccordé).
+	if step_id.begins_with("research_"):
+		var research := step_id.trim_prefix("research_")
+		return done.has(research) or engine.state.research_active == research
+	if step_id.begins_with("build_"):
+		return _has_linked(engine, step_id.trim_prefix("build_"))
 	return true
 
 

@@ -104,6 +104,18 @@ var _synergies: Array = []
 var _efficiency: Array[float] = []
 ## Réglables par les tests (0 = aucune poussière, aucune panne).
 var dust_rate := DUST_RATE
+# Caches (le jeu avance d'un tout petit pas à chaque image : chaque microseconde compte).
+## Par module : [niveau, multiplicateurs d'entrée, multiplicateurs de sortie] (synergies et améliorations).
+var _factor_cache: Array = []
+## Effets cumulés des recherches et de la région, recalculés quand la liste des recherches change.
+var _effect_cache := {}
+var _effect_research := -1
+var _effect_region := ""
+## Bilan moyen utilisé pour l'objectif « Autonomie », rafraîchi tous les STEP sols de jeu.
+var _autonomy_flows := {}
+var _autonomy_age := INF
+## Capacités de stockage par ressource (vidées quand un module est posé, démoli ou amélioré).
+var _capacity_cache := {}
 var breakdown_rate := BREAKDOWN_RATE
 ## Rendement moyen récent de chaque module (lissé sur environ un demi-sol, pour la note).
 var _efficiency_avg: Array[float] = []
@@ -169,6 +181,8 @@ func building_at(cell: Vector2i) -> int:
 func capacity(resource: String) -> float:
 	if resource == ColonyContent.DATA:
 		return INF
+	if _capacity_cache.has(resource):
+		return _capacity_cache[resource]
 	var total := 0.0
 	for i in state.buildings.size():
 		if _connected[i]:
@@ -176,6 +190,7 @@ func capacity(resource: String) -> float:
 			for upgrade: Dictionary in _upgrades_of(i):
 				amount *= upgrade.get("storage", {}).get(resource, 1.0)
 			total += amount
+	_capacity_cache[resource] = total
 	return total
 
 
@@ -214,11 +229,18 @@ func sunlight() -> float:
 
 
 func effect(key: String) -> float:
+	if state.research_done.size() != _effect_research or state.region != _effect_region:
+		_effect_cache.clear()
+		_effect_research = state.research_done.size()
+		_effect_region = state.region
+	if _effect_cache.has(key):
+		return _effect_cache[key]
 	var value: float = region().effects.get(key, 1.0)
 	for id in state.research_done:
 		var r: Defs.Research = research_defs.get(id)
 		if r != null:
 			value *= r.effects.get(key, 1.0)
+	_effect_cache[key] = value
 	return value
 
 
@@ -336,6 +358,8 @@ func upgrade(index: int) -> bool:
 	for r: String in cost:
 		_add(r, -cost[r])
 	state.buildings[index].level = level_of(index) + 1
+	_capacity_cache.clear()
+	_autonomy_flows = {}
 	_check_objectives()
 	changed.emit()
 	return true
@@ -680,10 +704,21 @@ func _step(ds: float) -> void:
 
 ## Multiplicateur dû aux synergies et aux améliorations sur une entrée ou une sortie d'un module.
 func rate_factor(index: int, resource: String, output: bool) -> float:
-	var factor := 1.0
-	for mod: Dictionary in _synergies[index] + _upgrades_of(index):
-		factor *= mod.get("outputs" if output else "inputs", {}).get(resource, 1.0)
-	return factor
+	if _factor_cache.size() != state.buildings.size():
+		_factor_cache.resize(state.buildings.size())
+	var entry: Variant = _factor_cache[index]
+	var level := level_of(index)
+	if entry == null or entry[0] != level:
+		var inputs := {}
+		var outputs := {}
+		for mod: Dictionary in _synergies[index] + _upgrades_of(index):
+			for r: String in mod.get("inputs", {}):
+				inputs[r] = inputs.get(r, 1.0) * mod.inputs[r]
+			for r: String in mod.get("outputs", {}):
+				outputs[r] = outputs.get(r, 1.0) * mod.outputs[r]
+		entry = [level, inputs, outputs]
+		_factor_cache[index] = entry
+	return (entry[2] if output else entry[1]).get(resource, 1.0)
 
 
 func _input_rate(index: int, resource: String) -> float:
@@ -1046,7 +1081,11 @@ func _check_shortages(demand: Dictionary) -> void:
 
 
 func _update_autonomy(ds: float) -> void:
-	var flows := average_flows()
+	_autonomy_age += ds
+	if _autonomy_age >= STEP - 1e-9 or _autonomy_flows.is_empty():
+		_autonomy_flows = average_flows()
+		_autonomy_age = 0.0
+	var flows := _autonomy_flows
 	var ok: bool = flows[ColonyContent.ENERGY] >= 0.0 and state.colonists.size() >= AUTONOMY_CREW
 	for r in ColonyContent.VITAL:
 		ok = ok and flows[r] >= 0.0 and state.amount(r) > 0.0
@@ -1263,6 +1302,9 @@ func _rebuild() -> void:
 					active.append(synergy)
 					break
 		_synergies[i] = active
+	_factor_cache.clear()
+	_capacity_cache.clear()
+	_autonomy_flows = {}
 	if n == 0:
 		return
 	var queue: Array[int] = [0]

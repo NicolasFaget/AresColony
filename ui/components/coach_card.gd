@@ -59,7 +59,8 @@ func show_step(step: int) -> bool:
 	visible = step >= 0
 	if step < 0:
 		return changed
-	_counter.text = Tr.t("GUIDE %d/%d") % [step + 1, ColonyAdvisor.TUTORIAL.size()]
+	var steps := ColonyAdvisor.era_steps(ColonyAdvisor.TUTORIAL[step].get("era", 1))
+	_counter.text = Tr.t("GUIDE %d/%d") % [steps.find(step) + 1, steps.size()]
 	_text.text = ColonyAdvisor.TUTORIAL[step].text
 	if changed:
 		UiFx.pop(self, 0.04)

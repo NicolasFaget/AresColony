@@ -112,6 +112,15 @@ Sans évacuation pour un joueur raisonnable. Un joueur qui ne fait rien perd son
 sol 9 environ : le danger est réel mais laisse le temps d'apprendre. Les tests vérifient ces
 fourchettes.
 
+## Performances
+
+- Le jeu avance d'un tout petit pas à chaque image : tout ce qui est appelé dans `_step` doit être
+  léger. Caches : multiplicateurs par module (`rate_factor`), effets des recherches (`effect`),
+  capacités de stockage (`capacity`), bilan d'autonomie (rafraîchi tous les STEP sols). Ils sont vidés
+  dans `_rebuild()` et `upgrade()`. Mesure : ~370 µs par image sur PC pour 33 modules (1 200 avant).
+- `_simulate_realtime()` (tests) rejoue l'ère 1 image par image à ×4 : mêmes résultats qu'en gros pas.
+- Téléphone (Mali-G57) : ~43 images/s en début de partie, ~39 avec 64 modules (limite : le GPU).
+
 ## Langues
 
 - Le français est la langue source ; `i18n/en.json` associe chaque texte français à l'anglais.
