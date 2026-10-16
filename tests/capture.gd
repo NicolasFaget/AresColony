@@ -25,6 +25,7 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(_out)
 
 	var manager: Node = root.get_node("GameManager")
+	manager.splash_shown = "--splash" not in OS.get_cmdline_user_args()
 	manager.take_startup_report()
 	var engine: ColonyEngine = ColonyEngine.new(ColonyState.new())
 	manager.engine = engine
@@ -358,6 +359,13 @@ func _run() -> void:
 			main._world.rig.zoom(1.25)
 			await _frames(30)
 			await _shot("96_arcadia")
+		"splash":
+			manager.stop_game()
+			var menu: Control = load("res://ui/menu.tscn").instantiate()
+			root.add_child(menu)
+			for t in [0.5, 1.0, 1.8]:
+				await create_timer(t if t == 0.5 else 0.6).timeout
+				await _shot("00_splash_%s" % str(t).replace(".", "_"))
 		"interaction":
 			main = await _open_main()
 			_close_modals(main)

@@ -16,16 +16,29 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	if OS.has_feature("mobile"):
 		get_viewport().scaling_3d_scale = 0.55
+	# Au lancement : écran du studio, pendant que la colonie de démonstration se prépare derrière.
+	var splash: Splash = null
+	if not GameManager.splash_shown:
+		GameManager.splash_shown = true
+		splash = Splash.new()
+		add_child(splash)
+		await get_tree().process_frame
+		await get_tree().process_frame
 	_build_background()
 	_build_layout()
 	AudioManager.set_mood("day")
 	AudioManager.set_wind(0.0)
 	_refresh()
+	if splash != null:
+		move_child(splash, -1)
+		splash.done.connect(splash.queue_free)
+		splash.ready_to_go = true
 
 
 func _process(delta: float) -> void:
 	# Lent travelling autour de la colonie.
-	_world.rig.rotation_degrees.y += delta * 2.5
+	if _world != null:
+		_world.rig.rotation_degrees.y += delta * 2.5
 
 
 ## Colonie de démonstration : quelques sols joués par le joueur simulé, figée au soleil couchant.

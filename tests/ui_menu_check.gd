@@ -15,6 +15,7 @@ func _press(node: Node, text: String) -> bool:
 
 func _run() -> void:
 	var gm: Node = root.get_node("GameManager")
+	gm.splash_shown = true
 	for slot in gm.SLOTS:
 		gm.delete_slot(slot)
 	gm.start_game("save", true)

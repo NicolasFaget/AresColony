@@ -32,6 +32,8 @@ var settings := { "music": true, "sound": true, "haptics": true }
 ## Langue de l'interface : "fr" ou "en" (par défaut, celle du téléphone).
 var locale := ""
 var _english_loaded := false
+## L'écran du studio ne s'affiche qu'au lancement de l'application.
+var splash_shown := false
 
 var _save_service: SaveService
 var _since_last_save := 0.0
