@@ -118,7 +118,7 @@ func sync_with_game() -> void:
 		_signature = signature
 		_rebuild_buildings()
 	_update_lights()
-	var ice := _engine.state.research_done.has("ice")
+	var ice := _engine.state.research_done.has("ice") or _engine.planet_id() == "titan"
 	if ice != _ice_visible:
 		_ice_visible = ice
 		_ice_root.visible = ice
@@ -481,6 +481,9 @@ func _update_sky(delta: float) -> void:
 	if not _engine.planet().atmosphere:
 		_update_airless_sky()
 		return
+	if _engine.planet_id() == "titan":
+		_update_titan_sky()
+		return
 	var t := _engine.time_of_day()
 	var daylight := clampf(cos(TAU * (t - 0.5)) * 1.6 + 0.15, 0.0, 1.0)
 	var twilight := clampf(1.0 - absf(cos(TAU * (t - 0.5))) * 3.0, 0.0, 1.0) * (1.0 if daylight > 0.0 else 0.4)
@@ -540,6 +543,27 @@ func _update_airless_sky() -> void:
 	_sky_mat.sky_horizon_color = Color(0.04, 0.04, 0.06)
 	_sky_mat.ground_horizon_color = Color(0.05, 0.05, 0.06)
 	_sky_mat.ground_bottom_color = Color(0.02, 0.02, 0.03)
+
+
+## Titan : lumière de crépuscule même à midi, brume orangée épaisse, ombres douces.
+func _update_titan_sky() -> void:
+	var t := _engine.time_of_day()
+	var daylight := clampf(cos(TAU * (t - 0.5)) * 1.6 + 0.15, 0.0, 1.0)
+	_sun.rotation = Vector3(-0.9, -0.5, 0)
+	_sun.light_energy = lerpf(0.3, 0.75, daylight)
+	_sun.light_color = Color(1.0, 0.72, 0.42)
+	_env.ambient_light_sky_contribution = 0.6
+	_env.ambient_light_color = Color(0.85, 0.55, 0.3)
+	_env.ambient_light_energy = lerpf(0.45, 0.8, daylight)
+	_env.fog_density = 0.009
+	_env.fog_light_color = Color(0.62, 0.4, 0.2).lerp(Color(0.2, 0.12, 0.07), 1.0 - daylight)
+	_motes.emitting = false
+	_dust.emitting = false
+	var haze := Color(0.75, 0.5, 0.25).lerp(Color(0.18, 0.11, 0.06), 1.0 - daylight)
+	_sky_mat.sky_top_color = haze.darkened(0.35)
+	_sky_mat.sky_horizon_color = haze
+	_sky_mat.ground_horizon_color = haze.darkened(0.2)
+	_sky_mat.ground_bottom_color = haze.darkened(0.6)
 
 
 func _build_environment() -> void:
@@ -733,6 +757,12 @@ func _build_terrain() -> void:
 
 	var mat := ShaderMaterial.new()
 	mat.shader = preload("res://world/terrain.gdshader")
+	if _engine.planet_id() == "titan":
+		# Titan : sables sombres d'hydrocarbures sur un socle de glace.
+		mat.set_shader_parameter("sand_color", Color(0.3, 0.2, 0.11))
+		mat.set_shader_parameter("light_sand", Color(0.42, 0.29, 0.16))
+		mat.set_shader_parameter("dark_color", Color(0.14, 0.09, 0.05))
+		mat.set_shader_parameter("rock_color", Color(0.5, 0.48, 0.44))
 	if not _engine.planet().atmosphere:
 		# Cérès : régolithe très sombre (l'un des sols les plus noirs du système solaire), gris-brun.
 		mat.set_shader_parameter("sand_color", Color(0.23, 0.22, 0.21))
@@ -848,6 +878,11 @@ func _build_ice() -> void:
 	mat.roughness = 0.6
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.roughness = 0.2
+	if _engine.planet_id() == "titan":
+		# Lacs de méthane : noirs et lisses comme un miroir sombre.
+		mat.albedo_color = Color(0.05, 0.04, 0.03, 0.92)
+		mat.roughness = 0.04
+		mat.metallic = 0.3
 	# Toutes les plaques de glace dans un seul maillage.
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(1.0, 1.0)

@@ -263,7 +263,7 @@ func is_unlocked(def: Defs.Building) -> bool:
 func buildable_defs() -> Array[Defs.Building]:
 	var list: Array[Defs.Building] = []
 	for def: Defs.Building in building_defs.values():
-		if not def.fixed:
+		if not def.fixed and not planet().forbidden.has(def.id):
 			list.append(def)
 	return list
 
@@ -510,10 +510,10 @@ func placement_problem(def_id: String, cell: Vector2i) -> String:
 			return Tr.t("Emplacement déjà occupé.")
 		if map.tile_at(c) == ColonyMap.Tile.ICE:
 			ice += 1
-	if def.requires_tile == ColonyMap.Tile.ICE and ice < 2:
+	if def.requires_tile == ColonyMap.Tile.ICE and ice < 2 and not (def.id == "extractor" and planet().ice_everywhere):
 		return Tr.t("À poser sur une plaque de glace (au moins 2 cases).")
 	if planet().forbidden.has(def.id):
-		return Tr.t(planet().forbidden_reason)
+		return Tr.t(planet().forbidden[def.id])
 	if def.id == "erv" and _count_of("erv") > 0:
 		return Tr.t("Un seul véhicule de retour suffit.")
 	if state.amount(ColonyContent.MATERIALS) < def.cost:
@@ -826,7 +826,7 @@ func _arrive(member: Array) -> void:
 # ---------- Événements ----------
 
 func _events(ds: float) -> void:
-	if not planet().atmosphere:
+	if not planet().storms:
 		state.next_storm = state.sol + 1e6
 	if not is_storm() and not _storm_warned and state.sol >= state.next_storm - STORM_WARNING_SOLS:
 		_storm_warned = true
@@ -939,7 +939,7 @@ func clean_panels() -> bool:
 
 ## De temps en temps, un tourbillon de poussière balaie quelques panneaux (comme pour Spirit et Opportunity).
 func _dust_devils() -> void:
-	if not planet().atmosphere:
+	if not planet().storms:
 		return
 	if is_storm() or state.sol < state.next_dust_devil:
 		return
@@ -1198,6 +1198,16 @@ func _objective_met(objective_id: String) -> bool:
 			return state.sites_done.has("ahuna")
 		"ceres_export":
 			return state.exported_materials >= 200.0
+		"titan":
+			return campaign_planets.has("titan")
+		"titan_breath":
+			return _has_connected("electrolyser")
+		"titan_pump":
+			return _has_connected("methane_pump")
+		"titan_selk":
+			return state.sites_done.has("selk")
+		"titan_fuel":
+			return state.exported_methane >= 200.0
 		"rooted":
 			for other in ["shelter", "nuclear", "garden"]:
 				if not state.objectives_done.has(other):
@@ -1342,8 +1352,9 @@ func setup_outpost(crew: Array, cargo: Dictionary) -> void:
 	state.next_storm += state.sol
 	state.next_resupply += state.sol
 	state.next_dust_devil += state.sol
-	if not planet().atmosphere:
+	if not planet().storms:
 		state.next_storm = state.sol + 1e6
+	if planet().starter_reactor:
 		var spot := _spot_beside_lander(Vector2i(2, 2))
 		if spot.x >= 0:
 			state.buildings.append({ "id": "reactor", "x": spot.x, "y": spot.y, "level": 1 })

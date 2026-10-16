@@ -453,6 +453,53 @@ func _run() -> void:
 			campaign.switch_to(0)
 			main._show_founding()
 			await _shot("B2_fondation_ceres")
+		"titan":
+			var mars_state := ColonyState.new()
+			var mars := ColonyEngine.new(mars_state)
+			ColonyBot.play(mars, 152.0)
+			mars.state.era = 4
+			for r: Defs.Research in mars.research_defs.values():
+				if not mars.state.research_done.has(r.id):
+					mars.state.research_done.append(r.id)
+			var campaign := Campaign.from_engine(mars)
+			var st := ColonyState.new()
+			st.region = "titan"
+			st.name = "Rives de Ligeia Mare"
+			st.sol = mars.state.sol
+			st.map_seed = 7920
+			campaign._add_colony(st)
+			var ceres: ColonyEngine = campaign.engines[1]
+			ceres.setup_outpost([{ "name": "Ada", "role": "ingénieure", "health": 1.0 }, { "name": "Tom", "role": "médecin", "health": 1.0 },
+					{ "name": "Yuki", "role": "chimiste", "health": 1.0 }, { "name": "Kofi", "role": "électricien", "health": 1.0 }],
+					{ ColonyContent.MATERIALS: 250.0 })
+			campaign.sync_knowledge()
+			ceres.state.resources[ColonyContent.MATERIALS] = 400.0
+			for id in ["electrolyser", "methane_pump", "extractor", "habitat"]:
+				var spot := ColonyBot.connected_spot(ceres, id)
+				if id == "methane_pump":
+					for cell in ceres.map.ice_cells():
+						if ceres.placement_problem("methane_pump", cell).is_empty() and ceres.would_connect("methane_pump", cell):
+							spot = cell
+							break
+				print(id, " : ", ceres.place(id, spot), " ", ceres.placement_problem(id, spot))
+			ceres.state.speed = 0
+			ceres.state.sol = floorf(ceres.state.sol) + 1.45
+			campaign.switch_to(1)
+			manager.campaign = campaign
+			manager.engine = ceres
+			main = await _open_main()
+			_close_modals(main)
+			if not main._window.collapsed:
+				main._window.toggle_collapsed()
+			main._world.rig.zoom(0.8)
+			await _frames(30)
+			await _shot("C0_titan")
+			main._show_network()
+			await _shot("C1_reseau_titan")
+			_close_modals(main)
+			campaign.switch_to(0)
+			main._show_founding()
+			await _shot("C2_fondation_titan")
 		"interaction":
 			main = await _open_main()
 			_close_modals(main)

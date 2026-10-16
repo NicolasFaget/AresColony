@@ -178,6 +178,7 @@ static func building(building_id: String) -> Node3D:
 		"bunker": _bunker(root)
 		"spaceport": _spaceport(root)
 		"brine": _brine(root)
+		"methane_pump": _methane_pump(root)
 		"reactor": _reactor(root)
 		"biodome": _biodome(root)
 	return root
@@ -381,6 +382,24 @@ static func _erv(r: Node3D) -> void:
 		strut(r, Vector3(0.62, y, -0.5), Vector3(0.2, y + 0.1, -0.15), 0.025, ORANGE)
 	cylinder(r, Vector3(-0.6, 0.35, 0.55), 0.18, 0.5, Color("#e98a5a"), Vector3.ZERO, -1.0, 16)
 	strut(r, Vector3(-0.5, 0.5, 0.45), Vector3(-0.15, 0.7, 0.1), 0.03, GREY)
+
+
+## Pompe à méthane : derrick bas, conduite plongeant dans le lac, réservoirs isolés givrés.
+static func _methane_pump(r: Node3D) -> void:
+	_pad(r, 1.9)
+	var frost := Color("#dfe8ef")
+	for corner in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+		strut(r, Vector3(corner.x * 0.3 - 0.35, 0.08, corner.y * 0.3 - 0.3), Vector3(corner.x * 0.08 - 0.35, 1.1, corner.y * 0.08 - 0.3), 0.03, ORANGE)
+	box(r, Vector3(-0.35, 1.15, -0.3), Vector3(0.25, 0.1, 0.25), DARK)
+	cylinder(r, Vector3(-0.35, 0.5, -0.3), 0.05, 1.0, GREY, Vector3.ZERO, -1.0, 10)
+	for k in 2:
+		var at := Vector3(0.35, 0.0, -0.4 + k * 0.6)
+		cylinder(r, at + Vector3(0, 0.3, 0), 0.22, 0.5, frost, Vector3(90, 0, 0), -1.0, 18)
+		sphere(r, at + Vector3(0, 0.3, 0.25), 0.22, frost, Vector3.ONE, 0.0, true, 16)
+	strut(r, Vector3(-0.35, 0.3, -0.3), Vector3(0.35, 0.3, -0.4), 0.03, GREY)
+	light(r, Vector3(-0.35, 1.25, -0.3), Color("#ffb347"), 0.035, 2.5)
+	box(r, Vector3(-0.4, 0.2, 0.55), Vector3(0.45, 0.3, 0.3), WHITE)
+	light(r, Vector3(-0.4, 0.3, 0.71), LIGHT, 0.025, 2.0)
 
 
 ## Raffinerie de saumure : tête de forage, cuves d'évaporation et tas de sel blanc.

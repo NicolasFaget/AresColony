@@ -722,9 +722,7 @@ func _show_network() -> void:
 		box.add_child(UiFx.label(Tr.t("Fenêtres de tir"), "HeadingLabel"))
 		for line in _window_lines(campaign):
 			box.add_child(UiFx.paragraph(line, "SmallLabel"))
-	var later := UiFx.paragraph(Tr.t("Destination suivante : Titan, la lune de Saturne."), "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
-	later.add_theme_color_override("font_color", Palette.TEXT_MUTED)
-	box.add_child(later)
+
 	var scroll := _fitted_scroll(box)
 	holder.append(Modal.open(_modal_layer, {
 		"icon": "planet", "title": Tr.t("Réseau de colonies"), "extra": scroll, "confirm_text": Tr.t("Fermer"),
@@ -782,9 +780,6 @@ func _show_founding() -> void:
 			reason.add_theme_color_override("font_color", Palette.WARNING)
 			rows.append(reason)
 		box.add_child(UiFx.panel("Row", UiFx.vbox(6, rows)))
-	var soon := UiFx.panel("RowLocked", UiFx.vbox(4, [UiFx.label(Tr.t("Titan"), "HeadingLabel"),
-			UiFx.label(Tr.t("Bientôt : la lune de Saturne, au bout du voyage."), "SmallLabel")]))
-	box.add_child(soon)
 	var scroll := _fitted_scroll(box)
 	holder.append(Modal.open(_modal_layer, {
 		"icon": "planet", "title": Tr.t("Fonder une colonie"), "extra": scroll, "confirm_text": Tr.t("Fermer"),

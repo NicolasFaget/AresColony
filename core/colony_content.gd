@@ -48,7 +48,7 @@ const COLONIST_NEEDS := { OXYGEN: 0.84, WATER: 2.5, FOOD: 1.0, ENERGY: 0.5 }
 ## Données scientifiques produites par chaque colon par sol.
 const COLONIST_DATA := 1.0
 ## Modules qui peuvent tomber en panne (les machines).
-const BREAKABLE := ["moxie", "extractor", "greenhouse", "electrolyser", "kiln", "sabatier", "biodome", "brine"]
+const BREAKABLE := ["moxie", "extractor", "greenhouse", "electrolyser", "kiln", "sabatier", "biodome", "brine", "methane_pump"]
 ## Ce que racontent les colons quand une machine lâche.
 const BREAKDOWN_LINES := {
 	"moxie": "L'électrolyseur de CO₂ a surchauffé. Il sent le grille-pain.",
@@ -57,6 +57,7 @@ const BREAKDOWN_LINES := {
 	"electrolyser": "Une fuite sur l'électrolyseur d'eau ! Le sifflement est très désagréable.",
 	"biodome": "L'arrosage de la serre géante s'est bloqué. Les tomates font la tête.",
 	"brine": "La raffinerie de saumure est entartrée de sel. Il faut gratter.",
+	"methane_pump": "La pompe à méthane a gelé. À −179 °C, même le méthane fait des siennes.",
 	"sabatier": "Le réacteur Sabatier a perdu la pression. Il boude à 400 °C.",
 	"kiln": "Le four à régolithe s'est arrêté net. Il y a de la poussière partout. Encore plus que d'habitude.",
 }
@@ -165,6 +166,12 @@ static func buildings() -> Array[Defs.Building]:
 			"card": "occator",
 			"description": "Pompe la saumure sous la glace : de l'eau, et des sels (carbonates) pour les matériaux. À poser sur la glace.",
 		}),
+		Defs.Building.new({
+			"id": "methane_pump", "name": "Pompe à méthane", "size": Vector2i(2, 2), "cost": 70.0, "research": "cryogenics",
+			"requires_tile": ColonyMap.Tile.ICE, "inputs": { ENERGY: 6.0 }, "outputs": { METHANE: 5.0 },
+			"storage": { METHANE: 60.0 }, "card": "kraken",
+			"description": "Pompe le méthane liquide d'un lac de Titan : le carburant de tout le réseau. À poser au bord d'un lac.",
+		}),
 	]
 
 
@@ -178,22 +185,38 @@ const ERAS := {
 
 ## Mondes colonisables. launch_fuel : carburant de décollage relatif (gravité) ;
 ## atmosphere : sans air, ni tempêtes ni poussière soulevée ; forbidden : modules impossibles.
+## storms : tempêtes de poussière qui voilent les panneaux ; starter_reactor : l'avant-poste arrive avec
+## un petit réacteur ; ice_everywhere : le sol est de la glace d'eau (l'extracteur se pose partout) ;
+## forbidden : modules impossibles et pourquoi.
 const PLANETS := {
-	"mars": { "name": "Mars", "launch_fuel": 1.0, "atmosphere": true, "forbidden": [] },
-	"ceres": { "name": "Cérès", "launch_fuel": 0.25, "atmosphere": false, "forbidden": ["moxie", "sabatier"],
-		"forbidden_reason": "Pas d'atmosphère de CO₂ sur Cérès." },
+	"mars": { "name": "Mars", "launch_fuel": 1.0, "atmosphere": true, "storms": true, "starter_reactor": false,
+		"ice_everywhere": false,
+		"forbidden": { "brine": "Pas de saumure à pomper ici : c'est un module pour Cérès.",
+			"methane_pump": "Pas de lac de méthane sur Mars : c'est un module pour Titan." } },
+	"ceres": { "name": "Cérès", "launch_fuel": 0.25, "atmosphere": false, "storms": false, "starter_reactor": true,
+		"ice_everywhere": false,
+		"forbidden": { "moxie": "Pas d'atmosphère de CO₂ sur Cérès.", "sabatier": "Pas d'atmosphère de CO₂ sur Cérès.",
+			"methane_pump": "Pas de lac de méthane sur Cérès : c'est un module pour Titan." } },
+	"titan": { "name": "Titan", "launch_fuel": 0.5, "atmosphere": true, "storms": false, "starter_reactor": true,
+		"ice_everywhere": true,
+		"forbidden": { "moxie": "L'air de Titan est fait d'azote et de méthane, presque sans CO₂.",
+			"sabatier": "L'air de Titan est fait d'azote et de méthane, presque sans CO₂.",
+			"brine": "Pas de saumure à pomper ici : c'est un module pour Cérès." } },
 }
-const PLANET_ORDER := ["mars", "ceres"]
+const PLANET_ORDER := ["mars", "ceres", "titan"]
 ## Routes entre mondes (dans le jeu, un sol de voyage vaut environ un mois réel) : durée du trajet
 ## (orbite de Hohmann), période entre deux fenêtres de tir (période synodique), durée d'ouverture,
 ## carburant de base et décalage de la première fenêtre.
 const ROUTES := {
 	"ceres-mars": { "transit": 19.0, "synodic": 38.0, "open": 6.0, "fuel": 120.0, "phase": 4.0 },
+	"mars-titan": { "transit": 78.0, "synodic": 24.0, "open": 4.0, "fuel": 300.0, "phase": 10.0 },
+	"ceres-titan": { "transit": 92.0, "synodic": 65.0, "open": 6.0, "fuel": 260.0, "phase": 20.0 },
 }
 
 ## Ères propres à chaque monde (Mars utilise ERAS).
 const PLANET_ERAS := {
 	"ceres": { 1: "Cérès · Avant-poste minier : glace, sels et minerais de la ceinture." },
+	"titan": { 1: "Titan · Mers de méthane : un monde glacé sous un ciel orangé." },
 }
 
 ## Régions d'atterrissage, choisies à la création de la colonie.
@@ -212,6 +235,13 @@ const REGIONS := {
 		"sites": ["occator", "ahuna", "ernutet"], "card": "ceres",
 		"rim": "Le rebord du cratère Occator, sous un ciel noir.",
 	},
+	"titan": {
+		"name": "Rives de Ligeia Mare", "tagline": "Sur Titan, la lune de Saturne, au bord d'une mer de méthane.",
+		"traits": ["Méthane partout, sol de glace d'eau", "Presque pas de lumière, −179 °C, air épais"],
+		"planet": "titan", "effects": { "solar": 0.01, "heating": 2.0, "dust": 0.0 },
+		"sites": ["ligeia", "huygens", "selk"], "card": "titan",
+		"rim": "Des collines de glace, sous la brume orangée.",
+	},
 	"arcadia": {
 		"name": "Arcadia Planitia", "tagline": "Une plaine du nord où la glace affleure sous la poussière.",
 		"traits": ["Beaucoup de glace, presque pas de rochers", "Plus au nord : −20 % de soleil, +25 % de chauffage"],
@@ -221,7 +251,7 @@ const REGIONS := {
 }
 const REGION_ORDER := ["jezero", "arcadia"]
 ## Régions où l'on peut fonder une colonie depuis l'astroport.
-const FOUNDING_REGIONS := ["jezero", "arcadia", "ceres"]
+const FOUNDING_REGIONS := ["jezero", "arcadia", "ceres", "titan"]
 ## Modules chauffés : leur besoin d'énergie suit l'effet « heating » de la région.
 const HEATED := ["habitat", "greenhouse", "bunker", "biodome"]
 
@@ -236,6 +266,9 @@ const SITES := [
 	{ "id": "occator", "name": "Les taches brillantes", "card": "occator", "reward": { MATERIALS: 80.0 } },
 	{ "id": "ahuna", "name": "Le mont Ahuna", "card": "ahuna", "reward": { DATA: 50.0, WATER: 60.0 } },
 	{ "id": "ernutet", "name": "Les terres rouges d'Ernutet", "card": "ernutet", "reward": { DATA: 70.0 } },
+	{ "id": "ligeia", "name": "Le large de Ligeia Mare", "card": "kraken", "reward": { METHANE: 80.0, DATA: 40.0 } },
+	{ "id": "huygens", "name": "Le site de Huygens", "card": "titan_light", "reward": { DATA: 60.0 } },
+	{ "id": "selk", "name": "Le cratère Selk", "card": "dragonfly", "reward": { DATA: 90.0 } },
 ]
 const PROSPECTION := { "id": "prospect", "name": "Prospection de minerais", "card": "", "reward": { MATERIALS: 50.0 } }
 
@@ -407,6 +440,9 @@ static func research() -> Array[Defs.Research]:
 		Defs.Research.new({ "id": "brines", "name": "Traitement des saumures", "cost": 120.0, "duration": 3.0, "era": 4,
 				"requires": ["spaceport"], "card": "occator",
 				"summary": "Débloque la raffinerie de saumure, pour la colonie de Cérès." }),
+		Defs.Research.new({ "id": "cryogenics", "name": "Cryogénie du méthane", "cost": 150.0, "duration": 3.0, "era": 4,
+				"requires": ["spaceport"], "card": "kraken",
+				"summary": "Débloque la pompe à méthane, pour la colonie de Titan." }),
 	]
 
 
@@ -479,6 +515,21 @@ static func objectives() -> Array[Defs.Objective]:
 		Defs.Objective.new({ "id": "ceres_export", "title": "Mine de la ceinture", "era": 1, "planet": "ceres",
 				"description": "Expédier 200 matériaux depuis Cérès vers d'autres colonies.",
 				"reward": { DATA: 80.0 } }),
+		Defs.Objective.new({ "id": "titan", "title": "Aux confins", "era": 4,
+				"description": "Fonder une colonie sur Titan, la lune de Saturne.",
+				"reward": { DATA: 200.0 } }),
+		Defs.Objective.new({ "id": "titan_breath", "title": "Respirer sous la brume", "era": 1, "planet": "titan",
+				"description": "Produire de l'oxygène en cassant l'eau de la glace (pas de CO₂ ici).",
+				"reward": { DATA: 40.0 } }),
+		Defs.Objective.new({ "id": "titan_pump", "title": "Puits de méthane", "era": 1, "planet": "titan",
+				"description": "Construire une pompe à méthane au bord d'un lac.",
+				"reward": { MATERIALS: 120.0 } }),
+		Defs.Objective.new({ "id": "titan_selk", "title": "Sur les traces de Dragonfly", "era": 1, "planet": "titan",
+				"description": "Mener une expédition jusqu'au cratère Selk.",
+				"reward": { DATA: 80.0 } }),
+		Defs.Objective.new({ "id": "titan_fuel", "title": "Station-service de Saturne", "era": 1, "planet": "titan",
+				"description": "Expédier 200 kg de méthane depuis Titan vers d'autres colonies.",
+				"reward": { DATA: 120.0 } }),
 	]
 
 
@@ -678,6 +729,34 @@ static func cards() -> Array[Defs.Card]:
 			"in_game": "Les terres rouges d'Ernutet intéressent beaucoup vos chercheurs : l'expédition rapporte des données.",
 			"sources": [["Sky & Telescope", "https://skyandtelescope.org/astronomy-news/scientists-find-organics-on-ceres-1602201723/"],
 				["Astrobiology (communiqué NASA)", "https://astrobiology.com/2017/02/16/dawn-discovers-evidence-for-organic-material-on-ceres/"]] }),
+		Defs.Card.new({ "id": "titan", "figure": "1,5 fois", "figure_label": "la pression de l'air terrestre, à −179 °C", "visual": "lander",
+			"quiz": "De quoi est surtout faite l'atmosphère de Titan ?", "choices": ["D'azote", "De dioxyde de carbone", "D'oxygène"], "answer": 0,
+			"title": "Titan, sous la brume", "status": "Mesuré",
+			"fact": "Le 14 janvier 2005, la sonde européenne Huygens s'est posée sur Titan, la plus grande lune de Saturne : le premier atterrissage dans le système solaire externe. Elle a mesuré une pression d'environ 1,5 fois celle de l'air terrestre et une température de −179 °C. L'atmosphère contient environ 95 % d'azote et 5 % de méthane.",
+			"in_game": "Sous une telle pression, pas besoin de scaphandre pressurisé : un habit très chaud et de l'oxygène suffisent. Mais tout se gèle.",
+			"sources": [["ESA – résultats de Huygens", "https://sci.esa.int/web/cassini-huygens/-/55222-science-highlights-from-huygens-1-profiling-the-atmosphere-of-titan"],
+				["ESA (2010)", "https://www.esa.int/Enabling_Support/Operations/Celebrating_the_fifth_anniversary_of_Huygens_Titan_touchdown"]] }),
+		Defs.Card.new({ "id": "kraken", "figure": "160 m", "figure_label": "de méthane liquide au centre de Ligeia Mare", "visual": "methane_pump",
+			"quiz": "De quoi sont faites les mers de Titan ?", "choices": ["De méthane et d'éthane liquides", "D'eau salée", "De lave refroidie"], "answer": 0,
+			"title": "Des mers de méthane", "status": "Mesuré",
+			"fact": "Titan a des mers à sa surface, mais de méthane et d'éthane liquides. En 2014, le radar de la sonde Cassini a sondé Ligeia Mare : environ 160 m de profondeur en son centre, et un liquide si pur que les ondes le traversaient. Kraken Mare, la plus grande mer, contient à elle seule environ 80 % des liquides de surface ; en son centre, elle était trop profonde pour le radar.",
+			"in_game": "La pompe à méthane puise dans ces lacs : Titan devient le réservoir de carburant de tout le réseau.",
+			"sources": [["Science News", "https://www.sciencenews.org/article/cassini-maps-depths-titan’s-seas"],
+				["Astronomy Now (2014)", "https://astronomynow.com/2014/11/10/cassini-sounds-the-depths-of-kraken-mare-titans-largest-sea/"]] }),
+		Defs.Card.new({ "id": "titan_light", "figure": "≈ 1 %", "figure_label": "de la lumière solaire reçue par la Terre, avant même la brume", "visual": "reactor",
+			"quiz": "Pourquoi fait-il si sombre sur Titan ?", "choices": ["Saturne est loin du Soleil et la brume arrête la lumière", "Titan tourne très vite sur elle-même", "Les anneaux de Saturne font de l'ombre"], "answer": 0,
+			"title": "Un midi de crépuscule", "status": "Mesuré",
+			"fact": "Titan reçoit environ 1 % de la lumière solaire qui arrive sur Terre, et sa brume orangée, faite de molécules organiques appelées tholins, en arrête encore une grande partie : selon les estimations, entre 0,1 % et 1 % de la lumière du jour terrestre atteint le sol. Vu du sol, le Soleil n'est qu'une tache diffuse.",
+			"in_game": "Les panneaux solaires ne servent presque à rien sur Titan : place au réacteur nucléaire.",
+			"sources": [["Space Daily", "https://spacedaily.com/m-titan-noon-permanent-dusk-barely-a-thousandth-of-earths-sunlight-reaches-surface/"],
+				["Universe Today", "https://www.universetoday.com/articles/sunrises-across-the-solar-system"]] }),
+		Defs.Card.new({ "id": "dragonfly", "figure": "2034", "figure_label": "arrivée prévue de Dragonfly près du cratère Selk", "visual": "garage",
+			"quiz": "Quel engin la NASA prépare-t-elle pour explorer Titan ?", "choices": ["Un drone à rotors", "Un rover à six roues", "Un sous-marin"], "answer": 0,
+			"title": "Dragonfly", "status": "Valeur de planification",
+			"fact": "La NASA prépare Dragonfly, un drone à huit rotors construit par le laboratoire APL de l'université Johns Hopkins. Son lancement est prévu en juillet 2028, pour une arrivée en 2034 près du cratère Selk, où de l'eau liquide s'est autrefois mêlée aux molécules organiques de Titan. Il doit sauter de site en site pendant plus de trois ans.",
+			"in_game": "Votre expédition vers le cratère Selk suit le chemin prévu pour Dragonfly.",
+			"sources": [["Universe Today", "https://www.universetoday.com/articles/dragonfly-is-going-to-titan-on-a-falcon-heavy"],
+				["DroneXL (2025)", "https://dronexl.co/2025/05/27/nasa-first-quadcopter-to-explore-titan"]] }),
 	]
 
 

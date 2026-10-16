@@ -264,6 +264,7 @@ func send_cargo(from: int, to: int, cargo: Dictionary, colonists: int) -> bool:
 	for r: String in cargo:
 		origin.withdraw(r, cargo[r])
 	origin.state.exported_materials += cargo.get(ColonyContent.MATERIALS, 0.0)
+	origin.state.exported_methane += cargo.get(ColonyContent.METHANE, 0.0)
 	var crew := origin.release_colonists(colonists)
 	_launch("cargo", from, to, cargo, crew, colonies[to].region)
 	return true

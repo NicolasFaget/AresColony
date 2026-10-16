@@ -127,7 +127,11 @@ fourchettes.
   pas d'électrolyseur de CO₂ ni de Sabatier), décollage ×0,25 en carburant. Route Mars ⇄ Cérès :
   19 sols de trajet, fenêtre de 6 sols tous les 38 sols (1 sol de voyage ≈ 1 mois réel). L'avant-poste
   arrive avec un petit réacteur. Objectifs propres (PLANET_ERAS, `Objective.planet`).
-- À venir : Titan.
+- Titan (région « Rives de Ligeia Mare ») : soleil ×0,01, chauffage ×2, air épais sans CO₂ ni tempêtes,
+  sol de glace d'eau (extracteur partout), lacs de méthane (pompe à méthane sur les cases de lac).
+  Routes : Mars ⇄ Titan 78 sols (fenêtre tous les 24 sols), Cérès ⇄ Titan 92 sols (tous les 65).
+  Décollage ×0,5. Objectifs propres ; objectif martien « Aux confins ».
+- Modules propres à un monde : `PLANETS[...].forbidden` (raison affichée), masqués de la liste.
 
 ## Performances
 
