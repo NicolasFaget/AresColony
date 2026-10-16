@@ -648,10 +648,10 @@ static func rock(rng: RandomNumberGenerator, color := ROCK) -> Node3D:
 	return r
 
 
-static func rock_material(color := ROCK) -> Material:
-	var key := "rock|" + color.to_html()
+static func rock_material(color := ROCK, dust := 0.55) -> Material:
+	var key := "rock|%s|%s" % [color.to_html(), dust]
 	if not _materials.has(key):
-		_materials[key] = hull(color, 0.0, 0.95, 0.6, 0.55, 0.0)
+		_materials[key] = hull(color, 0.0, 0.95, 0.6, dust, 0.0)
 	return _materials[key]
 
 

@@ -125,7 +125,8 @@ static func alerts(engine: ColonyEngine) -> Array[Dictionary]:
 			"title": Tr.t("Panneaux poussiéreux : −%d %% d'énergie") % roundi(ColonyEngine.DUST_LOSS * dust * 100.0),
 			"advice": Tr.t("Envoyez une sortie de nettoyage (elle coûte de l'oxygène), ou espérez un tourbillon de poussière."),
 			"tab": TAB_COLONY, "target": "maintenance" })
-	if engine.resupplies_left() <= 1 and not _has_linked(engine, "kiln"):
+	var outpost := engine.state.recruits_sent >= ColonyContent.RECRUITS.size() and engine.state.resupply_count >= ColonyEngine.RESUPPLY_LIMIT 			and engine.state.amount(ColonyContent.MATERIALS) >= 60.0
+	if engine.resupplies_left() <= 1 and not _has_linked(engine, "kiln") and not _has_linked(engine, "brine") and not outpost:
 		var researched := engine.state.research_done.has("regolith")
 		list.append({ "level": "warning", "resource": ColonyContent.MATERIALS, "sols": INF,
 			"title": Tr.t("Dernier envoi de matériaux au prochain ravitaillement") if engine.resupplies_left() == 1

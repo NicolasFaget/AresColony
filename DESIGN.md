@@ -123,7 +123,11 @@ fourchettes.
   20 kg + 0,1 kg par unité). Saut entre deux sites de Mars : 1 sol.
 - Une nouvelle colonie : savoir partagé, pas de ravitaillement de matériaux depuis la Terre ni de
   volontaires (le réseau s'en charge), calendrier de la colonie de départ, carte propre.
-- À venir : Cérès puis Titan, avec de vraies fenêtres de tir (orbites de Hohmann).
+- Cérès (région « Cratère Occator ») : soleil ×0,3, chauffage ×1,5, pas d'air (ni tempêtes ni poussière,
+  pas d'électrolyseur de CO₂ ni de Sabatier), décollage ×0,25 en carburant. Route Mars ⇄ Cérès :
+  19 sols de trajet, fenêtre de 6 sols tous les 38 sols (1 sol de voyage ≈ 1 mois réel). L'avant-poste
+  arrive avec un petit réacteur. Objectifs propres (PLANET_ERAS, `Objective.planet`).
+- À venir : Titan.
 
 ## Performances
 

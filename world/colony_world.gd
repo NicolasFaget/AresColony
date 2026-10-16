@@ -795,7 +795,7 @@ func _build_pebbles() -> void:
 		multimesh.set_instance_transform(i, transforms[i])
 	var pebbles := MultiMeshInstance3D.new()
 	pebbles.multimesh = multimesh
-	pebbles.material_override = ModelBuilder.rock_material(Color("#2e2c2a") if not _engine.planet().atmosphere else Color("#4e2516"))
+	pebbles.material_override = (ModelBuilder.rock_material(Color("#2e2c2a"), 0.0) if not _engine.planet().atmosphere else ModelBuilder.rock_material(Color("#4e2516")))
 	pebbles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(pebbles)
 
@@ -829,7 +829,7 @@ func _build_rocks() -> void:
 		multimesh.set_instance_transform(i, transforms[i])
 	var rocks := MultiMeshInstance3D.new()
 	rocks.multimesh = multimesh
-	rocks.material_override = ModelBuilder.rock_material(Color("#3a3734")) if not _engine.planet().atmosphere else ModelBuilder.rock_material()
+	rocks.material_override = ModelBuilder.rock_material(Color("#3a3734"), 0.0) if not _engine.planet().atmosphere else ModelBuilder.rock_material()
 	add_child(rocks)
 
 
