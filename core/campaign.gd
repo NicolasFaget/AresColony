@@ -246,6 +246,9 @@ func shipment_problem(from: int, to: int, cargo: Dictionary, colonists: int) -> 
 	var window := _window_problem(from, colonies[to].region)
 	if not window.is_empty():
 		return window
+	var arrival := _arrival_problem(to, cargo, colonists)
+	if not arrival.is_empty():
+		return arrival
 	var fuel := fuel_cost(from, colonies[to].region, cargo, colonists)
 	for r: String in cargo:
 		var needed: float = cargo[r] + (fuel if r == ColonyContent.METHANE else 0.0)
@@ -253,6 +256,33 @@ func shipment_problem(from: int, to: int, cargo: Dictionary, colonists: int) -> 
 			return Tr.t("Pas assez %s.") % Tr.t(ColonyContent.RESOURCE_PARTITIVE[r])
 	if origin.state.amount(ColonyContent.METHANE) < fuel - 0.001:
 		return Tr.t("Pas assez de méthane pour le vol (%s kg).") % NumberFormatter.format(fuel)
+	return ""
+
+
+## Ce que la colonie d'arrivée ne pourra pas accueillir (logement, stockage), en comptant
+## les cargaisons déjà en route vers elle. "" si tout tiendra.
+func _arrival_problem(to: int, cargo: Dictionary, colonists: int) -> String:
+	var target := engines[to]
+	var incoming := {}
+	var incoming_crew := 0
+	for shipment in shipments:
+		if shipment.kind == "cargo" and shipment.to == to:
+			incoming_crew += shipment.colonists.size()
+			for r: String in shipment.cargo:
+				incoming[r] = incoming.get(r, 0.0) + float(shipment.cargo[r])
+	if colonists > 0 and target.state.colonists.size() + incoming_crew + colonists > target.housing():
+		var free := maxi(0, target.housing() - target.state.colonists.size() - incoming_crew)
+		return Tr.t("Pas assez de logements à l'arrivée : %d place(s) libre(s).") % free
+	for r: String in cargo:
+		if cargo[r] <= 0.0 or r == ColonyContent.DATA:
+			continue
+		var room := target.capacity(r)
+		var name := Tr.t(ColonyContent.RESOURCE_PARTITIVE[r])
+		if room <= 0.0:
+			return Tr.t("Aucun stockage %s à l'arrivée : construisez-y d'abord un réservoir.") % name if r == ColonyContent.METHANE \
+					else Tr.t("Aucun stockage %s à l'arrivée.") % name
+		if cargo[r] + incoming.get(r, 0.0) > room + 0.001:
+			return Tr.t("Trop %s : la colonie d'arrivée n'en stocke que %s.") % [name, NumberFormatter.format(room)]
 	return ""
 
 
@@ -331,7 +361,7 @@ func _deliver() -> void:
 		if shipment.kind == "colony":
 			shipment.to = _found(shipment)
 		else:
-			engines[shipment.to].receive(shipment.cargo, shipment.colonists)
+			shipment.lost = engines[shipment.to].receive(shipment.cargo, shipment.colonists)
 			deliveries += 1
 		_update_info()
 		shipment_arrived.emit(shipment)
@@ -378,7 +408,9 @@ func _add_colony(state: ColonyState, existing: ColonyEngine = null) -> int:
 ## Ce que les objectifs d'une colonie doivent savoir de la campagne.
 func _update_info() -> void:
 	var planets := []
+	var era := 1
 	for state in colonies:
+		era = maxi(era, state.era)
 		var planet := planet_of_region(state.region)
 		if not planets.has(planet):
 			planets.append(planet)
@@ -386,6 +418,7 @@ func _update_info() -> void:
 		colony.campaign_colonies = colonies.size()
 		colony.campaign_deliveries = deliveries
 		colony.campaign_planets = planets
+		colony.campaign_era = era
 
 
 # ---------- Sauvegarde ----------
@@ -417,14 +450,46 @@ static func from_dict(data: Dictionary) -> Campaign:
 	var list: Variant = data.get("shipments")
 	if list is Array:
 		for item: Variant in list:
-			if item is Dictionary and item.get("arrive") != null:
-				var shipment: Dictionary = item
-				shipment.from = int(shipment.get("from", 0))
-				shipment.to = int(shipment.get("to", -1))
+			var shipment := _valid_shipment(item, campaign.colonies.size())
+			if not shipment.is_empty():
 				campaign.shipments.append(shipment)
 	campaign._update_info()
 	campaign.sync_knowledge()
 	return campaign
+
+
+## Cargaison relue d'une sauvegarde, nettoyée ; {} si elle est inutilisable.
+static func _valid_shipment(item: Variant, colony_count: int) -> Dictionary:
+	if not item is Dictionary:
+		return {}
+	var kind: String = str(item.get("kind", ""))
+	var arrive: Variant = item.get("arrive")
+	if not kind in ["cargo", "colony"] or not (arrive is float or arrive is int):
+		return {}
+	var shipment := {
+		"id": int(item.get("id", 0)), "kind": kind, "from": int(item.get("from", 0)), "to": int(item.get("to", -1)),
+		"region": str(item.get("region", "")), "arrive": float(arrive),
+		"depart": float(item.get("depart", arrive)) if (item.get("depart") is float or item.get("depart") is int) else float(arrive),
+		"cargo": {}, "colonists": [],
+	}
+	if shipment.from < 0 or shipment.from >= colony_count:
+		shipment.from = 0
+	if kind == "cargo" and (shipment.to < 0 or shipment.to >= colony_count):
+		return {}
+	if kind == "colony" and not ColonyContent.REGIONS.has(shipment.region):
+		return {}
+	var cargo: Variant = item.get("cargo")
+	if cargo is Dictionary:
+		for r: Variant in cargo:
+			if r in ColonyContent.RESOURCES and (cargo[r] is float or cargo[r] is int):
+				shipment.cargo[r] = maxf(0.0, float(cargo[r]))
+	var crew: Variant = item.get("colonists")
+	if crew is Array:
+		for colonist: Variant in crew:
+			if colonist is Dictionary and colonist.get("name") is String:
+				shipment.colonists.append({ "name": colonist.name, "role": str(colonist.get("role", "")),
+						"health": clampf(float(colonist.get("health", 1.0)) if (colonist.get("health") is float or colonist.get("health") is int) else 1.0, 0.0, 1.0) })
+	return shipment
 
 
 ## Résumé pour le menu : la colonie affichée, et le nombre de colonies.

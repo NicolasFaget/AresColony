@@ -74,8 +74,12 @@ const TUTORIAL := [
 		"text": "L'électrolyseur boit de l'eau : posez un extracteur sur une plaque de glace, avec des conduites." },
 	{ "id": "build_kiln", "planet": "ceres", "tab": TAB_BUILD, "target": "kiln",
 		"text": "Aucun ravitaillement ici : un four à régolithe fabriquera vos matériaux." },
+	{ "id": "research_brines", "planet": "ceres", "tab": TAB_RESEARCH, "target": "brines",
+		"text": "Recherchez « Traitement des saumures » pour exploiter l'eau salée de Cérès." },
 	{ "id": "build_brine", "planet": "ceres", "tab": TAB_BUILD, "target": "brine",
 		"text": "Posez une raffinerie de saumure sur la glace : de l'eau et des sels pour les matériaux." },
+	{ "id": "build_tank", "planet": "ceres", "tab": TAB_BUILD, "target": "tank",
+		"text": "Construisez un réservoir de méthane : sans lui, le méthane livré par Mars n'a nulle part où aller." },
 	{ "id": "build_garage", "planet": "ceres", "tab": TAB_BUILD, "target": "garage",
 		"text": "Construisez un garage à rovers. Les expéditions roulent au méthane : faites-en venir de Mars." },
 	# Titan.
@@ -85,6 +89,8 @@ const TUTORIAL := [
 		"text": "Le sol de Titan est de la glace d'eau : posez un extracteur n'importe où." },
 	{ "id": "build_kiln", "planet": "titan", "tab": TAB_BUILD, "target": "kiln",
 		"text": "Aucun ravitaillement ici : un four à régolithe fabriquera vos matériaux. Il est gourmand en énergie." },
+	{ "id": "research_cryogenics", "planet": "titan", "tab": TAB_RESEARCH, "target": "cryogenics",
+		"text": "Recherchez « Cryogénie du méthane » pour pomper les lacs de Titan." },
 	{ "id": "build_methane_pump", "planet": "titan", "tab": TAB_BUILD, "target": "methane_pump",
 		"text": "Posez une pompe à méthane au bord d'un lac (les zones sombres)." },
 	{ "id": "first_expedition", "planet": "titan", "tab": TAB_BUILD, "target": "garage",
@@ -173,16 +179,25 @@ static func _fix(engine: ColonyEngine, resource: String) -> Dictionary:
 	var energy_short: bool = engine.average_flows()[ColonyContent.ENERGY] < 0.0
 	match resource:
 		ColonyContent.OXYGEN:
+			if engine.planet().forbidden.has("moxie"):
+				# Pas de CO₂ : l'oxygène vient de l'électrolyse de l'eau.
+				if not engine.state.research_done.has("electrolysis"):
+					return _step(Tr.t("Recherchez « Électrolyse de l'eau » : ici, l'oxygène vient de la glace."), TAB_RESEARCH, "electrolysis")
+				if energy_short:
+					return _energy_step(engine, Tr.t("Vos électrolyseurs manquent d'énergie."))
+				return _step(Tr.t("Construisez un électrolyseur d'eau de plus (et de quoi l'abreuver)."), TAB_BUILD, "electrolyser")
 			if not engine.state.research_done.has("moxie"):
 				return _step(Tr.t("Lancez la recherche « Électrolyse du CO₂ »."), TAB_RESEARCH, "moxie")
 			if energy_short:
-				return _step(Tr.t("Vos électrolyseurs manquent d'énergie : ajoutez des panneaux solaires."), TAB_BUILD, "solar")
+				return _energy_step(engine, Tr.t("Vos électrolyseurs manquent d'énergie."))
 			return _step(Tr.t("Construisez un électrolyseur de CO₂ de plus."), TAB_BUILD, "moxie")
 		ColonyContent.WATER:
 			if not engine.state.research_done.has("ice"):
 				return _step(Tr.t("Lancez la recherche « Glace souterraine »."), TAB_RESEARCH, "ice")
 			if energy_short:
-				return _step(Tr.t("Les extracteurs manquent d'énergie : ajoutez des panneaux solaires."), TAB_BUILD, "solar")
+				return _energy_step(engine, Tr.t("Les extracteurs manquent d'énergie."))
+			if engine.planet().ice_everywhere:
+				return _step(Tr.t("Posez un extracteur de plus : ici, le sol est de la glace."), TAB_BUILD, "extractor")
 			return _step(Tr.t("Posez un extracteur sur une plaque de glace, relié par des conduites."), TAB_BUILD, "extractor")
 		_:
 			if not engine.state.research_done.has("greenhouse"):
@@ -191,6 +206,15 @@ static func _fix(engine: ColonyEngine, resource: String) -> Dictionary:
 			if not engine.state.research_done.has("perchlorate"):
 				return _step(Tr.t("Construisez une serre, et recherchez le lavage des perchlorates (récoltes ×2)."), TAB_BUILD, "greenhouse")
 			return _step(Tr.t("Construisez une serre de plus."), TAB_BUILD, "greenhouse")
+
+
+## Manque d'énergie : des panneaux si le soleil suffit, sinon un réacteur (Titan, tempête...).
+static func _energy_step(engine: ColonyEngine, why: String) -> Dictionary:
+	if engine.effect("solar") >= 0.5:
+		return _step(why + " " + Tr.t("Ajoutez des panneaux solaires."), TAB_BUILD, "solar")
+	if engine.state.research_done.has("fission"):
+		return _step(why + " " + Tr.t("Le soleil est trop faible ici : construisez un réacteur à fission."), TAB_BUILD, "reactor")
+	return _step(why + " " + Tr.t("Le soleil est trop faible ici : recherchez la fission nucléaire."), TAB_RESEARCH, "fission")
 
 
 static func _step(text: String, tab: int, target: String) -> Dictionary:

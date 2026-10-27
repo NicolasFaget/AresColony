@@ -26,6 +26,8 @@ func _init() -> void:
 	_test_campaign()
 	_test_ceres()
 	_test_titan()
+	_test_network_outposts()
+	_test_campaign_save()
 	_test_regions()
 	_test_night_and_batteries()
 	_test_colonists()
@@ -227,6 +229,164 @@ func _test_ceres() -> void:
 	_check(sol < ceres.state.sol, "Cérès avance")
 
 
+# ---------- Avant-postes fondés sans les technologies locales ----------
+
+## Campagne prête à fonder : Mars en ère 4 avec astroport, tout recherché sauf `missing`.
+func _network_campaign(missing: Array) -> Campaign:
+	var campaign := Campaign.from_state(ColonyState.new())
+	var mars := campaign.engine()
+	mars.state.next_storm = 1e9
+	mars.state.next_resupply = 1e9
+	mars.state.next_dust_devil = 1e9
+	mars.dust_rate = 0.0
+	mars.breakdown_rate = 0.0
+	for r: Defs.Research in mars.research_defs.values():
+		if not missing.has(r.id):
+			mars.state.research_done.append(r.id)
+	mars.state.era = 4
+	var lander := mars.map.lander_cell
+	for x in range(lander.x + 2, lander.x + 9):
+		for y in range(lander.y - 1, lander.y + 3):
+			mars.map.set_tile(Vector2i(x, y), ColonyMap.Tile.PLAIN)
+	mars.state.resources[R.MATERIALS] = 400.0
+	mars.place("spaceport", lander + Vector2i(2, 0))
+	for k in 8:
+		mars.state.colonists.append({ "name": "Recrue %d" % k, "role": "pilote", "health": 1.0 })
+	return campaign
+
+
+func _found_on(campaign: Campaign, region: String) -> ColonyEngine:
+	var mars := campaign.engines[0]
+	var route: Dictionary = Campaign.route("mars", ColonyContent.REGIONS[region].planet)
+	campaign.time = route.phase + route.synodic
+	mars.state.resources[R.MATERIALS] = 400.0
+	mars.state.resources[R.METHANE] = 600.0
+	var problem := campaign.founding_problem(0, region)
+	_check(campaign.found_colony(0, region), "départ vers %s %s" % [region, problem])
+	campaign.advance(route.transit + 0.5)
+	return campaign.engines[campaign.engines.size() - 1]
+
+
+func _test_network_outposts() -> void:
+	# Cérès fondée sans « Traitement des saumures » : la recherche est possible sur place.
+	var campaign := _network_campaign(["brines", "cryogenics"])
+	var ceres := _found_on(campaign, "ceres")
+	_check(ceres.planet_id() == "ceres" and ceres.state.era == 1, "avant-poste de Cérès en ère 1")
+	_check(ceres.research_era() == 4, "l'ère du réseau ouvre les recherches de l'avant-poste")
+	_check(ceres.research_state("brines") == "available", "saumures recherchables depuis Cérès")
+	var steps: Array[String] = []
+	for i in ColonyAdvisor.era_steps(1, "ceres"):
+		steps.append(ColonyAdvisor.TUTORIAL[i].id)
+	_check(steps.find("research_brines") >= 0 and steps.find("research_brines") < steps.find("build_brine"),
+			"guide de Cérès : rechercher avant de construire")
+	ceres.state.resources[R.DATA] = 500.0
+	_check(ceres.start_research("brines"), "recherche lancée sur Cérès")
+	ceres.advance(4.0)
+	campaign.sync_knowledge()
+	_check(campaign.engines[0].state.research_done.has("brines"), "la recherche de Cérès profite à Mars")
+
+	# Conseiller : jamais d'électrolyseur de CO₂ sans air, jamais de panneaux sous la brume de Titan.
+	var fix := ColonyAdvisor._fix(ceres, R.OXYGEN)
+	_check(fix.target != "moxie", "conseil d'oxygène adapté à Cérès")
+	var titan_campaign := _network_campaign(["cryogenics"])
+	var titan := _found_on(titan_campaign, "titan")
+	_check(titan.research_state("cryogenics") == "available", "cryogénie recherchable depuis Titan")
+	_check(ColonyAdvisor._energy_step(titan, "").target != "solar", "pas de panneaux conseillés sur Titan")
+	_check(ColonyAdvisor._fix(titan, R.OXYGEN).target != "moxie", "conseil d'oxygène adapté à Titan")
+
+	# Cargaison : la destination doit pouvoir loger et stocker.
+	var mars := campaign.engines[0]
+	var route: Dictionary = Campaign.route("mars", "ceres")
+	campaign.time = route.phase + route.synodic * 3.0
+	mars.state.resources[R.METHANE] = 600.0
+	for k in 20:
+		mars.state.colonists.append({ "name": "Renfort %d" % k, "role": "pilote", "health": 1.0 })
+	var free := ceres.housing() - ceres.state.colonists.size()
+	var crowd := campaign.shipment_problem(0, 1, {}, free + 1)
+	_check(crowd.begins_with("Pas assez de logements"), "cargaison refusée sans logement à l'arrivée : " + crowd)
+	if ceres.capacity(R.METHANE) <= 0.0:
+		_check(campaign.shipment_problem(0, 1, { R.METHANE: 20.0 }, 0).begins_with("Aucun stockage"),
+				"méthane refusé sans réservoir à l'arrivée")
+	var too_much := ceres.capacity(R.WATER) + 10.0
+	mars.state.resources[R.WATER] = mars.capacity(R.WATER)
+	if too_much < Campaign.PAYLOAD_UNITS and mars.capacity(R.WATER) > too_much + 10.0:
+		_check(campaign.shipment_problem(0, 1, { R.WATER: too_much }, 0).begins_with("Trop"), "cargaison trop grosse pour l'arrivée")
+	_check(campaign.shipment_problem(0, 1, { R.MATERIALS: 20.0 }, 0).is_empty(), "petite cargaison acceptée")
+	var lost := ceres.receive({ R.WATER: ceres.capacity(R.WATER) * 3.0 }, [])
+	_check(lost.get(R.WATER, 0.0) > 0.0, "perte signalée quand le stockage déborde")
+
+	# Expédition vers Ahuna Mons : le rover revient même en arrière-plan.
+	campaign.switch_to(0)
+	ceres.dust_rate = 0.0
+	ceres.breakdown_rate = 0.0
+	ceres.state.resources[R.MATERIALS] = 400.0
+	var spot := ColonyBot.connected_spot(ceres, "garage")
+	_check(spot.x >= 0 and ceres.place("garage", spot), "garage posé sur Cérès")
+	_check(ceres.place("tank", ColonyBot.connected_spot(ceres, "tank")), "réservoir de méthane posé sur Cérès")
+	var guard := 0
+	while not ceres.state.sites_done.has("ahuna") and guard < 6:
+		ceres.state.resources[R.METHANE] = ceres.capacity(R.METHANE)
+		ceres.state.resources[R.OXYGEN] = ceres.capacity(R.OXYGEN)
+		ceres.state.resources[R.WATER] = ceres.capacity(R.WATER)
+		ceres.state.resources[R.FOOD] = ceres.capacity(R.FOOD)
+		ceres.start_expedition()
+		ceres.run_autopilot(ColonyEngine.EXPEDITION_SOLS + 0.5)
+		guard += 1
+	_check(ceres.state.expeditions >= 1, "expédition rentrée en arrière-plan %s %s" % [ceres.expedition_problem(), ceres.state.expedition])
+	_check(ceres.state.sites_done.has("ahuna") and "ceres_ahuna" in ceres.state.objectives_done, "objectif Ahuna Mons")
+	ceres.state.exported_materials = 200.0
+	ceres._check_objectives()
+	_check("ceres_export" in ceres.state.objectives_done, "objectif d'export de Cérès")
+	titan.state.sites_done.append("selk")
+	titan.state.exported_methane = 200.0
+	titan._check_objectives()
+	_check("titan_selk" in titan.state.objectives_done and "titan_fuel" in titan.state.objectives_done, "objectifs Selk et carburant de Titan")
+
+
+# ---------- Sauvegarde de campagne ----------
+
+func _test_campaign_save() -> void:
+	var storage := SaveStorage.new()
+	var service := SaveService.new(storage)
+	storage.write("{ ceci n'est pas du JSON")
+	service.load_campaign()
+	_check(service.last_result == SaveService.LoadResult.CORRUPTED, "campagne illisible signalée")
+	var campaign := Campaign.from_state(ColonyState.new())
+	service.save_campaign(campaign, 1_700_000_000)
+	service.save_campaign(campaign, 1_700_000_100)
+	storage.write("{ abîmé")
+	service.load_campaign()
+	_check(service.last_result == SaveService.LoadResult.RESTORED_FROM_BACKUP, "campagne relue depuis la copie de secours")
+	service = SaveService.new(SaveStorage.new())
+	service.load_campaign()
+	_check(service.last_result == SaveService.LoadResult.NEW_GAME, "aucune sauvegarde : nouvelle partie")
+
+	# Données d'une autre version : module inconnu, région inconnue, cargaisons abîmées.
+	var data := campaign.to_dict()
+	data.colonies[0].buildings.append({ "id": "moteur_warp", "x": 3, "y": 3, "level": 1 })
+	data.colonies[0].research_done.append("teleportation")
+	data.shipments = [3, { "kind": "cargo", "to": 7, "arrive": 5.0 }, { "kind": "colony", "region": "atlantide", "arrive": 2.0 },
+			{ "kind": "cargo", "from": 0, "to": 0, "arrive": 9.0, "cargo": { "water": 10, "or": 5, "food": "beaucoup" },
+			"colonists": [{ "name": "Zoé", "health": 4 }, 12] }]
+	var loaded := Campaign.from_dict(JSON.parse_string(JSON.stringify(data)))
+	_check(loaded.engines[0].state.buildings.size() == campaign.engines[0].state.buildings.size(), "module inconnu ignoré")
+	_check(not loaded.engines[0].state.research_done.has("teleportation"), "recherche inconnue ignorée")
+	_check(loaded.shipments.size() == 1, "cargaisons invalides écartées")
+	var kept: Dictionary = loaded.shipments[0]
+	_check(kept.cargo.keys() == ["water"] and kept.colonists.size() == 1 and kept.colonists[0].health == 1.0, "cargaison nettoyée")
+	loaded.advance(10.0)
+	_check(loaded.shipments.is_empty(), "cargaison relue livrée")
+
+	# Un module en panne ne compte pas dans les débits (bandeau, fiches, objectif Autonomie).
+	var engine := _rich_engine()
+	var spot := ColonyBot.connected_spot(engine, "solar")
+	engine.place("solar", spot)
+	var index := engine.state.buildings.size() - 1
+	var before: float = engine.average_flows()[R.ENERGY]
+	engine.state.buildings[index].broken = true
+	_check(engine.average_flows()[R.ENERGY] < before - 1.0 and engine.building_flows(index).is_empty(), "module en panne : aucun débit")
+
+
 # ---------- Titan ----------
 
 func _test_titan() -> void:
@@ -306,7 +466,7 @@ func _test_guides() -> void:
 	outpost.setup_outpost([{ "name": "A", "role": "x", "health": 1.0 }], { R.MATERIALS: 250.0 })
 	var first := ColonyAdvisor.tutorial_step(outpost)
 	_check(first >= 0 and ColonyAdvisor.TUTORIAL[first].get("planet", "mars") == "ceres", "guide de Cérès dans l'avant-poste")
-	_check(ColonyAdvisor.era_steps(1, "titan").size() == 5, "guide de Titan")
+	_check(ColonyAdvisor.era_steps(1, "titan").size() == 6, "guide de Titan")
 
 
 # ---------- Ère 3 ----------

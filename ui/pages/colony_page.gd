@@ -71,7 +71,7 @@ func _ready() -> void:
 func refresh() -> void:
 	var engine := GameManager.engine
 	_era.text = Tr.t(engine.era_title())
-	_trips.visible = engine.state.era >= 2
+	_trips.visible = engine.state.era >= 2 or engine.planet_id() != "mars"
 	if engine.state.expedition.is_empty():
 		var found := engine.state.sites_done.size()
 		_trips.text = (Tr.t("Expéditions en rover · %d sites découverts") % found) if found > 1 \

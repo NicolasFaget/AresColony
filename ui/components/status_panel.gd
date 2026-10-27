@@ -75,7 +75,8 @@ func refresh() -> void:
 
 	var flows := engine.average_flows()
 	var days := ColonyAdvisor.forecast(engine)
-	_chips[ColonyContent.METHANE].visible = engine.state.era >= 2
+	_chips[ColonyContent.METHANE].visible = engine.state.era >= 2 or engine.planet_id() != "mars" \
+			or engine.state.amount(ColonyContent.METHANE) > 0.0 or engine.capacity(ColonyContent.METHANE) > 0.0
 	for r in ColonyContent.RESOURCES:
 		_values[r].text = NumberFormatter.format(engine.state.amount(r))
 		var flow: float = flows[r]

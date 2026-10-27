@@ -59,7 +59,7 @@ func refresh() -> void:
 			_status.text = Tr.t("En cours… (%d %%)") % roundi(engine.state.research_progress * 100.0)
 			_status.add_theme_color_override("font_color", Palette.FAME)
 			_bar.value = engine.state.research_progress * 100.0
-		"locked" when research.era > engine.state.era:
+		"locked" when research.era > engine.research_era():
 			_status.text = Tr.t("Ère %d : accomplissez d'abord l'ère en cours.") % research.era
 			_status.add_theme_color_override("font_color", Palette.TEXT_DIM)
 		"locked":

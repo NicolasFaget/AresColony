@@ -47,15 +47,20 @@ func load_state() -> ColonyState:
 
 ## Charge une campagne (plusieurs colonies). Une ancienne sauvegarde à une colonie est convertie.
 func load_campaign() -> Campaign:
-	for text in [_storage.read(), _storage.read_backup()]:
-		var data: Variant = _parse_json(text)
-		if data is Dictionary:
-			last_result = LoadResult.LOADED if text == _storage.read() else LoadResult.RESTORED_FROM_BACKUP
-			return Campaign.from_dict(data)
-		if text == _storage.read() and not text.strip_edges().is_empty():
-			push_warning("Sauvegarde illisible, mise de côté.")
-			_storage.quarantine()
-	last_result = LoadResult.NEW_GAME
+	var primary := _storage.read()
+	var data: Variant = _parse_json(primary)
+	if data is Dictionary:
+		last_result = LoadResult.LOADED
+		return Campaign.from_dict(data)
+	var primary_unreadable := not primary.strip_edges().is_empty()
+	if primary_unreadable:
+		push_warning("Sauvegarde illisible, mise de côté.")
+		_storage.quarantine()
+	data = _parse_json(_storage.read_backup())
+	if data is Dictionary:
+		last_result = LoadResult.RESTORED_FROM_BACKUP
+		return Campaign.from_dict(data)
+	last_result = LoadResult.CORRUPTED if primary_unreadable else LoadResult.NEW_GAME
 	return Campaign.from_state(ColonyState.new())
 
 

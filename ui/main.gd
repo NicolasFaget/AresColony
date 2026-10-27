@@ -549,14 +549,27 @@ func _show_building(index: int) -> void:
 	var def := _engine.def_of(index)
 	var status := _engine.building_status(index)
 	var lines: Array[String] = []
-	for r: String in def.outputs:
-		lines.append(Tr.t("+%s %s %s/sol") % [NumberFormatter.format(def.outputs[r] * _engine.rate_factor(index, r, true)), Tr.t(ColonyContent.RESOURCE_UNITS[r]), Tr.t(ColonyContent.RESOURCE_NAMES[r]).to_lower()])
-	for r: String in def.inputs:
-		lines.append(Tr.t("−%s %s %s/sol") % [NumberFormatter.format(def.inputs[r] * _engine.rate_factor(index, r, false)), Tr.t(ColonyContent.RESOURCE_UNITS[r]), Tr.t(ColonyContent.RESOURCE_NAMES[r]).to_lower()])
+	# Débit moyen réel (soleil, poussière, recherches, synergies, améliorations), comme le bandeau.
+	# À l'arrêt (panne, débranché) : ce qu'il ferait en marche.
+	var flows := _engine.building_flows(index)
+	var running := not flows.is_empty()
+	if not running:
+		for r: String in def.outputs:
+			flows[r] = def.outputs[r] * _engine.rate_factor(index, r, true)
+		for r: String in def.inputs:
+			flows[r] = flows.get(r, 0.0) - def.inputs[r] * _engine.rate_factor(index, r, false)
+	for r: String in ColonyContent.RESOURCES:
+		if flows.has(r) and absf(flows[r]) > 0.005:
+			lines.append(Tr.t("%s%s %s %s/sol") % ["+" if flows[r] > 0.0 else "−", NumberFormatter.format(absf(flows[r])),
+					Tr.t(ColonyContent.RESOURCE_UNITS[r]), Tr.t(ColonyContent.RESOURCE_NAMES[r]).to_lower()])
+	if not running and not flows.is_empty():
+		lines.append(Tr.t("(en marche ; à l'arrêt pour l'instant)"))
+	elif def.solar:
+		lines.append(Tr.t("(moyenne sur un sol, nuits comprises)"))
 	for r: String in def.storage:
-		lines.append(Tr.t("Stockage : +%s %s %s") % [NumberFormatter.format(def.storage[r]), Tr.t(ColonyContent.RESOURCE_UNITS[r]), Tr.t(ColonyContent.RESOURCE_NAMES[r]).to_lower()])
-	if def.housing > 0:
-		lines.append(Tr.t("Loge %d colons") % def.housing)
+		lines.append(Tr.t("Stockage : +%s %s %s") % [NumberFormatter.format(_engine.storage_of(index, r)), Tr.t(ColonyContent.RESOURCE_UNITS[r]), Tr.t(ColonyContent.RESOURCE_NAMES[r]).to_lower()])
+	if _engine.housing_of(index) > 0:
+		lines.append(Tr.t("Loge %d colons") % _engine.housing_of(index))
 	if def.solar:
 		lines.append(Tr.t("Poussière : %d %% (−%d %% d'énergie)") % [roundi(_engine.dust_of(index) * 100.0),
 				roundi(ColonyEngine.DUST_LOSS * _engine.dust_of(index) * 100.0)])
@@ -637,6 +650,9 @@ func _on_shipment_arrived(shipment: Dictionary) -> void:
 		_world.land_capsule()
 		AudioManager.play("landing")
 	_news.post(Tr.t("Cargaison livrée : %s → %s.") % [campaign.colony_name(shipment.from), campaign.colony_name(shipment.to)])
+	var lost: Dictionary = shipment.get("lost", {})
+	if not lost.is_empty():
+		_news.post(Tr.t("Faute de stockage, une partie de la cargaison est perdue : %s.") % ColonyPage._reward_text(lost))
 
 
 func _on_colony_founded(index: int) -> void:
@@ -1273,16 +1289,15 @@ func _show_resource(resource: String) -> void:
 	var flows := _engine.average_flows()
 	var lines: Array[String] = []
 	var unit: String = ColonyContent.RESOURCE_UNITS[resource]
+	# Mêmes débits que le bandeau (ColonyEngine.building_flows), regroupés par type de module.
 	var by_type := {}
 	for i in _engine.state.buildings.size():
-		if not _engine.is_linked(i):
-			continue
-		var def := _engine.def_of(i)
-		var amount: float = def.outputs.get(resource, 0.0) - def.inputs.get(resource, 0.0)
-		if amount != 0.0:
-			by_type[def.name] = by_type.get(def.name, 0.0) + amount
+		var amount: float = _engine.building_flows(i).get(resource, 0.0)
+		if absf(amount) > 0.005:
+			var name := _engine.def_of(i).name
+			by_type[name] = by_type.get(name, 0.0) + amount
 	for name: String in by_type:
-		lines.append(Tr.t("%s : %s%s %s/sol") % [name, "+" if by_type[name] > 0.0 else "", NumberFormatter.format(by_type[name]), unit])
+		lines.append(Tr.t("%s : %s%s %s/sol") % [Tr.t(name), "+" if by_type[name] > 0.0 else "−", NumberFormatter.format(absf(by_type[name])), unit])
 	var needs := _engine.colonist_needs()
 	if needs.has(resource):
 		lines.append(Tr.t("Colons (%d) : −%s %s/sol") % [_engine.state.colonists.size(),

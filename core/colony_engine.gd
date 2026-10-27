@@ -108,6 +108,8 @@ var dust_rate := DUST_RATE
 var campaign_colonies := 1
 var campaign_deliveries := 0
 var campaign_planets: Array = ["mars"]
+## Ère la plus avancée du réseau de colonies : elle ouvre les recherches dans toutes les colonies.
+var campaign_era := 1
 # Caches (le jeu avance d'un tout petit pas à chaque image : chaque microseconde compte).
 ## Par module : [niveau, multiplicateurs d'entrée, multiplicateurs de sortie] (synergies et améliorations).
 var _factor_cache: Array = []
@@ -142,6 +144,7 @@ func _init(p_state: ColonyState) -> void:
 	for objective in ColonyContent.objectives():
 		if objective.planet == planet_id():
 			objectives.append(objective)
+	_sanitize()
 	map = ColonyMap.new(state.map_seed, state.region)
 	_rng.seed = state.map_seed
 	_rng.state = state.event_seed
@@ -150,6 +153,27 @@ func _init(p_state: ColonyState) -> void:
 		if not region().card.is_empty():
 			state.cards_unlocked.append(region().card)
 	_rebuild()
+
+
+## Une sauvegarde peut venir d'une autre version : on écarte ce que cette version ne connaît pas.
+func _sanitize() -> void:
+	if not ColonyContent.REGIONS.has(state.region):
+		state.region = "jezero"
+	var kept: Array[Dictionary] = []
+	for building in state.buildings:
+		if building_defs.has(building.get("id", "")):
+			kept.append(building)
+		else:
+			push_warning("Module inconnu ignoré : %s" % building.get("id", "?"))
+	state.buildings = kept
+	var known: Array[String] = []
+	for id in state.research_done:
+		if research_defs.has(id):
+			known.append(id)
+	state.research_done = known
+	if not state.research_active.is_empty() and not research_defs.has(state.research_active):
+		state.research_active = ""
+		state.research_progress = 0.0
 
 
 func _new_game() -> void:
@@ -192,10 +216,7 @@ func capacity(resource: String) -> float:
 	var total := 0.0
 	for i in state.buildings.size():
 		if _connected[i]:
-			var amount: float = def_of(i).storage.get(resource, 0.0)
-			for upgrade: Dictionary in _upgrades_of(i):
-				amount *= upgrade.get("storage", {}).get(resource, 1.0)
-			total += amount
+			total += storage_of(i, resource)
 	_capacity_cache[resource] = total
 	return total
 
@@ -204,9 +225,23 @@ func housing() -> int:
 	var total := 0
 	for i in state.buildings.size():
 		if _connected[i]:
-			total += def_of(i).housing
-			for upgrade: Dictionary in _upgrades_of(i):
-				total += upgrade.get("housing", 0)
+			total += housing_of(i)
+	return total
+
+
+## Stockage d'un module, améliorations comprises.
+func storage_of(index: int, resource: String) -> float:
+	var amount: float = def_of(index).storage.get(resource, 0.0)
+	for upgrade: Dictionary in _upgrades_of(index):
+		amount *= upgrade.get("storage", {}).get(resource, 1.0)
+	return amount
+
+
+## Logement d'un module, améliorations comprises.
+func housing_of(index: int) -> int:
+	var total := def_of(index).housing
+	for upgrade: Dictionary in _upgrades_of(index):
+		total += upgrade.get("housing", 0)
 	return total
 
 
@@ -270,19 +305,32 @@ func buildable_defs() -> Array[Defs.Building]:
 
 ## Bilan moyen par sol de chaque ressource, si tous les modules raccordés tournent à plein
 ## (ensoleillement moyen, tempête comprise). Sert à l'affichage et à l'objectif « Autonomie ».
-func average_flows() -> Dictionary:
+## Débit moyen d'un module (par sol, sur un jour entier) : soleil moyen, tempête, poussière,
+## synergies, améliorations, recherches. Rien s'il est débranché ou en panne.
+## `real` : pondéré par son rendement récent (entrées qui manquent).
+func building_flows(index: int, real := false) -> Dictionary:
+	var flows := {}
+	if not _connected[index] or is_broken(index):
+		return flows
+	var def := def_of(index)
+	var sun := _storm_factor() * effect("solar")
+	var e := _efficiency_avg[index] if real and not def.inputs.is_empty() else 1.0
+	for r: String in def.inputs:
+		flows[r] = flows.get(r, 0.0) - _input_rate(index, r) * e
+	for r: String in def.outputs:
+		flows[r] = flows.get(r, 0.0) + _output_rate(index, r, sun) * e
+	return flows
+
+
+## Bilan moyen par sol. `real` : tient compte du rendement réel des modules (entrées qui manquent).
+func average_flows(real := false) -> Dictionary:
 	var flows := {}
 	for r in ColonyContent.RESOURCES:
 		flows[r] = 0.0
-	var sun := _storm_factor() * effect("solar")
 	for i in state.buildings.size():
-		if not _connected[i]:
-			continue
-		var def := def_of(i)
-		for r: String in def.inputs:
-			flows[r] -= _input_rate(i, r)
-		for r: String in def.outputs:
-			flows[r] += _output_rate(i, r, sun)
+		var own := building_flows(i, real)
+		for r: String in own:
+			flows[r] += own[r]
 	var count := state.colonists.size()
 	var needs := colonist_needs()
 	for r: String in needs:
@@ -477,13 +525,18 @@ func _neighbors_of(cell: Vector2i, size: Vector2i) -> Array[int]:
 	return result
 
 
+## Ère qui borne les recherches : celle de la colonie, ou celle du réseau si elle est plus avancée.
+func research_era() -> int:
+	return maxi(state.era, campaign_era)
+
+
 func research_state(research_id: String) -> String:
 	if state.research_done.has(research_id):
 		return "done"
 	if state.research_active == research_id:
 		return "active"
 	var r: Defs.Research = research_defs[research_id]
-	if r.era > state.era:
+	if r.era > research_era():
 		return "locked"
 	for req: String in r.requires:
 		if not state.research_done.has(req):
@@ -705,6 +758,8 @@ func _step(ds: float) -> void:
 	state.sol += ds
 	if not _autopilot:
 		_events(ds)
+	else:
+		_finish_expedition()
 	_update_autonomy(ds)
 	_check_shortages(demand)
 	_check_objectives()
@@ -1116,7 +1171,7 @@ func _check_shortages(demand: Dictionary) -> void:
 func _update_autonomy(ds: float) -> void:
 	_autonomy_age += ds
 	if _autonomy_age >= STEP - 1e-9 or _autonomy_flows.is_empty():
-		_autonomy_flows = average_flows()
+		_autonomy_flows = average_flows(true)
 		_autonomy_age = 0.0
 	var flows := _autonomy_flows
 	var ok: bool = flows[ColonyContent.ENERGY] >= 0.0 and state.colonists.size() >= AUTONOMY_CREW
@@ -1330,13 +1385,20 @@ func release_colonists(count: int) -> Array:
 
 
 ## Arrivée d'une cargaison : ressources (dans la limite des réserves) et colons.
-func receive(cargo: Dictionary, crew: Array) -> void:
+## Décharge une cargaison. Retourne ce qui a été perdu faute de stockage ({ ressource: quantité }).
+func receive(cargo: Dictionary, crew: Array) -> Dictionary:
+	var lost := {}
 	for r: String in cargo:
+		var before := state.amount(r)
 		_add(r, cargo[r])
+		var waste: float = cargo[r] - (state.amount(r) - before)
+		if waste > 0.5:
+			lost[r] = waste
 	for colonist: Dictionary in crew:
 		state.colonists.append(colonist)
 		colonist_arrived.emit(colonist.name)
 	changed.emit()
+	return lost
 
 
 ## Nouvelle colonie fondée par un vaisseau : son équipage, sa cargaison, et pas de ravitaillements
@@ -1391,10 +1453,7 @@ func apply_offline_seconds(elapsed: float) -> Dictionary:
 		var ds := minf(STEP, sols - simulated)
 		_step(ds)
 		simulated += ds
-		var needs := colonist_needs()
-		for r in ColonyContent.VITAL:
-			if state.amount(r) <= needs[r] * state.colonists.size() * 0.25:
-				report.standby = r
+		report.standby = _vital_low()
 		if not report.standby.is_empty():
 			break
 	_autopilot = false
