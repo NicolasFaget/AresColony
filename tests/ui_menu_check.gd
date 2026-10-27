@@ -1,5 +1,5 @@
 ## Vérification des parcours du menu et des fenêtres (suppression d'une sauvegarde, retour au menu).
-## Attention : utilise les emplacements « save » réels du PC (pas ceux du téléphone).
+## Sauvegardes dans user://ui_check (jamais celles du joueur), interface en français.
 ## Usage : godot --headless --path . -s tests/ui_menu_check.gd
 extends SceneTree
 
@@ -16,6 +16,9 @@ func _press(node: Node, text: String) -> bool:
 func _run() -> void:
 	var gm: Node = root.get_node("GameManager")
 	gm.splash_shown = true
+	# Les boutons sont cherchés par leur texte français, quelle que soit la langue de la machine.
+	gm.locale = "fr"
+	gm._apply_locale()
 	# Dossier à part : les vraies sauvegardes du joueur ne sont jamais touchées.
 	gm.save_dir = "user://ui_check"
 	DirAccess.make_dir_recursive_absolute(gm.save_dir)
@@ -36,7 +39,7 @@ func _run() -> void:
 	print("confirmation : ", _press(menu._modal_layer.get_child(-1), "Supprimer"))
 	for i in 30:
 		await process_frame
-	print("après : continuer visible = ", menu._continue.visible, " ; plus récente = '", gm.most_recent_slot(), "' ; fichiers ", DirAccess.get_files_at("user://"))
+	print("après : continuer visible = ", menu._continue.visible, " ; plus récente = '", gm.most_recent_slot(), "' ; fichiers ", DirAccess.get_files_at(gm.save_dir))
 	for i in 60:
 		await process_frame
 	for m in menu._modal_layer.get_children():
