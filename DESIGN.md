@@ -128,8 +128,12 @@ Mesures d'octobre 2026 (Jezero, `_simulate_campaign`) :
 | Abri, Nucléaire, Jardin (ère 3) | 145 à 151 |
 | Enracinés (fin de l'ère 3) | 151,1 |
 
-Avant-postes seuls (60 sols, `_simulate_outposts`) : Cérès respire au sol 1,5 et raffine la saumure au
-sol 26 ; Titan respire au sol 0,8 et pompe le méthane au sol 52 ; aucune évacuation.
+Avant-postes seuls, sans aucune cargaison de Mars (80 sols, `_simulate_outposts`) : Cérès respire au
+sol 1,5 et raffine la saumure au sol 31,5 ; Titan respire au sol 0,8 et pompe le méthane au sol 66 ;
+aucune évacuation.
+
+Réacteur à fission : 60 kWh/sol jour et nuit, mais 1 matériau/sol d'entretien (moteurs Stirling,
+radiateurs). Sans matériaux, il ralentit : l'énergie gratuite ne règle plus tout en fin de partie.
 
 Sans évacuation pour un joueur raisonnable. Un joueur qui ne fait rien perd son premier colon au
 sol 9,4 : le danger est réel mais laisse le temps d'apprendre. Les tests vérifient ces

@@ -1146,7 +1146,7 @@ func _simulate_realtime() -> void:
 ## Avant-postes de Cérès et de Titan joués par le joueur simulé, seuls, pendant 60 sols :
 ## ils doivent survivre et atteindre leurs premiers objectifs sans aide du réseau.
 func _simulate_outposts() -> void:
-	print("\n--- Avant-postes (60 sols, sans aide) ---")
+	print("\n--- Avant-postes (80 sols, sans aide) ---")
 	for region in ["ceres", "titan"]:
 		var mars := _engine()
 		for r: Defs.Research in mars.research_defs.values():
@@ -1166,7 +1166,7 @@ func _simulate_outposts() -> void:
 		var evacuations := [0]
 		outpost.colonist_evacuated.connect(func(_n: String, _c: String) -> void: evacuations[0] += 1)
 		var done := {}
-		while outpost.state.sol < 210.0:
+		while outpost.state.sol < 230.0:
 			ColonyBot.research(outpost)
 			ColonyBot.maintain(outpost)
 			ColonyBot.build(outpost)
