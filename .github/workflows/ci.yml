@@ -33,7 +33,13 @@ jobs:
 
       - name: Contrôle du menu (sauvegardes)
         run: |
-          $GODOT --headless --path . -s tests/ui_menu_check.gd 2>&1 | tee ui.log
+          set +e
+          $GODOT --headless --path . -s tests/ui_menu_check.gd > ui.log 2>&1
+          echo "::notice::code de sortie $?"
+          set -e
+          cat ui.log
+          # Résumé visible dans les annotations de la CI.
+          grep -E "SCRIPT ERROR|ERROR|visible|fermée|scène" ui.log | head -20 | while IFS= read -r line; do echo "::notice::$line"; done
           ! grep -q "SCRIPT ERROR" ui.log
           grep -q "continuer visible = false" ui.log
           grep -q "partie fermée = true" ui.log
