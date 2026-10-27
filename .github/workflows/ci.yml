@@ -39,7 +39,7 @@ jobs:
           set -e
           cat ui.log
           # Résumé visible dans les annotations de la CI.
-          grep -E "SCRIPT ERROR|ERROR|visible|fermée|scène" ui.log | head -20 | while IFS= read -r line; do echo "::notice::$line"; done
+          grep -vE "^ +at:|^Godot Engine|^$" ui.log | head -30 | while IFS= read -r line; do echo "::notice::$line"; done
           ! grep -q "SCRIPT ERROR" ui.log
           grep -q "continuer visible = false" ui.log
           grep -q "partie fermée = true" ui.log

@@ -33,6 +33,10 @@ func _run() -> void:
 	print("départ : continuer visible = ", menu._continue.visible)
 	menu._show_slots()
 	await process_frame
+	var texts := []
+	for b in menu.find_children("*", "Button", true, false):
+		texts.append("%s%s" % [(b as Button).text, "" if b.is_visible_in_tree() else " (caché)"])
+	print("boutons : ", texts, " · langue ", TranslationServer.get_locale())
 	print("bouton Supprimer : ", _press(menu, "Supprimer"))
 	for i in 5:
 		await process_frame
