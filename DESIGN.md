@@ -23,6 +23,9 @@ Reste avant publication : fiche Google Play, signature, politique de confidentia
   `user://ui_check`, jamais celles du joueur).
 - Icônes : `python tools/make_icons.py` ; sons : `python tools/make_sounds.py` (aucune dépendance).
 - Android : preset « Android » (arm64, vibrations) dans `export_presets.cfg`.
+- Intégration continue (`.github/workflows/ci.yml`, à chaque envoi sur GitHub) : tests de simulation,
+  contrôle du menu, traductions (`tools/i18n_check.py` échoue s'il manque un texte), puis APK de
+  débogage téléchargeable dans l'onglet Actions.
 
 ## Comment on joue
 
@@ -202,7 +205,6 @@ fourchettes ; mettre ce tableau à jour après chaque rééquilibrage.
 ## Prochaines étapes
 
 1. Publication Google Play : AAB signé, fiche FR/EN, politique de confidentialité.
-2. Intégration continue (tests + export Android) dès qu'un dépôt distant existe.
-3. Conception : branches de recherche exclusives (choix stratégiques), tension de fin de partie
+2. Conception : branches de recherche exclusives (choix stratégiques), tension de fin de partie
    (combustible du réacteur), parcours Cérès/Titan plus scénarisé.
-4. Plus d'événements (météorites, aurores) ; sauvegarde dans le cloud.
+3. Plus d'événements (météorites, aurores) ; sauvegarde dans le cloud.

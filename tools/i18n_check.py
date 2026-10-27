@@ -22,3 +22,4 @@ missing = [t for t in texts if t.replace("\\n", "\n").replace('\\"', '"') not in
 for text in missing:
     print(texts[text], "|", text)
 print(len(missing), "textes sans traduction (ajoutez-les à i18n/en.json, ou à i18n/same.txt s'ils restent identiques)")
+sys.exit(1 if missing else 0)
