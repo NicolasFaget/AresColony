@@ -21,7 +21,13 @@ func refresh() -> void:
 	var order := { "active": 0, "available": 1, "locked": 2, "done": 3 }
 	var sorted := _rows.duplicate()
 	sorted.sort_custom(func(a: ResearchRow, b: ResearchRow) -> bool:
-		return order[engine.research_state(a.research.id)] < order[engine.research_state(b.research.id)])
+		var sa: int = order[engine.research_state(a.research.id)]
+		var sb: int = order[engine.research_state(b.research.id)]
+		if sa != sb:
+			return sa < sb
+		if a.research.era != b.research.era:
+			return a.research.era < b.research.era
+		return _rows.find(a) < _rows.find(b))
 	for i in sorted.size():
 		list.move_child(sorted[i], i)
 		sorted[i].refresh()

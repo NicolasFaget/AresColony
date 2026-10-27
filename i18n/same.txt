@@ -1,0 +1,92 @@
+%s %s
+V
+kWh
+rations
+Arcadia Planitia
+Mars Direct
+NASA – Baseline Values and Assumptions Document (2018)
+122 g
+NASA JPL
+MIT News
+900 W
+Wageningen University
+9 kg → 8 kg
+1 kg
+8 kg
+NASA – Oxygen Generation Assembly (NTRS)
+2 rovers
+Sky & Telescope
+Space.com
+CO₂ + 4 H₂
+NASA – Technical Reports Server
+Solar Daily
+MIT News (1997)
+National Space Society
+40 km
+Scientific American
+Science News
+SwRI (2013)
+Universe Today
+The Chemical Engineer
+Wageningen University & Research
+NASA JPL (2019)
+Live Science
+150 m
+Sci.News
+NSTA (Science Scope, 2020)
+Voyager 1
+HyperPhysics (Georgia State University)
+UC Berkeley News (2020)
+NASA (2016)
+Wikipedia – Ahuna Mons
+ESA (2010)
+Astronomy Now (2014)
+Space Daily
+DroneXL (2025)
+Inès
+Léo
+Zoé
+Maëlle
+A
+B
+C
+D
+E
+Module inconnu ignoré : %s
+Synergies
+K
+M
+T
+%d s
+%d min
+%d h
+%d h %02d
+FPS %d · GPU %.1f ms · objets %d · primitives %d
+--save=
+\n
+%s · %s
+%s ⇄ %s
+%s + %s
+%s → %s
+ / %s
+ARES COLONY
+v%s · Mars
+   (+%d)
+%d×%d
+stock 
+QUIZ ✓
+QUIZ ✗
+QUIZ · +%d
+GUIDE %d/%d
+Langue / Language : %s
+KASSÁNDRA
+Sol %d · %02d:%02d
+×%d
+%s, %s
+%d / 100
+SF Pro Text
+Segoe UI
+Helvetica Neue
+ingénieur
+IconStudio absent de l'arbre
+%s|%s|%s

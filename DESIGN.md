@@ -4,7 +4,9 @@ Tycoon de colonie martienne en gestion active, pour ados et adultes curieux. God
 (testé avec 4.7.2), GDScript, mobile en portrait (base 720×1280, renderer Mobile).
 Vision et choix de conception : [docs/CONCEPT_MARS.md](docs/CONCEPT_MARS.md).
 
-État : **prototype jouable de l'ère 1 « Survie »** (cratère Jezero).
+État : **jeu complet en démo** : quatre ères sur Mars (Survie, Autonomie, Expansion, Interplanétaire),
+deux régions martiennes (Jezero, Arcadia), avant-postes sur Cérès et Titan, français et anglais.
+Reste avant publication : fiche Google Play, signature, politique de confidentialité.
 
 ## Lancer
 
@@ -14,7 +16,11 @@ Vision et choix de conception : [docs/CONCEPT_MARS.md](docs/CONCEPT_MARS.md).
   `godot --headless --path . -s tests/run_tests.gd` (code de sortie 0 si tout passe).
 - Captures d'écran (avec fenêtre) :
   `godot --path . --resolution 720x1400 -s tests/capture.gd -- --save=capture --out=<dossier> --scenario=<nom>`
-  avec `debut`, `milieu`, `nuit`, `tempete` ou `interaction` (touchers simulés).
+  avec `menu`, `debut`, `milieu`, `synergies`, `fiches`, `ameliorations`, `entretien`, `ere2`, `ere3`,
+  `biodome`, `rover`, `arcadia`, `reseau`, `ceres`, `titan`, `splash` ou `interaction` (touchers simulés),
+  et `--lang=en` pour l'anglais.
+- Contrôle du menu : `godot --headless --path . -s tests/ui_menu_check.gd` (sauvegardes dans
+  `user://ui_check`, jamais celles du joueur).
 - Icônes : `python tools/make_icons.py` ; sons : `python tools/make_sounds.py` (aucune dépendance).
 - Android : preset « Android » (arm64, vibrations) dans `export_presets.cfg`.
 
@@ -25,10 +31,14 @@ Vision et choix de conception : [docs/CONCEPT_MARS.md](docs/CONCEPT_MARS.md).
   enchaîner (conduites, panneaux).
 - **Raccorder** : un module ne fonctionne que s'il touche, de proche en proche, l'atterrisseur.
   Les conduites (4 matériaux) servent à aller loin, par exemple jusqu'à la glace.
-- **Équilibrer** : six ressources (énergie, oxygène, eau, nourriture, matériaux, données),
-  bilan moyen par sol affiché en haut. Toucher une ressource explique d'où elle vient.
-- **Rechercher** : les données (atterrisseur + colons) financent 8 recherches ; chacune débloque
-  une fiche de découverte sourcée.
+- **Équilibrer** : sept ressources (énergie, oxygène, eau, nourriture, matériaux, données, méthane),
+  bilan moyen par sol affiché en haut. Toucher une ressource explique d'où elle vient ; la fiche d'un
+  module et le détail d'une ressource utilisent les mêmes débits que le bandeau
+  (`ColonyEngine.building_flows`) : soleil moyen, poussière, synergies, améliorations, pannes.
+- **Rechercher** : les données (atterrisseur + colons) financent 18 recherches réparties sur quatre ères ;
+  chacune débloque une fiche de découverte sourcée (quiz facultatif).
+- **Optimiser** : synergies entre modules voisins, améliorations (niveaux 2 et 3), note de colonie.
+- **Entretenir** : poussière sur les panneaux, pannes à réparer, expéditions en rover.
 - **Survivre** : nuits sans soleil (batteries), tempêtes annoncées un sol à l'avance (20 % de
   lumière), ravitaillements de la Terre tous les 8 sols (matériaux, nourriture qui diminue,
   recrues s'il y a de la place).
@@ -99,18 +109,31 @@ de vie de l'application.
 
 | Objectif | Sol atteint |
 |---|---|
+Mesures d'octobre 2026 (Jezero, `_simulate_campaign`) :
+
+| Objectif | Sol atteint |
+|---|---|
 | Premier souffle (premier oxygène) | 0,8 |
-| Source vitale (extracteur de glace) | 2,8 |
-| Main verte (serre) | 8 |
+| Source vitale (extracteur de glace) | 3,1 |
+| Main verte (serre) | 8,3 |
 | Équipage complet (8 colons) | 40 |
-| Nuits sereines (150 kWh de stockage) | 24,5 |
-| Ingénierie fine (4 synergies actives) | 32 |
-| Colonie modèle (note B, 12 modules) | 49 |
-| Autonomie (10 sols sans déficit, 8 colons) | 50 |
+| Ingénierie fine (4 synergies actives) | 42,8 |
+| Nuits sereines (150 kWh de stockage) | 43,8 |
+| Colonie modèle (note B, 12 modules) | 45,1 |
+| Autonomie (10 sols sans déficit réel, 8 colons) | 50 |
+| Carburant martien (ère 2) | 60,1 |
+| Ville (ère 2) | 64 |
+| Explorateurs (3 expéditions) | 87,3 |
+| Retour assuré (véhicule de retour) | 124 |
+| Abri, Nucléaire, Jardin (ère 3) | 145 à 151 |
+| Enracinés (fin de l'ère 3) | 151,1 |
+
+Avant-postes seuls (60 sols, `_simulate_outposts`) : Cérès respire au sol 1,5 et raffine la saumure au
+sol 26 ; Titan respire au sol 0,8 et pompe le méthane au sol 52 ; aucune évacuation.
 
 Sans évacuation pour un joueur raisonnable. Un joueur qui ne fait rien perd son premier colon au
-sol 9 environ : le danger est réel mais laisse le temps d'apprendre. Les tests vérifient ces
-fourchettes.
+sol 9,4 : le danger est réel mais laisse le temps d'apprendre. Les tests vérifient ces
+fourchettes ; mettre ce tableau à jour après chaque rééquilibrage.
 
 ## Campagne : plusieurs colonies
 
@@ -132,6 +155,15 @@ fourchettes.
   Routes : Mars ⇄ Titan 78 sols (fenêtre tous les 24 sols), Cérès ⇄ Titan 92 sols (tous les 65).
   Décollage ×0,5. Objectifs propres ; objectif martien « Aux confins ».
 - Modules propres à un monde : `PLANETS[...].forbidden` (raison affichée), masqués de la liste.
+- Recherches : une colonie peut lancer toute recherche de l'ère la plus avancée du réseau
+  (`research_era()`, `campaign_era`) ; un avant-poste d'ère 1 peut donc étudier les saumures ou la
+  cryogénie sur place. Les guides de Cérès et Titan commencent par ces recherches.
+- Cargaisons : refusées si la colonie d'arrivée ne peut pas loger les colons ou stocker la cargaison
+  (en comptant les fusées déjà en route) ; une perte à l'arrivée est annoncée. Sur Cérès, le méthane
+  demande un réservoir (étape du guide).
+- Colonies en arrière-plan : pas d'événements, mais les rovers rentrent quand même.
+- Sauvegarde : une campagne illisible est mise de côté et signalée (`CORRUPTED`) ; modules, régions,
+  recherches et cargaisons inconnus d'une autre version sont écartés au chargement.
 
 ## Performances
 
@@ -148,6 +180,8 @@ fourchettes.
   `Tr.t("…")` traduit un modèle (`Tr.t("Sol %d") % n`) et les noms de contenu insérés ; les
   libellés et boutons se traduisent seuls quand leur texte correspond exactement à une clé.
 - Après un ajout de texte : `python tools/i18n_check.py` liste ce qui manque dans `en.json`.
+  Les textes identiques dans les deux langues (noms propres, sources, unités) vont dans
+  `i18n/same.txt`.
 - La langue suit celle du téléphone, puis le réglage « Langue / Language ».
 
 ## Pièges
@@ -163,7 +197,8 @@ fourchettes.
 
 ## Prochaines étapes
 
-1. Troisième région ? Plus d'événements (météorites, aurores) ; sauvegarde dans le cloud.
-2. Rovers d'exploration et sites à découvrir ; quiz facultatifs.
-3. Ère 2 « Autonomie » : Sabatier, briques de régolithe, recyclage, deuxième région.
-4. Tutoriel guidé, traduction anglaise.
+1. Publication Google Play : AAB signé, fiche FR/EN, politique de confidentialité.
+2. Intégration continue (tests + export Android) dès qu'un dépôt distant existe.
+3. Conception : branches de recherche exclusives (choix stratégiques), tension de fin de partie
+   (combustible du réacteur), parcours Cérès/Titan plus scénarisé.
+4. Plus d'événements (météorites, aurores) ; sauvegarde dans le cloud.

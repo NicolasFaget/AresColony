@@ -8,6 +8,7 @@ config/name="Ares Colony"
 config/version="0.1"
 config/icon="res://art/app_icon/icon.png"
 run/main_scene="res://ui/menu.tscn"
+config/quit_on_go_back=false
 config/features=PackedStringArray("4.5", "Mobile")
 boot_splash/bg_color=Color(0.043, 0.035, 0.024, 1)
 boot_splash/show_image=false

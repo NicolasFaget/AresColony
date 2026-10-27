@@ -10,6 +10,16 @@ var _continue: Button
 var _continue_info: Label
 
 
+## Bouton Retour (Android) : ferme la fenêtre du dessus, sinon quitte l'application.
+func on_back() -> void:
+	for i in range(_modal_layer.get_child_count() - 1, -1, -1):
+		var child := _modal_layer.get_child(i)
+		if child is Modal:
+			child.close()
+			return
+	get_tree().quit()
+
+
 func _ready() -> void:
 	theme = AppTheme.build()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -133,12 +143,21 @@ func _refresh() -> void:
 		_continue_info.text = Tr.t("%s · %s") % [Tr.t(SLOT_NAMES[slot]), _summary_text(GameManager.slot_summary(slot))]
 
 
+static func _objective_count(region: String) -> int:
+	var planet: String = ColonyContent.REGIONS.get(region, ColonyContent.REGIONS.jezero).get("planet", "mars")
+	var count := 0
+	for objective in ColonyContent.objectives():
+		if objective.planet == planet:
+			count += 1
+	return count
+
+
 static func _summary_text(summary: Dictionary) -> String:
 	if summary.is_empty():
 		return Tr.t("Emplacement libre")
 	var region: String = ColonyContent.REGIONS.get(summary.get("region", "jezero"), ColonyContent.REGIONS.jezero).name
 	return Tr.t("%s · Sol %d · %d colon%s · %d/%d objectifs · %s") % [Tr.t(region), summary.sol, summary.colonists,
-			"s" if summary.colonists > 1 else "", summary.objectives, ColonyContent.objectives().size(),
+			"s" if summary.colonists > 1 else "", summary.objectives, _objective_count(summary.get("region", "jezero")),
 			_ago(summary.last_saved_unix)]
 
 

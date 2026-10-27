@@ -15,7 +15,10 @@ subprocess.run([sys.executable, os.path.join(root, "tools", "i18n_extract.py"), 
                stdout=subprocess.DEVNULL)
 texts = json.load(open(out, encoding="utf-8"))
 english = json.load(open(os.path.join(root, "i18n", "en.json"), encoding="utf-8"))
-missing = [t for t in texts if t.replace("\\n", "\n").replace('\\"', '"') not in english]
+# Textes identiques dans les deux langues (noms propres, sources, unités, formats) : i18n/same.txt.
+same_path = os.path.join(root, "i18n", "same.txt")
+same = set(open(same_path, encoding="utf-8").read().splitlines()) if os.path.exists(same_path) else set()
+missing = [t for t in texts if t.replace("\\n", "\n").replace('\\"', '"') not in english and t not in same]
 for text in missing:
     print(texts[text], "|", text)
-print(len(missing), "textes sans traduction (noms propres, sources et nombres compris)")
+print(len(missing), "textes sans traduction (ajoutez-les à i18n/en.json, ou à i18n/same.txt s'ils restent identiques)")

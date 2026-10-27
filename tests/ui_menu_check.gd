@@ -16,6 +16,9 @@ func _press(node: Node, text: String) -> bool:
 func _run() -> void:
 	var gm: Node = root.get_node("GameManager")
 	gm.splash_shown = true
+	# Dossier à part : les vraies sauvegardes du joueur ne sont jamais touchées.
+	gm.save_dir = "user://ui_check"
+	DirAccess.make_dir_recursive_absolute(gm.save_dir)
 	for slot in gm.SLOTS:
 		gm.delete_slot(slot)
 	gm.start_game("save", true)

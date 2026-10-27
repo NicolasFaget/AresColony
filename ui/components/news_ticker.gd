@@ -23,7 +23,11 @@ func _ready() -> void:
 	_clip.add_child(_label)
 	add_child(UiFx.hbox(10, [UiFx.image(UiFx.icon("news"), 26, Palette.ACCENT), _clip]))
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_label.text = Tr.t("Bienvenue, commandant !")
+	var engine := GameManager.engine
+	if engine == null or engine.state.sol < 1.0:
+		_label.text = Tr.t("Bienvenue, commandant !")
+	else:
+		_label.text = Tr.t("De retour : %s, sol %d.") % [Tr.t(engine.region().name), engine.sol_number()]
 	_showing = true
 	_timer = DISPLAY_SECONDS
 

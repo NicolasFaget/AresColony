@@ -65,7 +65,7 @@ func refresh() -> void:
 		"locked":
 			var names: Array[String] = []
 			for req: String in research.requires:
-				names.append(engine.research_defs[req].name)
+				names.append(Tr.t(engine.research_defs[req].name))
 			_status.text = Tr.t("Nécessite : %s") % ", ".join(names)
 			_status.add_theme_color_override("font_color", Palette.TEXT_DIM)
 		_:

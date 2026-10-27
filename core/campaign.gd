@@ -66,9 +66,15 @@ func engine() -> ColonyEngine:
 	return engines[active]
 
 
+## Nom affiché d'une colonie, dans la langue du joueur (« Cratère Occator II » → « Occator Crater II »).
 func colony_name(index: int) -> String:
-	return colonies[index].name if not colonies[index].name.is_empty() \
-			else ColonyContent.REGIONS[colonies[index].region].name
+	var base: String = ColonyContent.REGIONS[colonies[index].region].name
+	var stored := colonies[index].name
+	if stored.is_empty():
+		return Tr.t(base)
+	if stored.begins_with(base):
+		return Tr.t(base) + stored.trim_prefix(base)
+	return stored
 
 
 # ---------- Temps ----------

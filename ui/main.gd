@@ -21,6 +21,8 @@ var _safe_area: MarginContainer
 var _pages: Array[Page] = []
 var _research_page: ResearchPage
 var _modal_layer: Control
+## Fenêtre d'évacuation ouverte (plusieurs évacuations d'un coup : une seule fenêtre).
+var _evacuation_modal: Modal
 var _current_page := 0
 
 # Mode placement.
@@ -446,16 +448,18 @@ func _on_cell_tapped(cell: Vector2i, index: int) -> void:
 	if index >= 0:
 		_show_building(index)
 		return
+	var planet := _engine.planet()
 	match _engine.map.tile_at(cell):
 		ColonyMap.Tile.ROCK:
-			_news.post(Tr.t("Des rochers basaltiques : impossible de construire ici."))
+			_news.post(Tr.t(planet.rock))
 		ColonyMap.Tile.RIM:
-			_news.post(_engine.region().rim)
+			_news.post(Tr.t(_engine.region().rim))
 		ColonyMap.Tile.ICE:
-			_news.post(Tr.t("De la glace d'eau, juste sous la poussière !") if _engine.state.research_done.has("ice")
-					else Tr.t("Régolithe martien : poussière fine et sels de perchlorate."))
+			# Sur Mars, la glace se cache sous la poussière tant qu'on ne l'a pas cherchée.
+			_news.post(Tr.t(planet.ice) if _engine.state.research_done.has("ice") or _engine.planet_id() != "mars"
+					else Tr.t(planet.ground))
 		_:
-			_news.post(Tr.t("Régolithe martien : poussière fine et sels de perchlorate."))
+			_news.post(Tr.t(planet.ground))
 
 
 # ---------- Événements ----------
@@ -520,14 +524,27 @@ func _on_resupply(report: Dictionary) -> void:
 		})
 
 
+## Bouton Retour (Android) : ferme la fenêtre du dessus, sinon revient au menu principal.
+func on_back() -> void:
+	for i in range(_modal_layer.get_child_count() - 1, -1, -1):
+		var child := _modal_layer.get_child(i)
+		if child is Modal:
+			child.close()
+			return
+	GameManager.open_menu()
+
+
 func _on_evacuation(colonist_name: String, cause: String) -> void:
 	_world.launch_evacuation()
 	AudioManager.play("evacuation")
 	GameManager.vibrate(80)
 	_news.post(Tr.t("%s a été évacué vers la Terre.") % colonist_name)
-	Modal.open(_modal_layer, {
+	if is_instance_valid(_evacuation_modal):
+		return
+	_evacuation_modal = Modal.open(_modal_layer, {
 		"icon": "warning", "title": Tr.t("%s évacué") % colonist_name,
-		"body": Tr.t("Sa santé ne permettait plus de rester sur Mars. Une capsule l'a ramené vers la Terre.\n\n")
+		"body": (Tr.t("Sa santé ne permettait plus de rester sur Mars. Une capsule l'a ramené vers la Terre.\n\n")
+				if _engine.planet_id() == "mars" else Tr.t("Sa santé ne permettait plus de rester ici. Le vaisseau de secours l'a ramené vers Mars.\n\n"))
 				+ Tr.t("Cause : ") + Tr.t(cause),
 		"confirm_text": Tr.t("Compris"),
 	})
@@ -635,9 +652,23 @@ func _show_building(index: int) -> void:
 	var modal := Modal.open(_modal_layer, options)
 	holder.append(modal)
 	if not def.fixed:
-		modal.cancelled.connect(func() -> void:
+		modal.cancelled.connect(func() -> void: _confirm_demolish.call_deferred(index))
+
+
+func _confirm_demolish(index: int) -> void:
+	if index >= _engine.state.buildings.size():
+		return
+	var def := _engine.def_of(index)
+	Modal.open(_modal_layer, {
+		"icon": "warning", "title": Tr.t("Démolir : %s ?") % Tr.t(def.name),
+		"body": Tr.t("Le module disparaît, ses améliorations aussi. Vous récupérez %s matériaux.")
+				% NumberFormatter.format(def.cost * ColonyEngine.DEMOLISH_REFUND),
+		"confirm_text": Tr.t("Démolir"),
+		"on_confirm": func() -> void:
 			if _engine.demolish(index):
-				AudioManager.play("whoosh"))
+				AudioManager.play("whoosh"),
+		"cancel_text": Tr.t("Garder"),
+	})
 
 
 # ---------- Réseau de colonies ----------

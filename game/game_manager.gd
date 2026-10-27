@@ -20,6 +20,8 @@ const REPORT_MIN_SECONDS := 60.0
 ## Emplacements de sauvegarde (le premier reprend l'ancien fichier unique « save »).
 const SLOTS: Array[String] = ["save", "save2", "save3"]
 const SETTINGS_PATH := "user://settings.json"
+## Dossier des emplacements de sauvegarde (un test peut en choisir un autre).
+var save_dir := "user://"
 const MENU_SCENE := "res://ui/menu.tscn"
 const GAME_SCENE := "res://ui/main.tscn"
 
@@ -86,8 +88,15 @@ func _notification(what: int) -> void:
 				var report := campaign.apply_offline(SaveService.now_unix())
 				save()
 				_report(report)
-		NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_WM_GO_BACK_REQUEST:
+		NOTIFICATION_APPLICATION_FOCUS_OUT:
 			save()
+		NOTIFICATION_WM_GO_BACK_REQUEST:
+			save()
+			var scene := get_tree().current_scene
+			if scene != null and scene.has_method("on_back"):
+				scene.on_back()
+			else:
+				get_tree().quit()
 		NOTIFICATION_WM_CLOSE_REQUEST:
 			save()
 			get_tree().quit()
@@ -98,7 +107,7 @@ func _notification(what: int) -> void:
 ## Charge (ou crée, si `new_game`) la partie de l'emplacement `slot`.
 func start_game(slot: String, new_game := false, region := "jezero") -> void:
 	current_slot = slot
-	_save_service = SaveService.new(FileSaveStorage.new("user://", slot))
+	_save_service = SaveService.new(FileSaveStorage.new(save_dir, slot))
 	if new_game:
 		var state := ColonyState.new()
 		state.region = region
@@ -157,7 +166,7 @@ func save() -> void:
 
 ## Résumé d'un emplacement (voir ColonyState.summary), ou {} s'il est vide.
 func slot_summary(slot: String) -> Dictionary:
-	var storage := FileSaveStorage.new("user://", slot)
+	var storage := FileSaveStorage.new(save_dir, slot)
 	if storage.read().strip_edges().is_empty() and storage.read_backup().strip_edges().is_empty():
 		return {}
 	return SaveService.new(storage).load_campaign().summary()
@@ -183,7 +192,7 @@ func first_free_slot() -> String:
 
 
 func delete_slot(slot: String) -> void:
-	var storage := FileSaveStorage.new("user://", slot)
+	var storage := FileSaveStorage.new(save_dir, slot)
 	for path in [storage.save_path, storage.backup_path, storage.temp_path]:
 		if FileAccess.file_exists(path):
 			DirAccess.remove_absolute(path)
