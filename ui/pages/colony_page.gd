@@ -132,7 +132,7 @@ func refresh() -> void:
 	var crew: String
 	if housing_left <= 0:
 		crew = Tr.t("Aucune place libre : construisez un habitat pour accueillir des recrues.")
-	elif engine.state.recruits_sent < ColonyContent.RECRUITS.size():
+	elif engine.recruits_left() > 0:
 		crew = Tr.t("Places libres : des recrues arriveront.")
 	elif engine.campaign_colonies > 1:
 		crew = Tr.t("Places libres : d'autres colons peuvent venir par cargaison.")

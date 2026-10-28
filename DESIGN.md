@@ -131,8 +131,9 @@ Mesures d'octobre 2026 (Jezero, `_simulate_campaign`) :
 | Porte des étoiles (astroport) | 157 |
 | Deuxième foyer, Cérès (fondation) | 251 |
 | Aux confins (Titan fondé), première livraison | 327 à 328 |
+| Capitale martienne (30 colons, un grand dôme pressurisé) | 404 |
 | Mine de la ceinture (Cérès exporte 200 matériaux) | 410 |
-| Station-service de Saturne (Titan exporte 200 kg de méthane) | 475 |
+| Station-service de Saturne (Titan exporte 200 kg de méthane) | 442 |
 
 L'ère 4 est jouée pour de vrai par le joueur simulé (`ColonyBot.network`) : astroport, fondation de
 Cérès puis de Titan, matériaux de Cérès vers les colonies qui ont de la place, méthane de Mars vers
@@ -166,6 +167,15 @@ fourchettes ; mettre ce tableau à jour après chaque rééquilibrage.
   vol, savoir partagé (recherches, fiches, quiz : `sync_knowledge`). Seule la colonie affichée est
   simulée image par image ; les autres en pilote automatique (`run_autopilot`, veille si une réserve
   vitale baisse). Sauvegarde v2 = `Campaign.to_dict()` ; une ancienne sauvegarde devient une campagne.
+- Le besoin de Mars en ère 4 : l'azote (8ᵉ ressource). L'air martien n'en a qu'environ 2,6 %, sous
+  moins de 1 % de la pression terrestre ; Titan en est faite (≈ 95 %) ; Cérès a des sels d'ammonium.
+  La Terre envoie une seconde vague de 16 volontaires (`RECRUITS_ERA4`, Mars, ère 4) ; l'objectif
+  « Capitale martienne » demande 30 colons et un grand dôme pressurisé. Grand dôme (recherche « Air à
+  l'azote ») : 10 places, 0,8 kg d'azote/sol de fuites, ne loge personne sous 90 % de rendement
+  (`is_pressurized`). Compresseur d'azote : 4 kg/sol × part d'azote de l'air (Titan 1, Mars 0,05,
+  interdit sur Cérès) ; la raffinerie de saumure de Cérès en donne 1 kg/sol. Un dôme demande donc
+  4 compresseurs martiens (240 matériaux, 24 kWh/sol), ou des livraisons de Cérès (19 sols) et
+  Titan (78 sols). Joueur simulé : 175 kg importés, Capitale au sol 404.
 - Ère 4 « Interplanétaire » (après « Racines ») : astroport, fondation d'une colonie (4 colons,
   150 matériaux, 60 kg de méthane), cargaisons (soute 300 unités, un colon = 10 ; carburant
   20 kg + 0,1 kg par unité). Saut entre deux sites de Mars : 1 sol.
@@ -230,6 +240,5 @@ fourchettes ; mettre ce tableau à jour après chaque rééquilibrage.
 ## Prochaines étapes
 
 1. Publication Google Play : AAB signé, fiche FR/EN, politique de confidentialité.
-2. Conception : branches de recherche exclusives (choix stratégiques) ; un vrai besoin de Mars en
-   ère 4 (aujourd'hui Mars se suffit à elle-même, seuls Cérès et Titan ont besoin du réseau).
+2. Conception : branches de recherche exclusives (choix stratégiques).
 3. Plus d'événements (météorites, aurores) ; sauvegarde dans le cloud.

@@ -67,6 +67,12 @@ const TUTORIAL := [
 		"text": "Fondez une deuxième colonie : bouton planète, en haut de l'écran." },
 	{ "id": "first_cargo", "era": 4, "tab": TAB_COLONY, "target": "network",
 		"text": "Envoyez une première cargaison vers votre nouvelle colonie." },
+	{ "id": "research_buffer_gas", "era": 4, "tab": TAB_RESEARCH, "target": "buffer_gas",
+		"text": "La Terre envoie une nouvelle vague de colons. Recherchez « Air à l'azote » pour bâtir de grands dômes." },
+	{ "id": "build_dome", "era": 4, "tab": TAB_BUILD, "target": "dome",
+		"text": "Construisez un grand dôme : 10 places, sous un air comme sur Terre." },
+	{ "id": "fill_dome", "era": 4, "tab": TAB_COLONY, "target": "network",
+		"text": "Le dôme est vide tant qu'il manque d'azote. Un compresseur martien en tire peu : faites-en venir de Titan ou de Cérès." },
 	# Cérès.
 	{ "id": "build_electrolyser", "planet": "ceres", "tab": TAB_BUILD, "target": "electrolyser",
 		"text": "Pas de CO₂ sur Cérès : construisez un électrolyseur d'eau pour l'oxygène." },
@@ -155,6 +161,16 @@ static func alerts(engine: ColonyEngine) -> Array[Dictionary]:
 			list.append({ "level": "warning", "resource": ColonyContent.ENERGY, "sols": stock / -balance,
 				"title": Tr.t("Énergie : déficit de %s kWh/sol") % NumberFormatter.format(-balance),
 				"advice": step.text, "tab": step.tab, "target": step.target })
+
+	var empty_domes := 0
+	for i in engine.state.buildings.size():
+		if engine.is_linked(i) and not engine.is_pressurized(i):
+			empty_domes += 1
+	if empty_domes > 0:
+		list.append({ "level": "warning", "resource": ColonyContent.NITROGEN, "sols": INF,
+			"title": Tr.t("%d grands dômes sans azote") % empty_domes if empty_domes > 1 else Tr.t("Grand dôme sans azote"),
+			"advice": Tr.t("Sans azote, le dôme ne loge personne. Construisez un compresseur d'azote (peu efficace sur Mars) ou faites-en livrer de Titan ou de Cérès."),
+			"tab": TAB_BUILD, "target": "n2_compressor" if not engine.planet().forbidden.has("n2_compressor") else "brine" })
 
 	var isolated := 0
 	for i in engine.state.buildings.size():
@@ -306,6 +322,11 @@ static func is_step_done(engine: ColonyEngine, step_id: String) -> bool:
 			return engine.campaign_colonies >= 2
 		"first_cargo":
 			return engine.campaign_deliveries >= 1
+		"fill_dome":
+			for i in engine.state.buildings.size():
+				if engine.state.buildings[i].id == "dome" and engine.is_linked(i) and engine.is_pressurized(i):
+					return true
+			return false
 		"first_export":
 			return engine.state.exported_materials > 0.0 or engine.state.exported_methane > 0.0
 		"build_bunker":

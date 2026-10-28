@@ -14,22 +14,24 @@ const MATERIALS := "materials"
 const DATA := "data"
 ## Ère 2 : carburant des rovers et de la fusée de retour.
 const METHANE := "methane"
+## Ère 4 : gaz tampon de l'air des grands dômes (Mars en manque, Titan et Cérès en ont).
+const NITROGEN := "nitrogen"
 
-const RESOURCES := [ENERGY, OXYGEN, WATER, FOOD, MATERIALS, DATA, METHANE]
+const RESOURCES := [ENERGY, OXYGEN, WATER, FOOD, MATERIALS, DATA, METHANE, NITROGEN]
 ## Ressources dont le manque met les colons en danger.
 const VITAL := [OXYGEN, WATER, FOOD]
 
 const RESOURCE_NAMES := {
 	ENERGY: "Énergie", OXYGEN: "Oxygène", WATER: "Eau", FOOD: "Nourriture",
-	MATERIALS: "Matériaux", DATA: "Données", METHANE: "Méthane",
+	MATERIALS: "Matériaux", DATA: "Données", METHANE: "Méthane", NITROGEN: "Azote",
 }
 ## « manque d'énergie », « manque de nourriture »...
 const RESOURCE_PARTITIVE := {
 	ENERGY: "d'énergie", OXYGEN: "d'oxygène", WATER: "d'eau", FOOD: "de nourriture",
-	MATERIALS: "de matériaux", DATA: "de données", METHANE: "de méthane",
+	MATERIALS: "de matériaux", DATA: "de données", METHANE: "de méthane", NITROGEN: "d'azote",
 }
 const RESOURCE_UNITS := {
-	ENERGY: "kWh", OXYGEN: "kg", WATER: "kg", FOOD: "rations", MATERIALS: "u", DATA: "", METHANE: "kg",
+	ENERGY: "kWh", OXYGEN: "kg", WATER: "kg", FOOD: "rations", MATERIALS: "u", DATA: "", METHANE: "kg", NITROGEN: "kg",
 }
 
 ## Explications affichées quand on touche une ressource.
@@ -41,6 +43,7 @@ const RESOURCE_HELP := {
 	MATERIALS: "Envoyés par la Terre lors des six premiers ravitaillements, puis fabriqués sur place par le four à régolithe. Ils servent à construire, améliorer et réparer ; démolir un module en rend la moitié.",
 	DATA: "Produites par le laboratoire de l'atterrisseur et par chaque colon. Elles financent la recherche.",
 	METHANE: "Fabriqué par le réacteur Sabatier à partir du CO₂ martien et de l'hydrogène de l'eau. Il fait rouler les rovers et remplira la fusée de retour.",
+	NITROGEN: "Le gaz neutre qui remplit l'air des grands dômes, autour de l'oxygène. L'air martien n'en contient presque pas : Titan en est faite, et les sels de Cérès en renferment.",
 }
 
 ## Besoins d'un colon par sol.
@@ -157,20 +160,30 @@ static func buildings() -> Array[Defs.Building]:
 		}),
 		Defs.Building.new({
 			"id": "spaceport", "name": "Astroport", "size": Vector2i(2, 2), "cost": 150.0, "research": "spaceport",
-			"storage": { METHANE: 100.0 }, "card": "hohmann",
+			"storage": { METHANE: 100.0, NITROGEN: 100.0 }, "card": "hohmann",
 			"description": "Un pas de tir et sa fusée : fonder de nouvelles colonies, expédier des cargaisons entre elles.",
 		}),
 		Defs.Building.new({
 			"id": "brine", "name": "Raffinerie de saumure", "size": Vector2i(2, 2), "cost": 80.0, "research": "brines",
-			"requires_tile": ColonyMap.Tile.ICE, "inputs": { ENERGY: 10.0 }, "outputs": { WATER: 8.0, MATERIALS: 4.0 },
-			"card": "occator",
-			"description": "Pompe la saumure sous la glace : de l'eau, et des sels (carbonates) pour les matériaux. À poser sur la glace.",
+			"requires_tile": ColonyMap.Tile.ICE, "inputs": { ENERGY: 10.0 }, "outputs": { WATER: 8.0, MATERIALS: 4.0, NITROGEN: 1.0 },
+			"storage": { NITROGEN: 40.0 }, "card": "occator",
+			"description": "Pompe la saumure sous la glace : de l'eau, des sels (carbonates) pour les matériaux, et un peu d'azote tiré des sels d'ammonium. À poser sur la glace.",
 		}),
 		Defs.Building.new({
 			"id": "methane_pump", "name": "Pompe à méthane", "size": Vector2i(2, 2), "cost": 45.0, "research": "cryogenics",
 			"requires_tile": ColonyMap.Tile.ICE, "inputs": { ENERGY: 4.0 }, "outputs": { METHANE: 5.0 },
 			"storage": { METHANE: 60.0 }, "card": "kraken",
 			"description": "Pompe le méthane liquide d'un lac de Titan : le carburant de tout le réseau. À poser au bord d'un lac.",
+		}),
+		Defs.Building.new({
+			"id": "dome", "name": "Grand dôme", "size": Vector2i(3, 3), "cost": 160.0, "research": "buffer_gas",
+			"inputs": { NITROGEN: 0.8 }, "housing": 10, "storage": { NITROGEN: 40.0, OXYGEN: 40.0 }, "card": "nitrogen",
+			"description": "Loge 10 colons sous un air comme sur Terre. Il lui faut de l'azote, qui fuit un peu chaque sol : sans lui, le dôme reste vide.",
+		}),
+		Defs.Building.new({
+			"id": "n2_compressor", "name": "Compresseur d'azote", "size": Vector2i(2, 2), "cost": 60.0, "research": "buffer_gas",
+			"inputs": { ENERGY: 6.0 }, "outputs": { NITROGEN: 4.0 }, "storage": { NITROGEN: 60.0 }, "card": "nitrogen",
+			"description": "Aspire l'air et en sépare l'azote. Sur Titan, l'air en est presque entièrement fait ; sur Mars, il en tire vingt fois moins.",
 		}),
 	]
 
@@ -195,6 +208,7 @@ const PLANETS := {
 		"rock": "Des rochers basaltiques : impossible de construire ici.",
 		"launch_fuel": 1.0, "atmosphere": true, "storms": true, "starter_reactor": false,
 		"ice_everywhere": false,
+		"air_nitrogen": 0.05,
 		"forbidden": { "brine": "Pas de saumure à pomper ici : c'est un module pour Cérès.",
 			"methane_pump": "Pas de lac de méthane sur Mars : c'est un module pour Titan." } },
 	"ceres": { "name": "Cérès",
@@ -204,12 +218,13 @@ const PLANETS := {
 		"launch_fuel": 0.25, "atmosphere": false, "storms": false, "starter_reactor": true,
 		"ice_everywhere": false,
 		"forbidden": { "moxie": "Pas d'atmosphère de CO₂ sur Cérès.", "sabatier": "Pas d'atmosphère de CO₂ sur Cérès.",
+			"n2_compressor": "Pas d'air à comprimer sur Cérès : l'azote vient des sels de la raffinerie de saumure.",
 			"methane_pump": "Pas de lac de méthane sur Cérès : c'est un module pour Titan." } },
 	"titan": { "name": "Titan",
 		"ground": "Un sol de glace d'eau, dure comme de la roche à −180 °C, couvert de grains organiques.",
 		"ice": "La rive d'un lac de méthane et d'éthane liquides.",
 		"rock": "Des galets de glace arrondis par d'anciennes pluies de méthane : impossible de construire ici.",
-		"launch_fuel": 0.5, "atmosphere": true, "storms": false, "starter_reactor": true, "lander_rtg": 20.0,
+		"launch_fuel": 0.5, "atmosphere": true, "storms": false, "starter_reactor": true, "lander_rtg": 20.0, "air_nitrogen": 1.0,
 		"ice_everywhere": true,
 		"forbidden": { "moxie": "L'air de Titan est fait d'azote et de méthane, presque sans CO₂.",
 			"sabatier": "L'air de Titan est fait d'azote et de méthane, presque sans CO₂.",
@@ -455,6 +470,9 @@ static func research() -> Array[Defs.Research]:
 		Defs.Research.new({ "id": "cryogenics", "name": "Cryogénie du méthane", "cost": 150.0, "duration": 3.0, "era": 4,
 				"requires": ["spaceport"], "card": "kraken",
 				"summary": "Débloque la pompe à méthane, pour la colonie de Titan." }),
+		Defs.Research.new({ "id": "buffer_gas", "name": "Air à l'azote", "cost": 120.0, "duration": 3.0, "era": 4,
+				"requires": ["spaceport"], "card": "nitrogen",
+				"summary": "Débloque le grand dôme (10 colons) et le compresseur d'azote. Mars manque d'azote : Titan et Cérès en ont." }),
 	]
 
 
@@ -530,6 +548,9 @@ static func objectives() -> Array[Defs.Objective]:
 		Defs.Objective.new({ "id": "titan", "title": "Aux confins", "era": 4,
 				"description": "Fonder une colonie sur Titan, la lune de Saturne.",
 				"reward": { DATA: 200.0 } }),
+		Defs.Objective.new({ "id": "capital", "title": "Capitale martienne", "era": 4,
+				"description": "Loger 30 colons sur Mars, dont des habitants d'un grand dôme : il lui faut de l'azote pour son air.",
+				"reward": { DATA: 100.0 } }),
 		Defs.Objective.new({ "id": "titan_breath", "title": "Respirer sous la brume", "era": 1, "planet": "titan",
 				"description": "Produire de l'oxygène en cassant l'eau de la glace (pas de CO₂ ici).",
 				"reward": { DATA: 40.0 } }),
@@ -764,6 +785,14 @@ static func cards() -> Array[Defs.Card]:
 			"sources": [["NASA JPL (2014)", "https://www.jpl.nasa.gov/news/cassini-explores-a-methane-sea-on-titan/"],
 				["Science News", "https://www.sciencenews.org/article/cassini-maps-depths-titan’s-seas"],
 				["Astronomy Now (2014)", "https://astronomynow.com/2014/11/10/cassini-sounds-the-depths-of-kraken-mare-titans-largest-sea/"]] }),
+		Defs.Card.new({ "id": "nitrogen", "figure": "2,6 %", "figure_label": "d'azote dans l'air martien, contre 78 % dans l'air terrestre", "visual": "dome",
+			"quiz": "De quel gaz l'atmosphère de Titan est-elle surtout faite ?", "choices": ["D'azote", "De dioxyde de carbone", "D'oxygène"], "answer": 0,
+			"title": "Le gaz qui manque à Mars", "status": "Mesuré",
+			"fact": "L'air que nous respirons contient 78 % d'azote : ce gaz neutre remplit l'atmosphère autour de l'oxygène. L'air de Mars est fait à 95 % de CO₂ ; l'azote n'y représente qu'environ 2,6 % (mesures de l'instrument SAM du rover Curiosity), et la pression au sol y est inférieure à 1 % de celle de la Terre. Titan, au contraire, est enveloppée d'azote : environ 95 % de son atmosphère, sous une pression supérieure de 60 % à celle de la Terre. Sur Cérès, la sonde Dawn a repéré des argiles et des sels contenant de l'ammoniac, une molécule d'azote.",
+			"in_game": "Les grands dômes de Mars ont besoin d'azote pour leur air. Un compresseur martien en tire un peu, à grand prix ; Titan et Cérès en ont à revendre.",
+			"sources": [["Eos (2019) – Curiosity et l'air de Mars", "https://eos.org/research-spotlights/curiosity-rover-reveals-oxygen-mystery-in-martian-atmosphere"],
+				["NASA Science – Titan", "https://science.nasa.gov/saturn/moons/titan/facts/"],
+				["NASA JPL (2015) – Dawn", "https://www.jpl.nasa.gov/news/new-clues-to-ceres-bright-spots-and-origins/"]] }),
 		Defs.Card.new({ "id": "titan_light", "figure": "≈ 1 %", "figure_label": "de la lumière solaire reçue par la Terre, avant même la brume", "visual": "reactor",
 			"quiz": "Pourquoi fait-il si sombre sur Titan ?", "choices": ["Saturne est loin du Soleil et la brume arrête la lumière", "Titan tourne très vite sur elle-même", "Les anneaux de Saturne font de l'ombre"], "answer": 0,
 			"title": "Un midi de crépuscule", "status": "Mesuré",
@@ -791,6 +820,11 @@ const RECRUITS := [["Yuki", "chimiste"], ["Léo", "pilote"], ["Sofia", "ingénie
 		["Hana", "astrophysicienne"], ["Diego", "mécanicien"], ["Lina", "cheffe cuisinière"], ["Arjun", "géophysicien"],
 		["Maëlle", "pilote de rover"], ["Tariq", "chimiste"], ["Ines", "radiologue"], ["Bao", "agronome"],
 		["Elsa", "ingénieure nucléaire"], ["Moussa", "maçon"]]
+## Seconde vague, en ère 4 : la Terre envoie de nouveaux volontaires à la capitale martienne.
+const RECRUITS_ERA4 := [["Iris", "urbaniste"], ["Sami", "pilote"], ["Chloé", "botaniste"], ["Jonas", "électricien"],
+		["Aya", "médecin"], ["Victor", "mécanicien"], ["Leila", "chimiste"], ["Noé", "géologue"],
+		["Rosa", "ingénieure"], ["Kenji", "agronome"], ["Fatou", "biologiste"], ["Hugo", "maçon"],
+		["Mila", "astrophysicienne"], ["Ravi", "radiologue"], ["Jade", "pilote de rover"], ["Oscar", "cuisinier"]]
 
 ## Messages d'ambiance du bandeau (avec une touche d'humour).
 const CHATTER := [

@@ -29,7 +29,7 @@ const FOUNDING_MATERIALS_FAR := 250.0
 const FAR_UNIT_FACTOR := 3.0
 ## Ressources qu'on peut expédier.
 const CARGO := [ColonyContent.MATERIALS, ColonyContent.WATER, ColonyContent.FOOD, ColonyContent.OXYGEN,
-		ColonyContent.METHANE, ColonyContent.DATA]
+		ColonyContent.METHANE, ColonyContent.NITROGEN, ColonyContent.DATA]
 
 var colonies: Array[ColonyState] = []
 var engines: Array[ColonyEngine] = []

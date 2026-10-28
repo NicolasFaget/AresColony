@@ -39,6 +39,7 @@ func _init() -> void:
 	_test_reactor()
 	_test_sanitize()
 	_test_campaign_offline()
+	_test_nitrogen()
 	_test_number_formatter()
 	_simulate_campaign()
 	_simulate_realtime()
@@ -484,7 +485,7 @@ func _test_guides() -> void:
 	_check(ColonyAdvisor.TUTORIAL[ColonyAdvisor.tutorial_step(engine)].era == 3, "guide de l'ère 3")
 	var copy := ColonyState.from_dict(JSON.parse_string(JSON.stringify(engine.state.to_dict())))
 	_check(copy.guides_skipped == [2], "guides passés sauvegardés")
-	_check(ColonyAdvisor.era_steps(4).size() == 4, "guide de l'ère 4")
+	_check(ColonyAdvisor.era_steps(4).size() == 7, "guide de l'ère 4")
 	var outpost_state := ColonyState.new()
 	outpost_state.region = "ceres"
 	var outpost := ColonyEngine.new(outpost_state)
@@ -1029,6 +1030,49 @@ func _test_campaign_offline() -> void:
 	_check(_near(campaign.time - start, expected, 0.001), "l'horloge de la campagne suit le temps écoulé (%.2f sols)" % (campaign.time - start))
 
 
+## Azote : dôme vide sans azote, compresseur vingt fois moins efficace sur Mars, seconde vague de recrues.
+func _test_nitrogen() -> void:
+	var mars := _calm_engine()
+	for id in ["spaceport", "buffer_gas"]:
+		mars.state.research_done.append(id)
+	mars.state.resources[R.MATERIALS] = 400.0
+	var before := mars.housing()
+	_check(mars.place("dome", ColonyBot.connected_spot(mars, "dome")), "grand dôme posé")
+	var dome := mars.state.buildings.size() - 1
+	_check(not mars.is_pressurized(dome) and mars.housing() == before, "dôme vide : aucune place sans azote")
+	var titles: Array[String] = []
+	for alert in ColonyAdvisor.alerts(mars):
+		titles.append(alert.title)
+	_check(titles.has("Grand dôme sans azote"), "alerte dôme sans azote")
+	mars.state.resources[R.NITROGEN] = mars.capacity(R.NITROGEN)
+	mars.advance(2.0)
+	_check(mars.is_pressurized(dome) and mars.housing() == before + 10, "dôme rempli d'azote : 10 places")
+	mars.state.resources[R.NITROGEN] = 0.0
+	mars.advance(3.0)
+	_check(not mars.is_pressurized(dome), "sans azote, le dôme se vide")
+	_check(mars.place("n2_compressor", ColonyBot.connected_spot(mars, "n2_compressor")), "compresseur posé sur Mars")
+	var compressor := mars.state.buildings.size() - 1
+	var on_mars: float = mars.building_flows(compressor).get(R.NITROGEN, 0.0)
+	var titan_state := ColonyState.new()
+	titan_state.region = "titan"
+	var titan_engine := ColonyEngine.new(titan_state)
+	titan_engine.state.research_done.append("buffer_gas")
+	titan_engine.state.resources[R.MATERIALS] = 400.0
+	_check(titan_engine.place("n2_compressor", ColonyBot.connected_spot(titan_engine, "n2_compressor")), "compresseur posé sur Titan")
+	var on_titan: float = titan_engine.building_flows(titan_engine.state.buildings.size() - 1).get(R.NITROGEN, 0.0)
+	_check(on_titan > 0.0 and _near(on_mars * 20.0, on_titan, 0.01), "Titan : vingt fois plus d'azote que Mars (%.2f / %.2f)" % [on_titan, on_mars])
+	var ceres_state := ColonyState.new()
+	ceres_state.region = "ceres"
+	_check(ColonyEngine.new(ceres_state).planet().forbidden.has("n2_compressor"), "pas de compresseur sur Cérès")
+	# Seconde vague de recrues : seulement sur Mars, en ère 4.
+	mars.state.recruits_sent = R.RECRUITS.size()
+	mars.state.era = 3
+	_check(mars.recruits_left() == 0, "pas de seconde vague avant l'ère 4")
+	mars.state.era = 4
+	_check(mars.recruits_left() == R.RECRUITS_ERA4.size(), "seconde vague en ère 4")
+	_check(Campaign.CARGO.has(R.NITROGEN), "l'azote voyage en cargaison")
+
+
 func _test_reactor() -> void:
 	var engine := _calm_engine()
 	engine.state.research_done.append("fission")
@@ -1165,9 +1209,13 @@ func _simulate_campaign() -> void:
 
 	# Ère 4, jouée pour de vrai : astroport, fondations, cargaisons et objectifs de Cérès et Titan.
 	var campaign := Campaign.from_engine(engine)
-	var network_goals := ["spaceport", "outpost", "cargo", "ceres", "titan",
+	var network_goals := ["spaceport", "outpost", "cargo", "ceres", "titan", "capital",
 			"ceres_breath", "ceres_brine", "ceres_ahuna", "ceres_export", "titan_breath", "titan_pump", "titan_selk", "titan_fuel"]
 	var reached := {}
+	var nitrogen_in := [0.0]
+	campaign.shipment_arrived.connect(func(shipment: Dictionary) -> void:
+		if shipment.kind == "cargo" and shipment.to == 0:
+			nitrogen_in[0] += float(shipment.cargo.get(R.NITROGEN, 0.0)))
 	while campaign.time < 900.0 and reached.size() < network_goals.size():
 		ColonyBot.network(campaign)
 		campaign.advance(0.25)
@@ -1180,6 +1228,9 @@ func _simulate_campaign() -> void:
 		print("%-14s %s" % [id, "sol %.1f" % reached[id] if reached.has(id) else "non atteint"])
 	print("Colonies : %s · livraisons %d" % [campaign.colonies.map(func(c: ColonyState) -> String:
 			return "%s (%d colons, exporté %.0f mat. / %.0f kg CH₄)" % [c.region, c.colonists.size(), c.exported_materials, c.exported_methane]), campaign.deliveries])
+	print("Azote livré à Mars : %.0f kg · dômes pressurisés : %d" % [nitrogen_in[0], campaign.engines[0].state.buildings.filter(
+			func(b: Dictionary) -> bool: return b.id == "dome").size()])
+	_check(nitrogen_in[0] > 0.0, "Mars importe de l'azote pour ses dômes")
 	for i in campaign.engines.size():
 		var colony := campaign.engines[i]
 		print("  %s : matériaux %.0f/%.0f, méthane %.0f/%.0f, astroport %s" % [colony.state.region, colony.state.amount(R.MATERIALS), colony.capacity(R.MATERIALS),

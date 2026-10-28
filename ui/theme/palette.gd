@@ -38,6 +38,7 @@ const RESOURCE_COLORS := {
 	"materials": Color("#e0a070"),
 	"data": Color("#c4b0ff"),
 	"methane": Color("#ff8a5c"),
+	"nitrogen": Color("#f29bd4"),
 }
 
 ## Couleur du statut d'une fiche de découverte.

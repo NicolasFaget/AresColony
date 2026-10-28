@@ -69,6 +69,8 @@ icons["target"] = ui(f'<circle cx="32" cy="32" r="24" stroke="{W}" stroke-width=
                      f'<circle cx="32" cy="32" r="12" stroke="{W}" stroke-width="5" fill="none"/><circle cx="32" cy="32" r="4" fill="{W}"/>')
 icons["methane"] = ui(f'<path d="M32 4 C40 18 52 26 52 42 a20 20 0 0 1 -40 0 C12 32 18 26 22 18 C24 26 28 30 32 30 C30 22 28 14 32 4 Z" fill="{W}"/>'
                       f'<path d="M32 58 a9 9 0 0 1 -9 -9 C23 42 28 38 32 34 C36 38 41 42 41 49 a9 9 0 0 1 -9 9 Z" fill="#000" opacity=".35"/>')
+icons["nitrogen"] = ui(f'<circle cx="20" cy="32" r="14" fill="{W}"/><circle cx="44" cy="32" r="14" fill="{W}"/>'
+                       f'<path d="M20 32 H44" stroke="#000" stroke-width="4" opacity=".35"/><path d="M20 26 H44 M20 38 H44" stroke="#000" stroke-width="3" opacity=".25"/>')
 icons["rover"] = ui(f'<rect x="10" y="20" width="44" height="20" rx="5" fill="{W}"/>'
                     f'<circle cx="16" cy="48" r="7" fill="{W}"/><circle cx="32" cy="48" r="7" fill="{W}"/><circle cx="48" cy="48" r="7" fill="{W}"/>'
                     + stroke("M44 20 V8 M38 8 H50", 4))

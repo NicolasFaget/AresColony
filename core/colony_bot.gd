@@ -5,7 +5,7 @@ extends RefCounted
 ## construit ce qui manque le plus, garde une réserve de matériaux, étend ses conduites vers la glace.
 
 const R = preload("res://core/colony_content.gd")
-const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate", "regolith", "sabatier", "rovers", "erv", "shielding", "fission", "soil", "spaceport", "brines", "cryogenics"]
+const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate", "regolith", "sabatier", "rovers", "erv", "shielding", "fission", "soil", "spaceport", "brines", "cryogenics", "buffer_gas"]
 
 
 ## Lance la prochaine recherche disponible, dans l'ordre conseillé.
@@ -98,6 +98,9 @@ static func build(engine: ColonyEngine) -> void:
 		want = "spaceport"
 	elif outpost and engine.planet_id() == "titan" and engine.has_spaceport() and _count(engine, "tank") < 2:
 		want = "tank"
+	elif outpost and engine.planet_id() == "titan" and engine.has_spaceport() and _count(engine, "n2_compressor") < 2 \
+			and engine.is_unlocked(engine.building_defs["n2_compressor"]):
+		want = "n2_compressor"
 	elif outpost and engine.capacity(R.ENERGY) < 150.0 and engine.is_unlocked(engine.building_defs["battery"]):
 		want = "battery"
 	elif outpost:
@@ -105,10 +108,12 @@ static func build(engine: ColonyEngine) -> void:
 	elif engine.is_unlocked(engine.building_defs["kiln"]) and engine.resupplies_left() <= 2 \
 			and _count(engine, "kiln") < 1 + engine.state.colonists.size() / 4:
 		want = "kiln"
+	elif engine.is_unlocked(engine.building_defs["dome"]) and _count(engine, "dome") == 0:
+		want = "dome"
 	elif engine.state.era >= 3 and engine.is_unlocked(engine.building_defs["bunker"]) \
-			and engine.state.colonists.size() >= engine.housing() - 1 and engine.state.recruits_sent < R.RECRUITS.size():
+			and engine.state.colonists.size() >= engine.housing() - 1 and engine.recruits_left() > 0:
 		want = "bunker"
-	elif engine.state.colonists.size() >= engine.housing() - 1 and engine.state.recruits_sent < R.RECRUITS.size() 			and flows[R.OXYGEN] >= margin[R.OXYGEN] and flows[R.FOOD] >= margin[R.FOOD]:
+	elif engine.state.colonists.size() >= engine.housing() - 1 and engine.recruits_left() > 0 			and flows[R.OXYGEN] >= margin[R.OXYGEN] and flows[R.FOOD] >= margin[R.FOOD]:
 		want = "habitat"
 	elif engine.is_unlocked(engine.building_defs["bunker"]) and engine.shelter_capacity() < engine.state.colonists.size():
 		want = "bunker"
@@ -125,6 +130,12 @@ static func build(engine: ColonyEngine) -> void:
 		want = "erv"
 	elif engine.is_unlocked(engine.building_defs["spaceport"]) and _count(engine, "spaceport") == 0:
 		want = "spaceport"
+	# Capitale (ère 4) : de grands dômes pour la seconde vague, et un compresseur d'appoint.
+	elif engine.is_unlocked(engine.building_defs["dome"]) and engine.recruits_left() > 0 \
+			and engine.state.colonists.size() >= engine.housing() - 1 and _count(engine, "dome") < 2 and _domes_ready(engine):
+		want = "dome"
+	elif engine.is_unlocked(engine.building_defs["dome"]) and _count(engine, "dome") > 0 and _count(engine, "n2_compressor") == 0:
+		want = "n2_compressor"
 	# Ère 4 : de quoi remplir les vols vers Cérès et Titan.
 	elif engine.has_spaceport() and engine.capacity(R.METHANE) < 500.0 and engine.is_unlocked(engine.building_defs["tank"]):
 		want = "tank"
@@ -138,7 +149,7 @@ static func build(engine: ColonyEngine) -> void:
 	if not engine.is_unlocked(engine.building_defs[want]):
 		return
 	# Confort (habitat, batteries) : seulement si une réserve reste pour les urgences vitales.
-	if want in ["habitat", "battery", "garage", "erv", "sabatier", "bunker", "reactor", "biodome", "spaceport", "tank"] and engine.state.amount(R.MATERIALS) < engine.building_defs[want].cost + 50.0:
+	if want in ["habitat", "battery", "garage", "erv", "sabatier", "bunker", "reactor", "biodome", "spaceport", "tank", "dome", "n2_compressor"] and engine.state.amount(R.MATERIALS) < engine.building_defs[want].cost + 50.0:
 		return
 	if want in ["extractor", "brine", "methane_pump"] and not (want == "extractor" and engine.planet().ice_everywhere):
 		reach_ice(engine, want)
@@ -191,16 +202,29 @@ static func network(campaign: Campaign) -> void:
 		var colony := campaign.engines[i]
 		match campaign.planet_of(i):
 			"ceres":
+				# Une seule fusée pour les matériaux et l'azote : le vol coûte du méthane, rare ici.
 				var spare := colony.state.amount(R.MATERIALS) - 120.0
+				var nitrogen := colony.state.amount(R.NITROGEN) - 5.0
+				var send_nitrogen := nitrogen >= 30.0 and _needs_nitrogen(mars)
+				var shipped := false
 				if spare >= 40.0:
 					for to in _by_free_space(campaign, R.MATERIALS, i):
-						if _ship(campaign, i, to, R.MATERIALS, minf(spare, 150.0)):
+						var cargo := { R.MATERIALS: minf(spare, 150.0) }
+						if to == 0 and send_nitrogen:
+							cargo[R.NITROGEN] = nitrogen
+						if _ship_cargo(campaign, i, to, cargo):
+							shipped = to == 0 and send_nitrogen
 							break
+				if send_nitrogen and not shipped:
+					_ship(campaign, i, 0, R.NITROGEN, nitrogen)
 				# Cérès n'a pas de méthane : Mars lui en envoie, une fois Titan fondée.
-				if planets.has("titan") and colony.state.amount(R.METHANE) < 40.0 and colony.capacity(R.METHANE) >= 100.0 \
+				if planets.has("titan") and colony.state.amount(R.METHANE) < 80.0 and colony.capacity(R.METHANE) >= 150.0 \
 						and mars.state.amount(R.METHANE) >= 300.0:
-					_ship(campaign, 0, i, R.METHANE, 100.0)
+					_ship(campaign, 0, i, R.METHANE, 150.0)
 			"titan":
+				var nitrogen := colony.state.amount(R.NITROGEN) - 20.0
+				if nitrogen >= 60.0 and _needs_nitrogen(mars):
+					_ship(campaign, i, 0, R.NITROGEN, nitrogen)
 				var stock := colony.state.amount(R.METHANE) - 30.0
 				if stock >= 150.0:
 					for to in _by_free_space(campaign, R.METHANE, i):
@@ -221,13 +245,39 @@ static func _by_free_space(campaign: Campaign, resource: String, from: int) -> A
 	return list
 
 
+## Mars a de la place pour de l'azote et en manque (moins de la moitié de ses réservoirs, livraisons comprises).
+static func _needs_nitrogen(mars: ColonyEngine) -> bool:
+	var room := mars.capacity(R.NITROGEN)
+	return room > 0.0 and mars.state.amount(R.NITROGEN) + mars.incoming.get(R.NITROGEN, 0.0) < room * 0.5
+
+
+## Les dômes déjà posés sont pressurisés (on n'en ajoute pas un vide de plus).
+static func _domes_ready(engine: ColonyEngine) -> bool:
+	for i in engine.state.buildings.size():
+		if engine.state.buildings[i].id == "dome" and not engine.is_pressurized(i):
+			return false
+	return true
+
+
 ## Envoie jusqu'à `amount` de `resource` (moins si le méthane du vol ou la place manque).
 static func _ship(campaign: Campaign, from: int, to: int, resource: String, amount: float) -> bool:
-	var x := amount
-	while x >= 20.0:
-		if campaign.shipment_problem(from, to, { resource: x }, 0).is_empty():
-			return campaign.send_cargo(from, to, { resource: x }, 0)
-		x *= 0.8
+	return _ship_cargo(campaign, from, to, { resource: amount })
+
+
+## Envoie la cargaison, réduite de 20 % en 20 % tant qu'elle ne passe pas (place, méthane du vol).
+static func _ship_cargo(campaign: Campaign, from: int, to: int, cargo: Dictionary) -> bool:
+	var scale := 1.0
+	while scale > 0.1:
+		var sized := {}
+		var total := 0.0
+		for r: String in cargo:
+			sized[r] = cargo[r] * scale
+			total += sized[r]
+		if total < 20.0:
+			return false
+		if campaign.shipment_problem(from, to, sized, 0).is_empty():
+			return campaign.send_cargo(from, to, sized, 0)
+		scale *= 0.8
 	return false
 
 

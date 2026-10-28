@@ -181,6 +181,8 @@ static func building(building_id: String) -> Node3D:
 		"methane_pump": _methane_pump(root)
 		"reactor": _reactor(root)
 		"biodome": _biodome(root)
+		"dome": _dome(root)
+		"n2_compressor": _n2_compressor(root)
 	return root
 
 
@@ -478,6 +480,50 @@ static func _reactor(r: Node3D) -> void:
 
 
 ## Serre géante : un grand dôme vitré sur un sol vivant, rangs de cultures et arbres fruitiers.
+## Grand dôme : coupole vitrée haute, maisons à l'intérieur, sas et cuves d'azote.
+static func _dome(r: Node3D) -> void:
+	_pad(r, 2.9)
+	var nitrogen := Color("#f29bd4")
+	for at in [Vector3(-0.5, 0.0, -0.3), Vector3(0.35, 0.0, -0.45), Vector3(0.1, 0.0, 0.4), Vector3(-0.55, 0.0, 0.5)]:
+		box(r, at + Vector3(0, 0.25, 0), Vector3(0.38, 0.36, 0.32), WHITE)
+		box(r, at + Vector3(0, 0.46, 0), Vector3(0.42, 0.06, 0.36), GREY)
+		light(r, at + Vector3(0, 0.28, 0.17), LIGHT, 0.025, 2.0)
+	sphere(r, Vector3(0.6, 0.2, 0.25), 0.18, DARK_GREEN, Vector3.ONE, 0.0, false, 12)
+	var glass := sphere(r, Vector3(0, 0.1, 0), 1.35, GLASS, Vector3(1.0, 0.9, 1.0), 0.0, true, 32)
+	glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var frame := Node3D.new()
+	frame.position = Vector3(0, 0.1, 0)
+	frame.scale = Vector3(1.0, 0.9, 1.0)
+	r.add_child(frame)
+	for angle in [0.0, 60.0, 120.0]:
+		var arch := TorusMesh.new()
+		arch.inner_radius = 1.33
+		arch.outer_radius = 1.37
+		arch.rings = 32
+		arch.ring_segments = 4
+		add(frame, arch, Vector3.ZERO, WHITE, Vector3(90, angle, 0))
+	box(r, Vector3(1.3, 0.25, 0.0), Vector3(0.3, 0.32, 0.32), WHITE)
+	for k in 2:
+		cylinder(r, Vector3(1.25, 0.2, -1.1 + k * 0.3), 0.11, 0.4, nitrogen, Vector3.ZERO, -1.0, 12)
+
+
+## Compresseur d'azote : prise d'air, colonne de séparation et réservoirs roses.
+static func _n2_compressor(r: Node3D) -> void:
+	_pad(r, 1.9)
+	var nitrogen := Color("#f29bd4")
+	box(r, Vector3(-0.35, 0.3, -0.3), Vector3(0.6, 0.45, 0.5), WHITE)
+	for k in 3:
+		cylinder(r, Vector3(-0.55 + k * 0.2, 0.62, -0.3), 0.07, 0.2, DARK, Vector3.ZERO, -1.0, 10)
+	cylinder(r, Vector3(0.45, 0.6, -0.4), 0.12, 1.1, GREY, Vector3.ZERO, -1.0, 14)
+	sphere(r, Vector3(0.45, 1.15, -0.4), 0.12, GREY, Vector3.ONE, 0.0, false, 12)
+	for k in 2:
+		var at := Vector3(-0.3 + k * 0.6, 0.0, 0.45)
+		cylinder(r, at + Vector3(0, 0.22, 0), 0.2, 0.44, nitrogen, Vector3(0, 0, 90), -1.0, 16)
+	strut(r, Vector3(-0.05, 0.3, -0.3), Vector3(0.45, 0.3, -0.4), 0.03, GREY)
+	strut(r, Vector3(0.45, 0.2, -0.3), Vector3(0.3, 0.22, 0.45), 0.03, GREY)
+	light(r, Vector3(-0.35, 0.4, -0.04), LIGHT, 0.025, 2.0)
+
+
 static func _biodome(r: Node3D) -> void:
 	_pad(r, 2.9)
 	cylinder(r, Vector3(0, 0.1, 0), 1.3, 0.06, Color("#5a3b26"), Vector3.ZERO, -1.0, 32)

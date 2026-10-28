@@ -68,6 +68,8 @@ const EXPEDITION_METHANE := 20.0
 const EXPEDITION_SOLS := 2.0
 ## Ère 2 : colons visés et méthane à réunir pour le retour.
 const CITY_CREW := 14
+## Objectif « Capitale martienne » (ère 4).
+const CAPITAL_CREW := 30
 const RETURN_METHANE := 200.0
 ## Éruptions solaires (ère 3) : préavis, durée, intervalle, santé perdue par sol sans abri.
 const FLARE_WARNING_SOLS := 0.5
@@ -287,9 +289,36 @@ func capacity(resource: String) -> float:
 func housing() -> int:
 	var total := 0
 	for i in state.buildings.size():
-		if _connected[i]:
+		if _connected[i] and is_pressurized(i):
 			total += housing_of(i)
 	return total
+
+
+## Un grand dôme ne loge personne tant que son air manque d'azote.
+func is_pressurized(index: int) -> bool:
+	return not def_of(index).inputs.has(ColonyContent.NITROGEN) or _efficiency_avg[index] >= 0.9
+
+
+## Grands dômes raccordés dont l'air est complet (azote).
+func pressurized_domes() -> int:
+	var count := 0
+	for i in state.buildings.size():
+		if _connected[i] and def_of(i).inputs.has(ColonyContent.NITROGEN) and is_pressurized(i):
+			count += 1
+	return count
+
+
+## Recrues que la Terre peut encore envoyer (seconde vague : Mars, ère 4).
+func recruits_left() -> int:
+	var left := ColonyContent.RECRUITS.size() - state.recruits_sent
+	if planet_id() == "mars" and state.era >= 4:
+		left = ColonyContent.RECRUITS.size() + ColonyContent.RECRUITS_ERA4.size() - state.recruits_sent
+	return maxi(0, left)
+
+
+func _next_recruit() -> Array:
+	var i := state.recruits_sent
+	return ColonyContent.RECRUITS[i] if i < ColonyContent.RECRUITS.size() else ColonyContent.RECRUITS_ERA4[i - ColonyContent.RECRUITS.size()]
 
 
 ## Stockage d'un module, améliorations comprises.
@@ -907,6 +936,9 @@ func _output_rate(index: int, resource: String, sun: float) -> float:
 		# Générateur à radio-isotopes de l'atterrisseur (Titan, comme Dragonfly) : jour et nuit.
 		if def.id == "lander":
 			rate += planet().get("lander_rtg", 0.0)
+	# Compresseur d'azote : selon la part d'azote de l'air (Titan 1, Mars 0,05).
+	if resource == ColonyContent.NITROGEN and def.id == "n2_compressor":
+		rate *= planet().get("air_nitrogen", 0.0)
 	if resource == ColonyContent.FOOD:
 		rate *= effect("food")
 	return rate
@@ -990,9 +1022,8 @@ func _events(ds: float) -> void:
 		_add(ColonyContent.MATERIALS, materials)
 		_add(ColonyContent.FOOD, food)
 		var arrived: Array[String] = []
-		while arrived.size() < 2 and state.colonists.size() < housing() \
-				and state.recruits_sent < ColonyContent.RECRUITS.size():
-			var member: Array = ColonyContent.RECRUITS[state.recruits_sent]
+		while arrived.size() < 2 and state.colonists.size() < housing() and recruits_left() > 0:
+			var member: Array = _next_recruit()
 			state.recruits_sent += 1
 			_arrive(member)
 			arrived.append(member[0])
@@ -1316,6 +1347,8 @@ func _objective_met(objective_id: String) -> bool:
 			return state.expeditions >= 3
 		"city":
 			return state.colonists.size() >= CITY_CREW
+		"capital":
+			return state.colonists.size() >= CAPITAL_CREW and pressurized_domes() > 0
 		"return":
 			return _has_connected("erv") and state.amount(ColonyContent.METHANE) >= RETURN_METHANE
 		"shelter":
@@ -1379,6 +1412,9 @@ func objective_progress(objective_id: String) -> float:
 			return clampf(state.expeditions / 3.0, 0.0, 1.0)
 		"city":
 			return clampf(float(state.colonists.size()) / CITY_CREW, 0.0, 1.0)
+		"capital":
+			var share := clampf(float(state.colonists.size()) / CAPITAL_CREW, 0.0, 1.0)
+			return share if pressurized_domes() > 0 else minf(share, 0.9)
 		"return":
 			return clampf(state.amount(ColonyContent.METHANE) / RETURN_METHANE, 0.0, 1.0) if _has_connected("erv") else 0.0
 		"shelter":
@@ -1498,7 +1534,7 @@ func setup_outpost(crew: Array, cargo: Dictionary) -> void:
 	for r in [ColonyContent.OXYGEN, ColonyContent.WATER, ColonyContent.FOOD, ColonyContent.ENERGY]:
 		state.resources[r] = capacity(r)
 	state.resupply_count = RESUPPLY_LIMIT
-	state.recruits_sent = ColonyContent.RECRUITS.size()
+	state.recruits_sent = ColonyContent.RECRUITS.size() + ColonyContent.RECRUITS_ERA4.size()
 	state.tutorial_done = true
 	state.next_storm += state.sol
 	state.next_resupply += state.sol
@@ -1616,7 +1652,8 @@ func _rebuild() -> void:
 	var old := _efficiency_avg.size()
 	_efficiency_avg.resize(n)
 	for i in range(old, n):
-		_efficiency_avg[i] = 1.0
+		# Un dôme qu'on vient de poser est vide d'air ; au chargement, on garde l'état sauvegardé (plein).
+		_efficiency_avg[i] = 0.0 if old > 0 and def_of(i).inputs.has(ColonyContent.NITROGEN) else 1.0
 	# Synergies : chaque module, une fois par type de synergie, si un voisin direct convient.
 	_synergies.resize(n)
 	for i in n:

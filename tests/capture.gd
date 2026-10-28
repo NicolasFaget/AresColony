@@ -335,6 +335,25 @@ func _run() -> void:
 			main._world.rig.zoom(0.7)
 			await _frames(30)
 			await _shot("93_biodome")
+		"azote":
+			for id in ["spaceport", "buffer_gas"]:
+				engine.state.research_done.append(id)
+			engine.state.era = 4
+			engine.state.resources[ColonyContent.MATERIALS] = 400.0
+			var spot := ColonyBot.connected_spot(engine, "dome")
+			engine.place("dome", spot)
+			engine.state.resources[ColonyContent.MATERIALS] = 400.0
+			engine.place("n2_compressor", ColonyBot.connected_spot(engine, "n2_compressor"))
+			engine.state.resources[ColonyContent.NITROGEN] = 30.0
+			engine.state.sol = 1.45
+			main = await _open_main()
+			_close_modals(main)
+			if not main._window.collapsed:
+				main._window.toggle_collapsed()
+			main._world.rig.focus(main._world.footprint_center(spot, Vector2i(3, 3)), 0.0)
+			main._world.rig.zoom(0.7)
+			await _frames(30)
+			await _shot("94_azote")
 		"arcadia":
 			manager.stop_game()
 			var menu: Control = load("res://ui/menu.tscn").instantiate()
