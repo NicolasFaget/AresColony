@@ -104,9 +104,11 @@ func _build_layout() -> void:
 				_menu_button(Tr.t("Quitter"), "Button", _quit)]),
 	])
 	if OS.is_debug_build():
-		var tests := UiFx.hbox(12, [])
-		for test: Array in [["ere3", Tr.t("ère 3")], ["ere4", Tr.t("ère 4")], ["ceres", Tr.t("Cérès")], ["titan", Tr.t("Titan")]]:
-			tests.add_child(_menu_button(Tr.t("Test · %s") % test[1], "Button", _on_test_game.bind(test[0])))
+		var tests := UiFx.hbox(8, [])
+		for test: Array in [["ere2", Tr.t("Ère 2")], ["ere3", Tr.t("Ère 3")], ["ere4", Tr.t("Ère 4")], ["ceres", Tr.t("Cérès")],
+				["titan", Tr.t("Titan")]]:
+			tests.add_child(_menu_button(test[1], "Button", _on_test_game.bind(test[0])))
+		buttons.add_child(UiFx.label(Tr.t("Parties de test"), "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER))
 		buttons.add_child(tests)
 	for row in buttons.get_children():
 		if row is HBoxContainer:
@@ -187,7 +189,7 @@ func _on_new_game() -> void:
 	_choose_region(slot)
 
 
-## Versions de développement : partie de test (ère 3, ère 4, Cérès, Titan) dans un emplacement libre.
+## Versions de développement : partie de test (ères 2 à 4, Cérès, Titan) dans un emplacement libre.
 func _on_test_game(test_name: String) -> void:
 	var slot := GameManager.first_free_slot()
 	if slot.is_empty():
