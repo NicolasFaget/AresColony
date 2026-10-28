@@ -82,7 +82,9 @@ func refresh() -> void:
 	var objective := engine.current_objective()
 	if objective == null:
 		_objective_title.text = Tr.t("Mission accomplie !")
-		_objective_text.text = Tr.t("La colonie est autonome et son retour est assuré. La suite arrive dans une prochaine version.")
+		_objective_text.text = Tr.t("La colonie est autonome et son retour est assuré. La suite arrive dans une prochaine version.") \
+				if engine.planet_id() == "mars" \
+				else Tr.t("Tous les objectifs de ce monde sont remplis : votre réseau de colonies tient debout. La suite arrive dans une prochaine version.")
 		_objective_bar.value = 100.0
 	else:
 		_objective_title.text = objective.title
@@ -119,12 +121,24 @@ func refresh() -> void:
 	var next := engine.state.next_resupply - engine.state.sol
 	var housing_left := engine.housing() - engine.state.colonists.size()
 	var left := engine.resupplies_left()
-	_info.text = Tr.t("%s %s\nÉvacués vers la Terre : %d.") % [
-		(Tr.t("Prochain ravitaillement de la Terre dans %s sol%s (%s).") % [NumberFormatter.format(next), "s" if next >= 2.0 else "",
-				Tr.t("le dernier avec des matériaux") if left == 1 else Tr.t("encore %d avec des matériaux") % left]) if left > 0
-				else Tr.t("La Terre n'envoie plus de matériaux : fabriquez-les avec le four à régolithe."),
-		Tr.t("Places libres : des recrues arriveront.") if housing_left > 0 else Tr.t("Aucune place libre : construisez un habitat pour accueillir des recrues."),
-		engine.state.evacuated]
+	var supply: String
+	if left > 0:
+		supply = Tr.t("Prochain ravitaillement de la Terre dans %s sol%s (%s).") % [NumberFormatter.format(next), "s" if next >= 2.0 else "",
+				Tr.t("le dernier avec des matériaux") if left == 1 else Tr.t("encore %d avec des matériaux") % left]
+	elif engine.planet_id() != "mars":
+		supply = Tr.t("Aucun ravitaillement de la Terre si loin : fabriquez vos matériaux ou faites-les livrer par cargaison.")
+	else:
+		supply = Tr.t("La Terre n'envoie plus de matériaux : fabriquez-les avec le four à régolithe.")
+	var crew: String
+	if housing_left <= 0:
+		crew = Tr.t("Aucune place libre : construisez un habitat pour accueillir des recrues.")
+	elif engine.state.recruits_sent < ColonyContent.RECRUITS.size():
+		crew = Tr.t("Places libres : des recrues arriveront.")
+	elif engine.campaign_colonies > 1:
+		crew = Tr.t("Places libres : d'autres colons peuvent venir par cargaison.")
+	else:
+		crew = Tr.t("Places libres.")
+	_info.text = Tr.t("%s %s\nÉvacués vers la Terre : %d.") % [supply, crew, engine.state.evacuated]
 
 
 ## Note d'efficacité : grande lettre, score, quatre jauges et le conseil le plus utile.

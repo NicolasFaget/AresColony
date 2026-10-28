@@ -5,7 +5,7 @@ extends RefCounted
 ## construit ce qui manque le plus, garde une réserve de matériaux, étend ses conduites vers la glace.
 
 const R = preload("res://core/colony_content.gd")
-const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate", "regolith", "sabatier", "rovers", "erv", "shielding", "fission", "soil"]
+const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate", "regolith", "sabatier", "rovers", "erv", "shielding", "fission", "soil", "spaceport", "brines", "cryogenics"]
 
 
 ## Lance la prochaine recherche disponible, dans l'ordre conseillé.
@@ -90,6 +90,14 @@ static func build(engine: ColonyEngine) -> void:
 		want = "garage"
 	elif outpost and engine.is_unlocked(engine.building_defs["kiln"]) and _count(engine, "kiln") < 2:
 		want = "kiln"
+	# Avant-poste équipé : un astroport pour exporter, et de quoi stocker le méthane.
+	elif outpost and _count(engine, "garage") > 0 and _count(engine, "tank") == 0 and engine.is_unlocked(engine.building_defs["tank"]):
+		want = "tank"
+	elif outpost and _count(engine, "garage") > 0 and not engine.has_spaceport() and engine.is_unlocked(engine.building_defs["spaceport"]) \
+			and engine.state.amount(R.MATERIALS) >= 200.0:
+		want = "spaceport"
+	elif outpost and engine.planet_id() == "titan" and engine.has_spaceport() and _count(engine, "tank") < 2:
+		want = "tank"
 	elif outpost and engine.capacity(R.ENERGY) < 150.0 and engine.is_unlocked(engine.building_defs["battery"]):
 		want = "battery"
 	elif outpost:
@@ -115,6 +123,11 @@ static func build(engine: ColonyEngine) -> void:
 		want = "sabatier"
 	elif engine.is_unlocked(engine.building_defs["erv"]) and _count(engine, "erv") == 0:
 		want = "erv"
+	elif engine.is_unlocked(engine.building_defs["spaceport"]) and _count(engine, "spaceport") == 0:
+		want = "spaceport"
+	# Ère 4 : de quoi remplir les vols vers Cérès et Titan.
+	elif engine.has_spaceport() and engine.capacity(R.METHANE) < 500.0 and engine.is_unlocked(engine.building_defs["tank"]):
+		want = "tank"
 	elif engine.capacity(R.ENERGY) < 150.0 and engine.is_unlocked(engine.building_defs["battery"]):
 		want = "battery"
 	if want.is_empty():
@@ -125,7 +138,7 @@ static func build(engine: ColonyEngine) -> void:
 	if not engine.is_unlocked(engine.building_defs[want]):
 		return
 	# Confort (habitat, batteries) : seulement si une réserve reste pour les urgences vitales.
-	if want in ["habitat", "battery", "garage", "erv", "sabatier", "bunker", "reactor", "biodome"] and engine.state.amount(R.MATERIALS) < engine.building_defs[want].cost + 50.0:
+	if want in ["habitat", "battery", "garage", "erv", "sabatier", "bunker", "reactor", "biodome", "spaceport", "tank"] and engine.state.amount(R.MATERIALS) < engine.building_defs[want].cost + 50.0:
 		return
 	if want in ["extractor", "brine", "methane_pump"] and not (want == "extractor" and engine.planet().ice_everywhere):
 		reach_ice(engine, want)
@@ -152,6 +165,70 @@ static func _count(engine: ColonyEngine, def_id: String) -> int:
 		if building.id == def_id:
 			count += 1
 	return count
+
+
+## Ère 4 : joue toutes les colonies, fonde Cérès puis Titan, et fait circuler les cargaisons
+## (matériaux de Cérès vers Mars, méthane de Mars vers Cérès, méthane de Titan vers le réseau).
+static func network(campaign: Campaign) -> void:
+	for colony in campaign.engines:
+		research(colony)
+		maintain(colony)
+		build(colony)
+	if not campaign.interplanetary_unlocked():
+		return
+	var planets := []
+	for i in campaign.colonies.size():
+		planets.append(campaign.planet_of(i))
+	for shipment in campaign.shipments:
+		if shipment.kind == "colony":
+			planets.append(Campaign.planet_of_region(shipment.region))
+	for region in ["ceres", "titan"]:
+		if not planets.has(region):
+			campaign.found_colony(0, region)
+			break
+	var mars := campaign.engines[0]
+	for i in range(1, campaign.engines.size()):
+		var colony := campaign.engines[i]
+		match campaign.planet_of(i):
+			"ceres":
+				var spare := colony.state.amount(R.MATERIALS) - 120.0
+				if spare >= 40.0:
+					for to in _by_free_space(campaign, R.MATERIALS, i):
+						if _ship(campaign, i, to, R.MATERIALS, minf(spare, 150.0)):
+							break
+				# Cérès n'a pas de méthane : Mars lui en envoie, une fois Titan fondée.
+				if planets.has("titan") and colony.state.amount(R.METHANE) < 40.0 and colony.capacity(R.METHANE) >= 100.0 \
+						and mars.state.amount(R.METHANE) >= 300.0:
+					_ship(campaign, 0, i, R.METHANE, 100.0)
+			"titan":
+				var stock := colony.state.amount(R.METHANE) - 30.0
+				if stock >= 150.0:
+					for to in _by_free_space(campaign, R.METHANE, i):
+						if _ship(campaign, i, to, R.METHANE, stock):
+							break
+
+
+## Autres colonies, de celle qui a le plus de place libre pour `resource` à celle qui en a le moins.
+static func _by_free_space(campaign: Campaign, resource: String, from: int) -> Array:
+	var list := []
+	for k in campaign.engines.size():
+		if k != from:
+			list.append(k)
+	var free := func(k: int) -> float:
+		var colony := campaign.engines[k]
+		return colony.capacity(resource) - colony.state.amount(resource) - colony.incoming.get(resource, 0.0)
+	list.sort_custom(func(a: int, b: int) -> bool: return free.call(a) > free.call(b))
+	return list
+
+
+## Envoie jusqu'à `amount` de `resource` (moins si le méthane du vol ou la place manque).
+static func _ship(campaign: Campaign, from: int, to: int, resource: String, amount: float) -> bool:
+	var x := amount
+	while x >= 20.0:
+		if campaign.shipment_problem(from, to, { resource: x }, 0).is_empty():
+			return campaign.send_cargo(from, to, { resource: x }, 0)
+		x *= 0.8
+	return false
 
 
 ## Améliore le module le moins cher, en gardant une réserve de matériaux et de données pour la recherche.

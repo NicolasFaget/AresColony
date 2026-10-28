@@ -26,6 +26,10 @@ for f in glob.glob(os.path.join(root, "**", "*.gd"), recursive=True):
         stripped = line.strip()
         if stripped.startswith("#"):
             continue
+        # Messages pour les développeurs (journal, avertissements, options de ligne de commande,
+        # clés internes de couleur) : jamais affichés au joueur.
+        if re.search(r"\b(push_warning|push_error|printerr|print|assert)\(|--[a-z]+=|: Color\(", line):
+            continue
         for m in pat.finditer(line):
             t = m.group(1)
             if not re.search(r"[A-Za-zÀ-ÿ]", t):

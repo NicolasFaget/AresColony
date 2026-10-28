@@ -1317,13 +1317,13 @@ func _quiz_block(card: Defs.Card) -> Control:
 
 
 func _show_resource(resource: String) -> void:
-	var flows := _engine.average_flows()
+	var flows := _engine.average_flows(true)
 	var lines: Array[String] = []
 	var unit: String = ColonyContent.RESOURCE_UNITS[resource]
 	# Mêmes débits que le bandeau (ColonyEngine.building_flows), regroupés par type de module.
 	var by_type := {}
 	for i in _engine.state.buildings.size():
-		var amount: float = _engine.building_flows(i).get(resource, 0.0)
+		var amount: float = _engine.building_flows(i, true).get(resource, 0.0)
 		if absf(amount) > 0.005:
 			var name := _engine.def_of(i).name
 			by_type[name] = by_type.get(name, 0.0) + amount

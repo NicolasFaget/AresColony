@@ -120,7 +120,11 @@ func apply_offline_seconds(elapsed: float) -> Dictionary:
 		var colony_report := engines[i].apply_offline_seconds(elapsed)
 		if i == active:
 			report = colony_report
-	time += report.get("sols", 0.0)
+	# L'horloge de la campagne suit le temps écoulé, comme en jeu : une colonie en veille
+	# s'arrête, mais les fusées continuent leur route.
+	var sols := clampf(elapsed, 0.0, ColonyEngine.OFFLINE_CAP_SECONDS) / ColonyEngine.OFFLINE_SECONDS_PER_SOL
+	if sols >= 0.01:
+		time += sols
 	_update_info()
 	_deliver()
 	return report
@@ -287,8 +291,9 @@ func _arrival_problem(to: int, cargo: Dictionary, colonists: int) -> String:
 		if room <= 0.0:
 			return Tr.t("Aucun stockage %s à l'arrivée : construisez-y d'abord un réservoir.") % name if r == ColonyContent.METHANE \
 					else Tr.t("Aucun stockage %s à l'arrivée.") % name
-		if cargo[r] + incoming.get(r, 0.0) > room + 0.001:
-			return Tr.t("Trop %s : la colonie d'arrivée n'en stocke que %s.") % [name, NumberFormatter.format(room)]
+		var free := maxf(0.0, room - target.state.amount(r) - incoming.get(r, 0.0))
+		if cargo[r] > free + 0.001:
+			return Tr.t("Trop %s : la colonie d'arrivée n'a de place que pour %s.") % [name, NumberFormatter.format(free)]
 	return ""
 
 
@@ -354,6 +359,7 @@ func _launch(kind: String, from: int, to: int, cargo: Dictionary, crew: Array, r
 		"colonists": crew, "region": region, "depart": time, "arrive": time + transit_sols(from, region),
 	})
 	next_shipment_id += 1
+	_update_info()
 
 
 func _deliver() -> void:
@@ -368,6 +374,10 @@ func _deliver() -> void:
 			shipment.to = _found(shipment)
 		else:
 			shipment.lost = engines[shipment.to].receive(shipment.cargo, shipment.colonists)
+			# Ce qui est perdu à l'arrivée ne compte pas pour les objectifs d'export.
+			var origin := engines[shipment.from]
+			origin.state.exported_materials = maxf(0.0, origin.state.exported_materials - float(shipment.lost.get(ColonyContent.MATERIALS, 0.0)))
+			origin.state.exported_methane = maxf(0.0, origin.state.exported_methane - float(shipment.lost.get(ColonyContent.METHANE, 0.0)))
 			deliveries += 1
 		_update_info()
 		shipment_arrived.emit(shipment)
@@ -420,6 +430,15 @@ func _update_info() -> void:
 		var planet := planet_of_region(state.region)
 		if not planets.has(planet):
 			planets.append(planet)
+	var reserved := []
+	for colony in engines:
+		reserved.append({})
+	for shipment in shipments:
+		if shipment.kind == "cargo" and shipment.to >= 0 and shipment.to < engines.size():
+			for r: String in shipment.cargo:
+				reserved[shipment.to][r] = reserved[shipment.to].get(r, 0.0) + float(shipment.cargo[r])
+	for k in engines.size():
+		engines[k].incoming = reserved[k]
 	for colony in engines:
 		colony.campaign_colonies = colonies.size()
 		colony.campaign_deliveries = deliveries

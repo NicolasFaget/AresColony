@@ -110,8 +110,6 @@ de vie de l'application.
 
 ## Équilibrage mesuré (joueur simulé, tests/run_tests.gd)
 
-| Objectif | Sol atteint |
-|---|---|
 Mesures d'octobre 2026 (Jezero, `_simulate_campaign`) :
 
 | Objectif | Sol atteint |
@@ -122,21 +120,41 @@ Mesures d'octobre 2026 (Jezero, `_simulate_campaign`) :
 | Équipage complet (8 colons) | 40 |
 | Ingénierie fine (4 synergies actives) | 42,8 |
 | Nuits sereines (150 kWh de stockage) | 43,8 |
-| Colonie modèle (note B, 12 modules) | 45,1 |
-| Autonomie (10 sols sans déficit réel, 8 colons) | 50 |
-| Carburant martien (ère 2) | 60,1 |
+| Colonie modèle (note B, 12 modules) | 44,8 |
+| Autonomie (10 sols sans déficit réel, 8 colons) | 50,2 |
+| Carburant martien (ère 2) | 60,8 |
 | Ville (ère 2) | 64 |
-| Explorateurs (3 expéditions) | 87,3 |
-| Retour assuré (véhicule de retour) | 124 |
-| Abri, Nucléaire, Jardin (ère 3) | 145 à 151 |
-| Enracinés (fin de l'ère 3) | 151,1 |
+| Explorateurs (3 expéditions) | 85,6 |
+| Retour assuré (véhicule de retour) | 119,9 |
+| Abri, Nucléaire, Jardin (ère 3) | 139,5 à 148,3 |
+| Enracinés (fin de l'ère 3) | 148,3 |
+| Porte des étoiles (astroport) | 157 |
+| Deuxième foyer, Cérès (fondation) | 251 |
+| Aux confins (Titan fondé), première livraison | 327 à 328 |
+| Mine de la ceinture (Cérès exporte 200 matériaux) | 410 |
+| Station-service de Saturne (Titan exporte 200 kg de méthane) | 475 |
+
+L'ère 4 est jouée pour de vrai par le joueur simulé (`ColonyBot.network`) : astroport, fondation de
+Cérès puis de Titan, matériaux de Cérès vers les colonies qui ont de la place, méthane de Mars vers
+Cérès (qui n'en produit pas), méthane de Titan vers le réseau. Le trajet Mars ⇄ Titan (78 sols) fait
+l'essentiel de la durée de l'ère 4.
 
 Avant-postes seuls, sans aucune cargaison de Mars (80 sols, `_simulate_outposts`) : Cérès respire au
-sol 1,5 et raffine la saumure au sol 31,5 ; Titan respire au sol 0,8 et pompe le méthane au sol 66 ;
-aucune évacuation.
+sol 1,5 et raffine la saumure au sol 29 ; Titan respire au sol 0,8 et pompe le méthane au sol 16
+(générateur à radio-isotopes de l'atterrisseur, +20 kWh/sol, comme Dragonfly ; pompe à 45 matériaux
+et 4 kWh/sol) ; aucune évacuation.
 
 Réacteur à fission : 60 kWh/sol jour et nuit, mais 1 matériau/sol d'entretien (moteurs Stirling,
-radiateurs). Sans matériaux, il ralentit : l'énergie gratuite ne règle plus tout en fin de partie.
+radiateurs). Sans matériaux, il ralentit, et une alerte « Réacteur à l'arrêt » le signale.
+
+Production : un module dont toutes les sorties sont pleines se met en veille et ne consomme rien
+(un réacteur ne mange plus de matériaux quand les batteries sont pleines). La place réservée par une
+cargaison en route compte comme pleine. Prévisions, bandeau et alertes utilisent les débits réels
+(rendement récent des modules) ; le conseiller juge l'énergie sur le bilan réel (`energy_balance`).
+
+Autonomie : 10 sols d'affilée sans déficit ; les tempêtes (plus 2 sols de remise en route) et les
+pannes en cours mettent le compteur en pause au lieu de le remettre à zéro, tant qu'aucune réserve
+vitale n'est vide. Une panne ne fait pas baisser le rendement moyen d'un module.
 
 Sans évacuation pour un joueur raisonnable. Un joueur qui ne fait rien perd son premier colon au
 sol 9,4 : le danger est réel mais laisse le temps d'apprendre. Les tests vérifient ces
@@ -166,11 +184,18 @@ fourchettes ; mettre ce tableau à jour après chaque rééquilibrage.
   (`research_era()`, `campaign_era`) ; un avant-poste d'ère 1 peut donc étudier les saumures ou la
   cryogénie sur place. Les guides de Cérès et Titan commencent par ces recherches.
 - Cargaisons : refusées si la colonie d'arrivée ne peut pas loger les colons ou stocker la cargaison
-  (en comptant les fusées déjà en route) ; une perte à l'arrivée est annoncée. Sur Cérès, le méthane
-  demande un réservoir (étape du guide).
+  dans sa place libre (stock actuel et fusées déjà en route compris) ; une perte à l'arrivée est
+  annoncée. Les exportations comptent au départ, et ce qui est perdu à l'arrivée en est retiré.
+  Sur Cérès, le méthane demande un réservoir (étape du guide).
+- Guides : chaque colonie garde ses propres guides passés. Cérès : électrolyseur, extracteur, four,
+  saumures, réservoir, garage, astroport, première cargaison. Titan : électrolyseur, extracteur, four,
+  cryogénie, pompe, garage, expédition, astroport, première cargaison.
 - Colonies en arrière-plan : pas d'événements, mais les rovers rentrent quand même.
 - Sauvegarde : une campagne illisible est mise de côté et signalée (`CORRUPTED`) ; modules, régions,
-  recherches et cargaisons inconnus d'une autre version sont écartés au chargement.
+  recherches et cargaisons inconnus d'une autre version sont écartés au chargement ; niveaux bornés,
+  atterrisseur toujours en tête (reposé s'il manque).
+- Absence : l'horloge de la campagne avance du temps écoulé, même si la colonie affichée se met en
+  veille (les fusées continuent leur route).
 
 ## Performances
 
@@ -205,6 +230,6 @@ fourchettes ; mettre ce tableau à jour après chaque rééquilibrage.
 ## Prochaines étapes
 
 1. Publication Google Play : AAB signé, fiche FR/EN, politique de confidentialité.
-2. Conception : branches de recherche exclusives (choix stratégiques), tension de fin de partie
-   (combustible du réacteur), parcours Cérès/Titan plus scénarisé.
+2. Conception : branches de recherche exclusives (choix stratégiques) ; un vrai besoin de Mars en
+   ère 4 (aujourd'hui Mars se suffit à elle-même, seuls Cérès et Titan ont besoin du réseau).
 3. Plus d'événements (météorites, aurores) ; sauvegarde dans le cloud.

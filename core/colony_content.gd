@@ -1,6 +1,6 @@
 class_name ColonyContent
 extends RefCounted
-## Contenu de l'ère « Survie » : modules, recherches, fiches de découverte, objectifs, équipage.
+## Contenu du jeu : modules, recherches, fiches de découverte, objectifs, équipage, mondes et régions.
 ## Les identifiants sont stockés dans la sauvegarde : ne jamais les renommer.
 ##
 ## Les quantités sont simplifiées pour le jeu, sauf mention contraire dans les fiches
@@ -167,8 +167,8 @@ static func buildings() -> Array[Defs.Building]:
 			"description": "Pompe la saumure sous la glace : de l'eau, et des sels (carbonates) pour les matériaux. À poser sur la glace.",
 		}),
 		Defs.Building.new({
-			"id": "methane_pump", "name": "Pompe à méthane", "size": Vector2i(2, 2), "cost": 70.0, "research": "cryogenics",
-			"requires_tile": ColonyMap.Tile.ICE, "inputs": { ENERGY: 6.0 }, "outputs": { METHANE: 5.0 },
+			"id": "methane_pump", "name": "Pompe à méthane", "size": Vector2i(2, 2), "cost": 45.0, "research": "cryogenics",
+			"requires_tile": ColonyMap.Tile.ICE, "inputs": { ENERGY: 4.0 }, "outputs": { METHANE: 5.0 },
 			"storage": { METHANE: 60.0 }, "card": "kraken",
 			"description": "Pompe le méthane liquide d'un lac de Titan : le carburant de tout le réseau. À poser au bord d'un lac.",
 		}),
@@ -209,7 +209,7 @@ const PLANETS := {
 		"ground": "Un sol de glace d'eau, dure comme de la roche à −180 °C, couvert de grains organiques.",
 		"ice": "La rive d'un lac de méthane et d'éthane liquides.",
 		"rock": "Des galets de glace arrondis par d'anciennes pluies de méthane : impossible de construire ici.",
-		"launch_fuel": 0.5, "atmosphere": true, "storms": false, "starter_reactor": true,
+		"launch_fuel": 0.5, "atmosphere": true, "storms": false, "starter_reactor": true, "lander_rtg": 20.0,
 		"ice_everywhere": true,
 		"forbidden": { "moxie": "L'air de Titan est fait d'azote et de méthane, presque sans CO₂.",
 			"sabatier": "L'air de Titan est fait d'azote et de méthane, presque sans CO₂.",
@@ -477,7 +477,7 @@ static func objectives() -> Array[Defs.Objective]:
 				"description": "Avec au moins 12 modules, atteindre la note d'efficacité B (70 / 100) : onglet Colonie.",
 				"reward": { MATERIALS: 60.0, DATA: 20.0 } }),
 		Defs.Objective.new({ "id": "autonomy", "title": "Autonomie",
-				"description": "Avec au moins 8 colons, tenir 10 sols d'affilée sans déficit d'oxygène, d'eau ni de nourriture.",
+				"description": "Avec au moins 8 colons, tenir 10 sols d'affilée sans déficit d'oxygène, d'eau ni de nourriture. Tempêtes et pannes mettent le compteur en pause.",
 				"reward": { MATERIALS: 100.0 } }),
 		Defs.Objective.new({ "id": "methane", "title": "Carburant martien", "era": 2,
 				"description": "Construire un réacteur Sabatier (recherche « Réaction de Sabatier »).",

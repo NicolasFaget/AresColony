@@ -36,6 +36,9 @@ func _init() -> void:
 	_test_offline()
 	_test_save()
 	_test_advisor()
+	_test_reactor()
+	_test_sanitize()
+	_test_campaign_offline()
 	_test_number_formatter()
 	_simulate_campaign()
 	_simulate_realtime()
@@ -314,6 +317,28 @@ func _test_network_outposts() -> void:
 	_check(campaign.shipment_problem(0, 1, { R.MATERIALS: 20.0 }, 0).is_empty(), "petite cargaison acceptée")
 	var lost := ceres.receive({ R.WATER: ceres.capacity(R.WATER) * 3.0 }, [])
 	_check(lost.get(R.WATER, 0.0) > 0.0, "perte signalée quand le stockage déborde")
+	# Place libre : le stock déjà présent à l'arrivée compte.
+	var water_room := ceres.capacity(R.WATER)
+	ceres.state.resources[R.WATER] = water_room * 0.8
+	var partial := campaign.shipment_problem(0, 1, { R.WATER: water_room * 0.5 }, 0)
+	_check(partial.begins_with("Trop"), "cargaison refusée quand l'arrivée est presque pleine : " + partial)
+	_check(campaign.shipment_problem(0, 1, { R.WATER: water_room * 0.15 }, 0).is_empty(), "cargaison acceptée dans la place libre")
+	# Exportations : comptées au départ, puis corrigées de ce qui est perdu à l'arrivée.
+	mars.state.resources[R.METHANE] = 600.0
+	mars.state.resources[R.MATERIALS] = 300.0
+	ceres.state.resources[R.MATERIALS] = 0.0
+	var exported_before := mars.state.exported_materials
+	_check(campaign.send_cargo(0, 1, { R.MATERIALS: 20.0 }, 0), "première cargaison de matériaux partie")
+	mars.state.resources[R.METHANE] = 600.0
+	_check(campaign.send_cargo(0, 1, { R.MATERIALS: 20.0 }, 0), "seconde cargaison de matériaux partie")
+	_check(_near(mars.state.exported_materials, exported_before + 40.0, 0.01), "export compté au départ")
+	# Pendant le voyage, Cérès remplit ses entrepôts : il ne reste de place que pour une cargaison.
+	ceres.state.resources[R.MATERIALS] = ceres.capacity(R.MATERIALS) - 20.0
+	var arrival: float = campaign.shipments[-1].arrive
+	campaign.time = arrival + 0.1
+	campaign._deliver()
+	_check(_near(mars.state.exported_materials, exported_before + 20.0, 0.01),
+			"la cargaison perdue est retirée de l'export (%.1f)" % (mars.state.exported_materials - exported_before))
 
 	# Expédition vers Ahuna Mons : le rover revient même en arrière-plan.
 	campaign.switch_to(0)
@@ -466,7 +491,7 @@ func _test_guides() -> void:
 	outpost.setup_outpost([{ "name": "A", "role": "x", "health": 1.0 }], { R.MATERIALS: 250.0 })
 	var first := ColonyAdvisor.tutorial_step(outpost)
 	_check(first >= 0 and ColonyAdvisor.TUTORIAL[first].get("planet", "mars") == "ceres", "guide de Cérès dans l'avant-poste")
-	_check(ColonyAdvisor.era_steps(1, "titan").size() == 6, "guide de Titan")
+	_check(ColonyAdvisor.era_steps(1, "titan").size() == 9, "guide de Titan")
 
 
 # ---------- Ère 3 ----------
@@ -973,6 +998,65 @@ func _test_offline() -> void:
 
 # ---------- Conseiller ----------
 
+## Réacteur : en veille quand l'énergie est pleine, alerte quand il manque de matériaux.
+## Sauvegarde abîmée : niveaux bornés, atterrisseur remis en tête.
+func _test_sanitize() -> void:
+	var source := _engine()
+	source.state.research_done.append("fission")
+	source.state.resources[R.MATERIALS] = 400.0
+	_check(source.place("reactor", ColonyBot.connected_spot(source, "reactor")), "réacteur posé (sauvegarde abîmée)")
+	var data := source.state.to_dict()
+	data.buildings[1].level = 9
+	data.buildings.reverse()
+	var loaded := ColonyEngine.new(ColonyState.from_dict(data))
+	_check(loaded.state.buildings[0].id == "lander", "atterrisseur remis en tête")
+	_check(loaded.level_of(1) == loaded.max_level(1), "niveau borné au maximum du module")
+	_check(loaded.is_linked(1), "le réacteur reste raccordé")
+	var no_lander := source.state.to_dict()
+	no_lander.buildings.remove_at(0)
+	var repaired := ColonyEngine.new(ColonyState.from_dict(no_lander))
+	_check(repaired.state.buildings[0].id == "lander", "atterrisseur manquant reposé")
+
+
+## Absence : l'horloge de la campagne avance même si la colonie affichée se met en veille.
+func _test_campaign_offline() -> void:
+	var campaign := Campaign.from_state(ColonyState.new())
+	var start := campaign.time
+	campaign.engine().state.resources[R.OXYGEN] = 0.0
+	var report := campaign.apply_offline_seconds(3.0 * 3600.0)
+	var expected := 3.0 * 3600.0 / ColonyEngine.OFFLINE_SECONDS_PER_SOL
+	_check(not str(report.get("standby", "")).is_empty(), "colonie affichée en veille dès le départ")
+	_check(_near(campaign.time - start, expected, 0.001), "l'horloge de la campagne suit le temps écoulé (%.2f sols)" % (campaign.time - start))
+
+
+func _test_reactor() -> void:
+	var engine := _calm_engine()
+	engine.state.research_done.append("fission")
+	engine.state.resources[R.MATERIALS] = 400.0
+	var spot := ColonyBot.connected_spot(engine, "reactor")
+	_check(spot.x >= 0 and engine.place("reactor", spot), "réacteur posé")
+	var reactor := engine.state.buildings.size() - 1
+	# Énergie pleine : il ne tourne que pour compenser la consommation, et s'économise.
+	engine.state.resources[R.MATERIALS] = 100.0
+	engine.state.resources[R.ENERGY] = engine.capacity(R.ENERGY)
+	engine.advance(2.0)
+	var used := 100.0 - engine.state.amount(R.MATERIALS)
+	_check(used < 1.5, "réacteur en veille quand l'énergie est pleine (%.2f matériaux en 2 sols)" % used)
+	_check(ColonyAdvisor.stalled_reactors(engine) == 0, "pas d'alerte pour un réacteur en veille")
+	# Sans matériaux : il s'arrête, et le conseiller le dit.
+	engine.state.resources[R.MATERIALS] = 0.0
+	engine.state.resources[R.ENERGY] = 0.0
+	engine.advance(3.0)
+	_check(engine.efficiency_avg(reactor) < 0.5, "réacteur à l'arrêt sans matériaux")
+	_check(ColonyAdvisor.stalled_reactors(engine) == 1, "réacteur à l'arrêt détecté")
+	var titles: Array[String] = []
+	for alert in ColonyAdvisor.alerts(engine):
+		titles.append(alert.title)
+	_check(titles.has("Réacteur à l'arrêt : plus de matériaux"), "alerte réacteur à l'arrêt : %s" % [titles])
+	_check(engine.energy_balance() < engine.average_flows()[R.ENERGY] - 30.0, "bilan énergétique réel sans le réacteur")
+	_check(engine.average_flows(true)[R.ENERGY] < engine.average_flows()[R.ENERGY] - 30.0, "bandeau : débit réel sans le réacteur")
+
+
 func _test_advisor() -> void:
 	var engine := _calm_engine()
 	var days := ColonyAdvisor.forecast(engine)
@@ -1079,6 +1163,31 @@ func _simulate_campaign() -> void:
 		ColonyBot.build(engine)
 		engine.advance(0.25)
 
+	# Ère 4, jouée pour de vrai : astroport, fondations, cargaisons et objectifs de Cérès et Titan.
+	var campaign := Campaign.from_engine(engine)
+	var network_goals := ["spaceport", "outpost", "cargo", "ceres", "titan",
+			"ceres_breath", "ceres_brine", "ceres_ahuna", "ceres_export", "titan_breath", "titan_pump", "titan_selk", "titan_fuel"]
+	var reached := {}
+	while campaign.time < 900.0 and reached.size() < network_goals.size():
+		ColonyBot.network(campaign)
+		campaign.advance(0.25)
+		for colony in campaign.engines:
+			for id in colony.state.objectives_done:
+				if id in network_goals and not reached.has(id):
+					reached[id] = campaign.time
+	print("\n--- Ère 4 et réseau (joueur simulé) ---")
+	for id in network_goals:
+		print("%-14s %s" % [id, "sol %.1f" % reached[id] if reached.has(id) else "non atteint"])
+	print("Colonies : %s · livraisons %d" % [campaign.colonies.map(func(c: ColonyState) -> String:
+			return "%s (%d colons, exporté %.0f mat. / %.0f kg CH₄)" % [c.region, c.colonists.size(), c.exported_materials, c.exported_methane]), campaign.deliveries])
+	for i in campaign.engines.size():
+		var colony := campaign.engines[i]
+		print("  %s : matériaux %.0f/%.0f, méthane %.0f/%.0f, astroport %s" % [colony.state.region, colony.state.amount(R.MATERIALS), colony.capacity(R.MATERIALS),
+				colony.state.amount(R.METHANE), colony.capacity(R.METHANE), colony.has_spaceport()])
+	for id in network_goals:
+		_check(reached.has(id), "ère 4 jouée : objectif %s" % id)
+	_check(reached.get("titan_fuel", INF) < 600.0, "réseau complet avant le sol 600")
+
 	print("\n--- Campagne « Survie » (joueur simulé) ---")
 	for objective in engine.objectives:
 		print("%-14s %s" % [objective.id, "sol %.1f" % done[objective.id] if done.has(objective.id) else "non atteint"])
@@ -1096,7 +1205,11 @@ func _simulate_campaign() -> void:
 		if objective.era == 2:
 			era2 = maxf(era2, done.get(objective.id, INF))
 	_check(era2 <= 160.0, "ère 2 accomplie avant le sol 160")
-	_check(done.size() >= mars_objectives and done.values().max() <= 250.0, "ère 3 accomplie avant le sol 250")
+	var era3 := 0.0
+	for objective in engine.objectives:
+		if objective.era <= 3:
+			era3 = maxf(era3, done.get(objective.id, INF))
+	_check(era3 <= 250.0, "ère 3 accomplie avant le sol 250")
 	_check(evacuations[0] == 0, "un joueur raisonnable ne perd aucun colon")
 
 	# Un joueur qui ne fait rien finit par mettre la colonie en danger, mais pas tout de suite.
@@ -1178,3 +1291,4 @@ func _simulate_outposts() -> void:
 		_check(evacuations[0] == 0, "%s : l'avant-poste survit seul" % region)
 		_check(done.has(region + "_breath"), "%s : premier oxygène" % region)
 		_check(done.has("ceres_brine" if region == "ceres" else "titan_pump"), "%s : premier module du monde" % region)
+		_check(region != "titan" or done.get("titan_pump", INF) <= 25.0, "Titan : la pompe à méthane arrive tôt")

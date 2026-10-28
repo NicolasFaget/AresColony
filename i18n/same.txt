@@ -52,7 +52,6 @@ B
 C
 D
 E
-Module inconnu ignoré : %s
 Synergies
 K
 M
@@ -61,8 +60,6 @@ T
 %d min
 %d h
 %d h %02d
-FPS %d · GPU %.1f ms · objets %d · primitives %d
---save=
 \n
 %s · %s
 %s ⇄ %s
@@ -87,8 +84,6 @@ Sol %d · %02d:%02d
 SF Pro Text
 Segoe UI
 Helvetica Neue
-ingénieur
-IconStudio absent de l'arbre
 %s|%s|%s
 NASA JPL (2009)
 NASA (2023)

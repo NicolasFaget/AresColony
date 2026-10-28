@@ -82,6 +82,10 @@ const TUTORIAL := [
 		"text": "Construisez un réservoir de méthane : sans lui, le méthane livré par Mars n'a nulle part où aller." },
 	{ "id": "build_garage", "planet": "ceres", "tab": TAB_BUILD, "target": "garage",
 		"text": "Construisez un garage à rovers. Les expéditions roulent au méthane : faites-en venir de Mars." },
+	{ "id": "build_spaceport", "planet": "ceres", "tab": TAB_BUILD, "target": "spaceport",
+		"text": "Construisez un astroport : c'est lui qui expédiera les matériaux de Cérès vers vos autres colonies." },
+	{ "id": "first_export", "planet": "ceres", "tab": TAB_COLONY, "target": "network",
+		"text": "Envoyez une cargaison de matériaux (bouton planète, en haut). Le vol consomme du méthane venu de Mars ; 200 matériaux au total pour l'objectif." },
 	# Titan.
 	{ "id": "build_electrolyser", "planet": "titan", "tab": TAB_BUILD, "target": "electrolyser",
 		"text": "Pas de CO₂ sur Titan : construisez un électrolyseur d'eau pour l'oxygène." },
@@ -93,14 +97,20 @@ const TUTORIAL := [
 		"text": "Recherchez « Cryogénie du méthane » pour pomper les lacs de Titan." },
 	{ "id": "build_methane_pump", "planet": "titan", "tab": TAB_BUILD, "target": "methane_pump",
 		"text": "Posez une pompe à méthane au bord d'un lac (les zones sombres)." },
-	{ "id": "first_expedition", "planet": "titan", "tab": TAB_BUILD, "target": "garage",
-		"text": "Construisez un garage à rovers, puis partez vers le cratère Selk." },
+	{ "id": "build_garage", "planet": "titan", "tab": TAB_BUILD, "target": "garage",
+		"text": "Construisez un garage à rovers : le cratère Selk vous attend." },
+	{ "id": "first_expedition", "planet": "titan", "tab": TAB_COLONY, "target": "expeditions",
+		"text": "Lancez une expédition avec votre méthane : ici, le carburant se pompe sur place." },
+	{ "id": "build_spaceport", "planet": "titan", "tab": TAB_BUILD, "target": "spaceport",
+		"text": "Construisez un astroport, et des réservoirs : Titan sera la station-service du réseau." },
+	{ "id": "first_export", "planet": "titan", "tab": TAB_COLONY, "target": "network",
+		"text": "Envoyez une cargaison de méthane vers une autre colonie (bouton planète, en haut) : 200 kg au total pour l'objectif." },
 ]
 
 
 ## Sols restants avant épuisement de chaque ressource vitale (INF si la réserve ne baisse pas).
 static func forecast(engine: ColonyEngine) -> Dictionary:
-	var flows := engine.average_flows()
+	var flows := engine.average_flows(true)
 	var result := {}
 	for r in ColonyContent.VITAL:
 		var flow: float = flows[r]
@@ -129,6 +139,22 @@ static func alerts(engine: ColonyEngine) -> Array[Dictionary]:
 			"advice": fix.text, "tab": fix.tab, "target": fix.target,
 		})
 	list.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.sols < b.sols)
+
+	var stalled := stalled_reactors(engine)
+	if stalled > 0:
+		var source := "kiln" if not engine.planet().forbidden.has("kiln") else "brine"
+		list.insert(0, { "level": "danger", "resource": ColonyContent.ENERGY, "sols": 0.0,
+			"title": (Tr.t("%d réacteurs à l'arrêt : plus de matériaux") % stalled) if stalled > 1 else Tr.t("Réacteur à l'arrêt : plus de matériaux"),
+			"advice": Tr.t("Un réacteur use 1 matériau par sol en pièces de rechange. Fabriquez des matériaux ou faites-en livrer par cargaison."),
+			"tab": TAB_BUILD, "target": source })
+	else:
+		var balance := engine.energy_balance()
+		var stock := engine.state.amount(ColonyContent.ENERGY)
+		if balance < -0.05 and stock / -balance <= WARNING_SOLS:
+			var step := _energy_step(engine, Tr.t("La colonie consomme plus d'énergie qu'elle n'en produit."))
+			list.append({ "level": "warning", "resource": ColonyContent.ENERGY, "sols": stock / -balance,
+				"title": Tr.t("Énergie : déficit de %s kWh/sol") % NumberFormatter.format(-balance),
+				"advice": step.text, "tab": step.tab, "target": step.target })
 
 	var isolated := 0
 	for i in engine.state.buildings.size():
@@ -174,9 +200,20 @@ static func alerts(engine: ColonyEngine) -> Array[Dictionary]:
 	return list
 
 
+## Réacteurs raccordés qui tournent à moins de la moitié faute de matériaux.
+static func stalled_reactors(engine: ColonyEngine) -> int:
+	var count := 0
+	for i in engine.state.buildings.size():
+		var def := engine.def_of(i)
+		if def.inputs.has(ColonyContent.MATERIALS) and def.outputs.has(ColonyContent.ENERGY) \
+				and engine.is_linked(i) and not engine.is_broken(i) and engine.efficiency_avg(i) < 0.5:
+			count += 1
+	return count
+
+
 ## Marche à suivre pour une ressource qui baisse, selon l'avancement de la colonie.
 static func _fix(engine: ColonyEngine, resource: String) -> Dictionary:
-	var energy_short: bool = engine.average_flows()[ColonyContent.ENERGY] < 0.0
+	var energy_short: bool = engine.energy_balance() < 0.0
 	match resource:
 		ColonyContent.OXYGEN:
 			if engine.planet().forbidden.has("moxie"):
@@ -269,6 +306,8 @@ static func is_step_done(engine: ColonyEngine, step_id: String) -> bool:
 			return engine.campaign_colonies >= 2
 		"first_cargo":
 			return engine.campaign_deliveries >= 1
+		"first_export":
+			return engine.state.exported_materials > 0.0 or engine.state.exported_methane > 0.0
 		"build_bunker":
 			return engine.shelter_capacity() >= mini(engine.state.colonists.size(), 8)
 	# Les autres étapes : « research_x » (lancée ou faite) et « build_x » (module raccordé).

@@ -77,6 +77,8 @@ const FLARE_DAMAGE := 1.0
 const ROOTED_CREW := 20
 const ROOTED_SCORE := 85.0
 const AUTONOMY_CREW := 8
+## Sols après une tempête pendant lesquels le compteur d'autonomie reste en pause.
+const AUTONOMY_STORM_GRACE := 2.0
 
 const START_RESOURCES := {
 	ColonyContent.ENERGY: 30.0, ColonyContent.OXYGEN: 30.0, ColonyContent.WATER: 80.0,
@@ -107,6 +109,9 @@ var dust_rate := DUST_RATE
 ## Ce que la campagne dit à la colonie (objectifs de l'ère 4).
 var campaign_colonies := 1
 var campaign_deliveries := 0
+## Place réservée par les cargaisons en route vers cette colonie ({ ressource: quantité }) :
+## les producteurs s'arrêtent avant de la prendre.
+var incoming := {}
 var campaign_planets: Array = ["mars"]
 ## Ère la plus avancée du réseau de colonies : elle ouvre les recherches dans toutes les colonies.
 var campaign_era := 1
@@ -125,6 +130,10 @@ var _capacity_cache := {}
 var breakdown_rate := BREAKDOWN_RATE
 ## Rendement moyen récent de chaque module (lissé sur environ un demi-sol, pour la note).
 var _efficiency_avg: Array[float] = []
+## Modules en veille : toutes leurs sorties sont pleines, ils ne consomment plus rien.
+var _idle: Array[bool] = []
+## Fin de la remise en route après la dernière tempête (compteur d'autonomie en pause).
+var _storm_calm_at := -INF
 var _occupied := {}
 var _rng := RandomNumberGenerator.new()
 var _storm_warned := false
@@ -146,6 +155,7 @@ func _init(p_state: ColonyState) -> void:
 			objectives.append(objective)
 	_sanitize()
 	map = ColonyMap.new(state.map_seed, state.region)
+	_ensure_lander()
 	_rng.seed = state.map_seed
 	_rng.state = state.event_seed
 	if state.buildings.is_empty():
@@ -160,11 +170,24 @@ func _sanitize() -> void:
 	if not ColonyContent.REGIONS.has(state.region):
 		state.region = "jezero"
 	var kept: Array[Dictionary] = []
+	var lander := {}
 	for building in state.buildings:
-		if building_defs.has(building.get("id", "")):
-			kept.append(building)
-		else:
-			push_warning("Module inconnu ignoré : %s" % building.get("id", "?"))
+		var id: String = str(building.get("id", ""))
+		if not building_defs.has(id):
+			push_warning("Module inconnu ignoré : %s" % id)
+			continue
+		# Niveau borné entre 1 et le niveau maximal du module.
+		var top: int = 1 + ColonyContent.UPGRADES.get(id, []).size()
+		var level: Variant = building.get("level", 1)
+		building.level = clampi(int(level) if (level is int or level is float) else 1, 1, top)
+		# Un seul atterrisseur, toujours en tête : les raccordements partent de lui.
+		if id == "lander":
+			if lander.is_empty():
+				lander = building
+			continue
+		kept.append(building)
+	if not lander.is_empty():
+		kept.insert(0, lander)
 	state.buildings = kept
 	var known: Array[String] = []
 	for id in state.research_done:
@@ -174,6 +197,23 @@ func _sanitize() -> void:
 	if not state.research_active.is_empty() and not research_defs.has(state.research_active):
 		state.research_active = ""
 		state.research_progress = 0.0
+
+
+## Sauvegarde abîmée sans atterrisseur : on le repose à sa place (en écartant ce qui l'encombre).
+func _ensure_lander() -> void:
+	if state.buildings.is_empty() or state.buildings[0].id == "lander":
+		return
+	push_warning("Atterrisseur manquant : remis en place.")
+	var cells := _footprint(map.lander_cell, building_defs["lander"].size)
+	var kept: Array[Dictionary] = [{ "id": "lander", "x": map.lander_cell.x, "y": map.lander_cell.y, "level": 1 }]
+	for building in state.buildings:
+		var overlaps := false
+		for c in _footprint(Vector2i(int(building.get("x", 0)), int(building.get("y", 0))), building_defs[building.id].size):
+			if c in cells:
+				overlaps = true
+		if not overlaps:
+			kept.append(building)
+	state.buildings = kept
 
 
 func _new_game() -> void:
@@ -202,6 +242,29 @@ func is_linked(index: int) -> bool:
 
 func efficiency(index: int) -> float:
 	return _efficiency[index]
+
+
+## Rendement récent (moyenne glissante) : bas quand une entrée manque depuis un moment.
+func efficiency_avg(index: int) -> float:
+	return _efficiency_avg[index]
+
+
+func is_idle(index: int) -> bool:
+	return _idle[index]
+
+
+## Bilan énergétique réaliste par sol : production réelle (un réacteur sans matériaux ne produit
+## rien) moins la demande nominale des modules et des colons. Négatif : il manque de l'énergie.
+func energy_balance() -> float:
+	var e := ColonyContent.ENERGY
+	var balance: float = -colonist_needs().get(e, 0.0) * state.colonists.size()
+	for i in state.buildings.size():
+		var def := def_of(i)
+		if def.outputs.has(e):
+			balance += building_flows(i, true).get(e, 0.0)
+		elif def.inputs.has(e):
+			balance += building_flows(i).get(e, 0.0)
+	return balance
 
 
 func building_at(cell: Vector2i) -> int:
@@ -346,6 +409,8 @@ func building_status(index: int) -> Dictionary:
 		return { "ok": false, "text": Tr.t("Non raccordé : collez-le à un module relié à l'atterrisseur.") }
 	if is_broken(index):
 		return { "ok": false, "text": Tr.t("En panne : réparez-le (%s matériaux).") % NumberFormatter.format(repair_cost(index)[ColonyContent.MATERIALS]) }
+	if _idle[index]:
+		return { "ok": true, "text": Tr.t("En veille : stockage plein, il ne consomme rien.") }
 	if not def.inputs.is_empty():
 		var e := _efficiency[index]
 		if e < 0.999:
@@ -712,9 +777,13 @@ func _step(ds: float) -> void:
 	var demand := {}
 	var passive := {}
 	for i in n:
+		_idle[i] = false
 		if not _connected[i] or is_broken(i):
 			continue
 		var def := def_of(i)
+		if OS.get_environment("NOIDLE") == "" and not def.inputs.is_empty() and _outputs_full(def):
+			_idle[i] = true
+			continue
 		if def.inputs.is_empty():
 			for r: String in def.outputs:
 				passive[r] = passive.get(r, 0.0) + _output_rate(i, r, sun) * ds
@@ -739,13 +808,19 @@ func _step(ds: float) -> void:
 			var def := def_of(i)
 			e = 1.0
 			for r: String in def.inputs:
-				e = minf(e, satisfied[r])
+				e = minf(e, satisfied[r] if satisfied.has(r) else minf(1.0, state.amount(r) / maxf(_input_rate(i, r) * ds, 1e-6)))
+			if _idle[i]:
+				# En veille : le rendement suit ce qu'il pourrait faire, sans rien consommer.
+				_efficiency[i] = e
+				_efficiency_avg[i] = lerpf(_efficiency_avg[i], e, minf(1.0, ds * 2.0))
+				continue
 			for r: String in def.inputs:
 				delta[r] = delta.get(r, 0.0) - _input_rate(i, r) * e * ds
 			for r: String in def.outputs:
 				delta[r] = delta.get(r, 0.0) + _output_rate(i, r, sun) * e * ds
+			# Moyenne des entrées disponibles : une panne ou un débranchement ne la fait pas baisser.
+			_efficiency_avg[i] = lerpf(_efficiency_avg[i], e, minf(1.0, ds * 2.0))
 		_efficiency[i] = e
-		_efficiency_avg[i] = lerpf(_efficiency_avg[i], e, minf(1.0, ds * 2.0))
 	for r: String in needs:
 		delta[r] = delta.get(r, 0.0) - needs[r] * count * ds * satisfied.get(r, 1.0)
 	delta[ColonyContent.DATA] = delta.get(ColonyContent.DATA, 0.0) + ColonyContent.COLONIST_DATA * count * ds
@@ -829,6 +904,9 @@ func _output_rate(index: int, resource: String, sun: float) -> float:
 	var rate: float = def.outputs[resource] * rate_factor(index, resource, true)
 	if def.solar and resource == ColonyContent.ENERGY:
 		rate *= sun * (1.0 - DUST_LOSS * dust_of(index))
+		# Générateur à radio-isotopes de l'atterrisseur (Titan, comme Dragonfly) : jour et nuit.
+		if def.id == "lander":
+			rate += planet().get("lander_rtg", 0.0)
 	if resource == ColonyContent.FOOD:
 		rate *= effect("food")
 	return rate
@@ -894,6 +972,7 @@ func _events(ds: float) -> void:
 		unlock_card("storm")
 	elif state.storm_until > 0.0 and state.sol >= state.storm_until:
 		state.storm_until = -1.0
+		_storm_calm_at = state.sol + AUTONOMY_STORM_GRACE
 		_storm_warned = false
 		storm_ended.emit()
 
@@ -1174,6 +1253,14 @@ func _update_autonomy(ds: float) -> void:
 		_autonomy_flows = average_flows(true)
 		_autonomy_age = 0.0
 	var flows := _autonomy_flows
+	# Tempête et remise en route, ou machine en panne à réparer : pause tant que rien ne manque.
+	if is_storm() or state.sol < _storm_calm_at or broken_count() > 0:
+		var stocked := state.colonists.size() >= AUTONOMY_CREW
+		for r in ColonyContent.VITAL:
+			stocked = stocked and state.amount(r) > 0.0
+		if not stocked:
+			state.autonomy_streak = 0.0
+		return
 	var ok: bool = flows[ColonyContent.ENERGY] >= 0.0 and state.colonists.size() >= AUTONOMY_CREW
 	for r in ColonyContent.VITAL:
 		ok = ok and flows[r] >= 0.0 and state.amount(r) > 0.0
@@ -1485,6 +1572,16 @@ func _has_connected(def_id: String) -> bool:
 	return false
 
 
+## Toutes les sorties d'un module sont à pleine capacité (inutile de le faire tourner).
+func _outputs_full(def: Defs.Building) -> bool:
+	if def.outputs.is_empty():
+		return false
+	for r: String in def.outputs:
+		if state.amount(r) < capacity(r) - incoming.get(r, 0.0) - 0.01:
+			return false
+	return true
+
+
 func _scarcest_input(def: Defs.Building) -> String:
 	var worst := ""
 	var lowest := INF
@@ -1514,6 +1611,8 @@ func _rebuild() -> void:
 	_connected.resize(n)
 	_connected.fill(false)
 	_efficiency.resize(n)
+	_idle.resize(n)
+	_idle.fill(false)
 	var old := _efficiency_avg.size()
 	_efficiency_avg.resize(n)
 	for i in range(old, n):
