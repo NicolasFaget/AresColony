@@ -195,7 +195,7 @@ func first_free_slot() -> String:
 const TEST_SAVES_DIR := "res://game/test_saves/"
 
 
-## Copie la partie de test `test_name` (« ere4 », « ceres », « titan ») dans l'emplacement `slot`, datée de
+## Copie la partie de test `test_name` (« ere3 », « ere4 », « ceres », « titan ») dans l'emplacement `slot`, datée de
 ## maintenant (pas d'absence à rattraper).
 func install_test_save(slot: String, test_name: String) -> bool:
 	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(TEST_SAVES_DIR + test_name + ".json"))
