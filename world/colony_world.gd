@@ -20,6 +20,7 @@ const CORRIDOR_GLASS := Color(0.72, 0.9, 1.0, 0.32)
 
 const DAY_SKY := Color(0.74, 0.5, 0.34)
 const NIGHT_SKY := Color(0.03, 0.035, 0.07)
+const AURORA_GLOW := Color(0.3, 0.85, 0.5)
 const STORM_SKY := Color(0.62, 0.4, 0.26)
 
 var rig: CameraRig
@@ -191,6 +192,15 @@ func _drop_in(node: Node3D) -> void:
 	tween.tween_property(node, "position", target, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tween.tween_property(node, "scale", Vector3.ONE, 0.5).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT).set_delay(0.3)
 	tween.chain().tween_callback(func() -> void: _dust_puff(target, 1.0))
+
+
+## Impact de météorite : gerbe de poussière sur le module touché (ou à côté de l'atterrisseur).
+func impact(index: int) -> void:
+	var at := Vector3(_engine.map.lander_cell.x + 4.0, 0.0, _engine.map.lander_cell.y + 3.0)
+	if index >= 0 and index < _engine.state.buildings.size():
+		var b: Dictionary = _engine.state.buildings[index]
+		at = footprint_center(Vector2i(b.x, b.y), _engine.def_of(index).size)
+	_dust_puff(at, 2.5)
 
 
 func _dust_puff(at: Vector3, strength: float) -> void:
@@ -523,6 +533,10 @@ func _update_sky(delta: float) -> void:
 	_sky_mat.sky_horizon_color = horizon
 	_sky_mat.ground_horizon_color = horizon.darkened(0.2)
 	_sky_mat.ground_bottom_color = Color(0.3, 0.14, 0.08).lerp(Color(0.04, 0.03, 0.05), 1.0 - daylight)
+	# Aurore verte (oxygène, 557,7 nm), la nuit : une lueur dans le ciel seulement, pas sur le sol.
+	if _engine.is_aurora():
+		_sky_mat.sky_horizon_color = horizon.lerp(AURORA_GLOW, 0.35 * (1.0 - daylight))
+		_sky_mat.sky_top_color = top.lerp(AURORA_GLOW * 0.3, 0.2 * (1.0 - daylight))
 
 
 ## Monde sans atmosphère : ciel noir de jour comme de nuit, soleil blanc et dur, ombres très sombres.

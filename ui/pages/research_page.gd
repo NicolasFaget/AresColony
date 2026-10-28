@@ -18,7 +18,7 @@ func _ready() -> void:
 
 func refresh() -> void:
 	var engine := GameManager.engine
-	var order := { "active": 0, "available": 1, "locked": 2, "done": 3 }
+	var order := { "active": 0, "available": 1, "locked": 2, "done": 3, "excluded": 4 }
 	var sorted := _rows.duplicate()
 	sorted.sort_custom(func(a: ResearchRow, b: ResearchRow) -> bool:
 		var sa: int = order[engine.research_state(a.research.id)]

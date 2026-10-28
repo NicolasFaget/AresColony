@@ -67,6 +67,8 @@ class Research:
 	var summary: String
 	## Ère à partir de laquelle la recherche est possible.
 	var era: int
+	## Choix exclusif : la recherche concurrente (lancer l'une écarte l'autre pour toute la partie).
+	var rival: String
 
 	func _init(p: Dictionary) -> void:
 		id = p.id
@@ -78,6 +80,7 @@ class Research:
 		effects = p.get("effects", {})
 		card = p.get("card", "")
 		summary = p.get("summary", "")
+		rival = p.get("rival", "")
 
 
 ## Fiche de découverte : un fait réel, sourcé.

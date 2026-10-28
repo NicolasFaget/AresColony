@@ -354,6 +354,46 @@ func _run() -> void:
 			main._world.rig.zoom(0.7)
 			await _frames(30)
 			await _shot("94_azote")
+		"choix":
+			ColonyBot.play(engine, 60.0)
+			engine.state.speed = 0
+			engine.state.research_active = ""
+			for id in ["cleaning", "recycling"]:
+				if not engine.state.research_done.has(id):
+					engine.state.research_done.append(id)
+			engine.state.resources[ColonyContent.DATA] = 200.0
+			main = await _open_main()
+			_close_modals(main)
+			main._select_tab(2)
+			await _frames(30)
+			await _shot("B0_choix")
+			for row in main._research_page._rows:
+				if row.research.id == "hardened":
+					row._on_start()
+			await _frames(20)
+			await _shot("B1_choix_confirmation")
+			_close_modals(main)
+			engine.start_research("hardened")
+			main._research_page.refresh()
+			await _frames(10)
+			await _shot("B2_choix_ecarte")
+		"aurore":
+			ColonyBot.play(engine, 60.0)
+			engine.state.speed = 0
+			engine.state.sol = floorf(engine.state.sol) + 1.92
+			engine.state.aurora_until = engine.state.sol + 1.0
+			main = await _open_main()
+			_close_modals(main)
+			if not main._window.collapsed:
+				main._window.toggle_collapsed()
+			await _frames(60)
+			await _shot("B3_aurore")
+			engine.state.next_meteor = engine.state.sol
+			engine.state.era = maxi(engine.state.era, 2)
+			engine.breakdown_rate = ColonyEngine.BREAKDOWN_RATE
+			engine.state.speed = 1
+			await _frames(8)
+			await _shot("B4_meteorite")
 		"arcadia":
 			manager.stop_game()
 			var menu: Control = load("res://ui/menu.tscn").instantiate()

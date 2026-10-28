@@ -41,6 +41,8 @@ func _init() -> void:
 	_test_campaign_offline()
 	_test_nitrogen()
 	_test_test_save()
+	_test_choices()
+	_test_meteors_and_aurora()
 	_test_number_formatter()
 	_simulate_campaign()
 	_simulate_realtime()
@@ -83,8 +85,10 @@ func _calm_engine() -> ColonyEngine:
 ## Engine avec toutes les recherches faites et beaucoup de matériaux (tests de construction).
 func _rich_engine() -> ColonyEngine:
 	var engine := _calm_engine()
+	# Toutes les recherches, sauf les choix exclusifs (seule l'option la plus neutre pour les tests).
 	for r: Defs.Research in engine.research_defs.values():
-		engine.state.research_done.append(r.id)
+		if r.rival.is_empty():
+			engine.state.research_done.append(r.id)
 	engine.state.resources[R.MATERIALS] = 400.0
 	return engine
 
@@ -1032,6 +1036,117 @@ func _test_campaign_offline() -> void:
 
 
 ## Azote : dôme vide sans azote, compresseur vingt fois moins efficace sur Mars, seconde vague de recrues.
+# ---------- Choix exclusifs ----------
+
+func _test_choices() -> void:
+	var pairs := 0
+	var engine := _rich_engine()
+	for r: Defs.Research in engine.research_defs.values():
+		if r.rival.is_empty():
+			continue
+		pairs += 1
+		var rival: Defs.Research = engine.research_defs.get(r.rival)
+		_check(rival != null and rival.rival == r.id and rival.era == r.era, "choix %s : réciproque, même ère" % r.id)
+	_check(pairs == 6, "trois choix exclusifs (%d recherches)" % pairs)
+	engine.state.era = 4
+	engine.state.resources[R.DATA] = 500.0
+	_check(engine.research_state("solid_state") == "available" and engine.research_state("hardened") == "available", "les deux options ouvertes")
+	_check(engine.start_research("hardened"), "choix lancé")
+	_check(engine.research_state("solid_state") == "excluded", "l'autre option est écartée dès le lancement")
+	engine.advance(3.0)
+	_check(engine.state.research_done.has("hardened") and engine.research_state("solid_state") == "excluded", "écartée pour de bon")
+	_check(not engine.start_research("solid_state"), "option écartée : impossible à lancer")
+	# Batteries à électrolyte solide : +50 % de stockage.
+	var lander := engine.map.lander_cell
+	var batteries := _rich_engine()
+	batteries.place("battery", lander + Vector2i(2, 0))
+	var before := batteries.capacity(R.ENERGY)
+	batteries.state.research_done.append("solid_state")
+	_check(_near(batteries.capacity(R.ENERGY) - before, 30.0), "batteries à électrolyte solide : +50 %% (+%.1f)" % (batteries.capacity(R.ENERGY) - before))
+	# Forage profond : +50 % d'eau aux extracteurs.
+	var drill := _rich_engine()
+	var ice := ColonyBot.connected_spot(drill, "extractor")
+	for cell in drill.map.ice_cells():
+		if drill.placement_problem("extractor", cell).is_empty():
+			ice = cell
+			break
+	drill.place("extractor", ice)
+	var extractor := drill.state.buildings.size() - 1
+	var water := drill._output_rate(extractor, R.WATER, 1.0)
+	drill.state.research_done.append("deep_drill")
+	drill._effect_cache.clear()
+	_check(_near(drill._output_rate(extractor, R.WATER, 1.0), water * 1.5), "forage profond : +50 % d'eau")
+	# Réseau : un choix lancé dans une colonie écarte l'autre option partout.
+	var mars := _rich_engine()
+	mars.state.resources[R.DATA] = 500.0
+	mars.state.era = 4
+	var campaign := Campaign.from_engine(mars)
+	var st := ColonyState.new()
+	st.region = "ceres"
+	campaign._add_colony(st)
+	campaign.sync_knowledge()
+	_check(mars.start_research("closed_loop"), "Mars choisit le recyclage intégral")
+	campaign.advance(0.01)
+	_check(campaign.engines[1].research_state("deep_drill") == "excluded", "Cérès : le forage profond est écarté")
+	var copy := ColonyState.from_dict(JSON.parse_string(JSON.stringify(mars.state.to_dict())))
+	_check(copy.research_active == "closed_loop", "choix en cours sauvegardé")
+
+
+# ---------- Météorites et aurores ----------
+
+func _test_meteors_and_aurora() -> void:
+	var engine := _rich_engine()
+	engine.breakdown_rate = 1e-9
+	engine.state.era = 2
+	var lander := engine.map.lander_cell
+	engine.place("moxie", lander + Vector2i(2, 0))
+	var moxie := engine.state.buildings.size() - 1
+	var hits := []
+	engine.meteor_impact.connect(func(i: int) -> void: hits.append(i))
+	engine.advance(0.05)
+	_check(engine.state.next_meteor > engine.state.sol + ColonyEngine.METEOR_MIN_SOLS - 0.1
+			and engine.state.next_meteor < engine.state.sol + ColonyEngine.METEOR_MAX_SOLS, "météorite programmée à l'ère 2")
+	engine.state.next_meteor = engine.state.sol + 0.01
+	var materials := engine.state.amount(R.MATERIALS)
+	engine.advance(0.05)
+	_check(hits.size() == 1 and hits[0] == moxie and engine.is_broken(moxie), "météorite : le module est endommagé")
+	_check(_near(engine.state.amount(R.MATERIALS), materials + ColonyEngine.METEOR_SALVAGE), "éclats récupérés")
+	_check(engine.state.cards_unlocked.has("impacts"), "fiche des impacts")
+	var copy := ColonyState.from_dict(JSON.parse_string(JSON.stringify(engine.state.to_dict())))
+	_check(_near(copy.next_meteor, engine.state.next_meteor), "prochaine météorite sauvegardée")
+	# Pas de météorite à l'ère 1, ni sur Titan (atmosphère épaisse), ni sans pannes (tests).
+	var early := _rich_engine()
+	early.breakdown_rate = 1e-9
+	early.advance(1.0)
+	_check(early.state.next_meteor >= 1e8, "aucune météorite à l'ère 1")
+	var st := ColonyState.new()
+	st.region = "titan"
+	st.era = 3
+	var titan := ColonyEngine.new(st)
+	titan.advance(1.0)
+	_check(titan.state.next_meteor >= 1e8, "aucune météorite sur Titan")
+	# Aurore : après une éruption solaire, sur Mars seulement.
+	var aurora := _rich_engine()
+	aurora.state.era = 3
+	aurora.state.next_flare = aurora.state.sol + 0.01
+	var seen := [0]
+	aurora.aurora_started.connect(func() -> void: seen[0] += 1)
+	var data := aurora.state.amount(R.DATA)
+	aurora.advance(ColonyEngine.FLARE_SOLS + 0.1)
+	_check(seen[0] == 1 and aurora.is_aurora(), "aurore après l'éruption")
+	_check(aurora.state.amount(R.DATA) >= data + ColonyEngine.AURORA_DATA - 0.01, "aurore : des données")
+	_check(aurora.state.cards_unlocked.has("aurora"), "fiche de l'aurore")
+	aurora.advance(ColonyEngine.AURORA_SOLS + 0.1)
+	_check(not aurora.is_aurora(), "l'aurore s'éteint")
+	var ceres_state := ColonyState.new()
+	ceres_state.region = "ceres"
+	ceres_state.era = 3
+	var ceres := ColonyEngine.new(ceres_state)
+	ceres.state.next_flare = ceres.state.sol + 0.01
+	ceres.advance(ColonyEngine.FLARE_SOLS + 0.1)
+	_check(not ceres.is_aurora(), "pas d'aurore sur Cérès (pas d'atmosphère)")
+
+
 ## La partie de test du menu (versions de développement) se charge en ère 4.
 func _test_test_save() -> void:
 	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://game/test_saves/ere4.json"))

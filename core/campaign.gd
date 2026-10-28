@@ -83,6 +83,12 @@ func colony_name(index: int) -> String:
 func advance(sols: float) -> void:
 	if sols <= 0.0:
 		return
+	for i in engines.size():
+		var others := []
+		for k in colonies.size():
+			if k != i and not colonies[k].research_active.is_empty():
+				others.append(colonies[k].research_active)
+		engines[i].network_research = others
 	engine().advance(sols)
 	time += sols
 	_background += sols

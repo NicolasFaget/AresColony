@@ -228,6 +228,20 @@ func _connect_engine() -> void:
 	_engine.expedition_returned.connect(func(site: Dictionary) -> void:
 		AudioManager.play("milestone")
 		_news.post(Tr.t("Le rover est rentré : %s. Butin : %s.") % [Tr.t(site.name), ColonyPage._reward_text(site.reward)]))
+	_engine.meteor_impact.connect(func(i: int) -> void:
+		AudioManager.play("alert")
+		GameManager.vibrate(80)
+		_world.impact(i)
+		if i >= 0:
+			_news.post(Tr.t("Impact de météorite sur le module « %s » : réparez-le. Les éclats de métal récupérés font %d matériaux.")
+					% [Tr.t(_engine.def_of(i).name), roundi(ColonyEngine.METEOR_SALVAGE)])
+		else:
+			_news.post(Tr.t("Une petite météorite est tombée près de la colonie. Les éclats de métal récupérés font %d matériaux.")
+					% roundi(ColonyEngine.METEOR_SALVAGE)))
+	_engine.aurora_started.connect(func() -> void:
+		AudioManager.play("milestone")
+		_news.post(Tr.t("Une aurore verte illumine la nuit martienne ! Les mesures des colons rapportent %d données.")
+				% roundi(ColonyEngine.AURORA_DATA)))
 	_engine.dust_devil.connect(func(count: int) -> void:
 		_news.post((Tr.t("Un tourbillon de poussière a balayé %d panneaux. Merci le vent !") % count) if count > 1
 				else Tr.t("Un tourbillon de poussière a balayé un panneau. Merci le vent !")))

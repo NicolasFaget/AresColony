@@ -25,6 +25,9 @@ signal flare_started
 signal flare_ended
 signal expedition_returned(site: Dictionary)
 signal dust_devil(cleaned: int)
+## Météorite : le module touché (endommagé), ou -1 si elle est tombée à côté.
+signal meteor_impact(index: int)
+signal aurora_started
 
 ## Durée d'un sol en jeu, à vitesse ×1 (secondes réelles).
 const SECONDS_PER_SOL := 60.0
@@ -75,6 +78,14 @@ const RETURN_METHANE := 200.0
 const FLARE_WARNING_SOLS := 0.5
 const FLARE_SOLS := 0.3
 const FLARE_DAMAGE := 1.0
+## Météorites (Mars et Cérès, à partir de l'ère 2) : intervalle en sols, éclats récupérés.
+const METEOR_ERA := 2
+const METEOR_MIN_SOLS := 25.0
+const METEOR_MAX_SOLS := 45.0
+const METEOR_SALVAGE := 15.0
+## Aurore martienne après une éruption solaire : durée (sols) et données des observations.
+const AURORA_SOLS := 1.0
+const AURORA_DATA := 15.0
 ## Ère 3 : colons visés et note demandée.
 const ROOTED_CREW := 20
 const ROOTED_SCORE := 85.0
@@ -117,6 +128,9 @@ var incoming := {}
 var campaign_planets: Array = ["mars"]
 ## Ère la plus avancée du réseau de colonies : elle ouvre les recherches dans toutes les colonies.
 var campaign_era := 1
+## Recherches en cours dans les autres colonies (le savoir est partagé : un choix exclusif lancé
+## ailleurs écarte aussi la recherche concurrente ici).
+var network_research: Array = []
 # Caches (le jeu avance d'un tout petit pas à chaque image : chaque microseconde compte).
 ## Par module : [niveau, multiplicateurs d'entrée, multiplicateurs de sortie] (synergies et améliorations).
 var _factor_cache: Array = []
@@ -129,6 +143,7 @@ var _autonomy_flows := {}
 var _autonomy_age := INF
 ## Capacités de stockage par ressource (vidées quand un module est posé, démoli ou amélioré).
 var _capacity_cache := {}
+var _capacity_research := -1
 var breakdown_rate := BREAKDOWN_RATE
 ## Rendement moyen récent de chaque module (lissé sur environ un demi-sol, pour la note).
 var _efficiency_avg: Array[float] = []
@@ -276,6 +291,10 @@ func building_at(cell: Vector2i) -> int:
 func capacity(resource: String) -> float:
 	if resource == ColonyContent.DATA:
 		return INF
+	# Une recherche (terminée ici ou reçue d'une autre colonie) peut changer les capacités.
+	if state.research_done.size() != _capacity_research:
+		_capacity_cache.clear()
+		_capacity_research = state.research_done.size()
 	if _capacity_cache.has(resource):
 		return _capacity_cache[resource]
 	var total := 0.0
@@ -326,6 +345,8 @@ func storage_of(index: int, resource: String) -> float:
 	var amount: float = def_of(index).storage.get(resource, 0.0)
 	for upgrade: Dictionary in _upgrades_of(index):
 		amount *= upgrade.get("storage", {}).get(resource, 1.0)
+	if resource == ColonyContent.ENERGY and def_of(index).id == "battery":
+		amount *= effect("battery")
 	return amount
 
 
@@ -630,6 +651,9 @@ func research_state(research_id: String) -> String:
 	if state.research_active == research_id:
 		return "active"
 	var r: Defs.Research = research_defs[research_id]
+	if not r.rival.is_empty() and (state.research_done.has(r.rival) or state.research_active == r.rival
+			or network_research.has(r.rival)):
+		return "excluded"
 	if r.era > research_era():
 		return "locked"
 	for req: String in r.requires:
@@ -941,6 +965,10 @@ func _output_rate(index: int, resource: String, sun: float) -> float:
 		rate *= planet().get("air_nitrogen", 0.0)
 	if resource == ColonyContent.FOOD:
 		rate *= effect("food")
+	elif resource == ColonyContent.WATER and def.id == "extractor":
+		rate *= effect("ice_water")
+	elif resource == ColonyContent.MATERIALS and def.id == "kiln":
+		rate *= effect("materials")
 	return rate
 
 
@@ -1033,8 +1061,11 @@ func _events(ds: float) -> void:
 
 	_dust_devils()
 	_breakdowns(ds)
+	_meteors()
 	_finish_expedition()
 	_flares()
+	if state.aurora_until > 0.0 and state.sol >= state.aurora_until:
+		state.aurora_until = -1.0
 
 
 # ---------- Poussière et pannes ----------
@@ -1160,11 +1191,38 @@ func _breakdowns(ds: float) -> void:
 		if not _connected[i] or is_broken(i) or not state.buildings[i].id in ColonyContent.BREAKABLE:
 			continue
 		drew = true
-		if _rng.randf() < breakdown_rate * ds:
+		if _rng.randf() < breakdown_rate * effect("breakdowns") * ds:
 			state.buildings[i].broken = true
 			breakdown.emit(i)
 	if drew:
 		state.event_seed = _rng.state
+
+
+## Petites météorites (Mars et Cérès, ère 2 et suivantes) : un module endommagé, des éclats récupérés.
+## Comme les pannes, désactivées quand breakdown_rate vaut 0 (tests).
+func _meteors() -> void:
+	if breakdown_rate <= 0.0 or not planet().get("meteors", false) or state.era < METEOR_ERA:
+		return
+	if state.next_meteor >= 1e8:
+		state.next_meteor = state.sol + _rng.randf_range(METEOR_MIN_SOLS, METEOR_MAX_SOLS)
+		state.event_seed = _rng.state
+		return
+	if state.sol < state.next_meteor:
+		return
+	state.next_meteor = state.sol + _rng.randf_range(METEOR_MIN_SOLS, METEOR_MAX_SOLS)
+	var targets: Array[int] = []
+	for i in state.buildings.size():
+		if _connected[i] and not is_broken(i) and state.buildings[i].id in ColonyContent.BREAKABLE:
+			targets.append(i)
+	var hit := -1
+	if not targets.is_empty():
+		hit = targets[_rng.randi_range(0, targets.size() - 1)]
+		state.buildings[hit].broken = true
+	state.event_seed = _rng.state
+	_add(ColonyContent.MATERIALS, METEOR_SALVAGE)
+	unlock_card("impacts")
+	meteor_impact.emit(hit)
+	changed.emit()
 
 
 # ---------- Expéditions (ère 2) ----------
@@ -1262,6 +1320,16 @@ func _flares() -> void:
 		state.flare_until = -1.0
 		_flare_warned = false
 		flare_ended.emit()
+		# Les particules de l'éruption illuminent l'atmosphère martienne (pas de champ magnétique global).
+		if planet_id() == "mars":
+			state.aurora_until = state.sol + AURORA_SOLS
+			_add(ColonyContent.DATA, AURORA_DATA)
+			unlock_card("aurora")
+			aurora_started.emit()
+
+
+func is_aurora() -> bool:
+	return state.aurora_until > 0.0 and state.sol < state.aurora_until
 
 
 func resupplies_left() -> int:
@@ -1485,6 +1553,10 @@ func _shift_schedule(shift: float) -> void:
 		state.storm_until += shift
 	if state.flare_until > 0.0:
 		state.flare_until += shift
+	if state.next_meteor < 1e8:
+		state.next_meteor += shift
+	if state.aurora_until > 0.0:
+		state.aurora_until += shift
 
 
 # ---------- Campagne : astroport, cargaisons ----------

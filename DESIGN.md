@@ -101,6 +101,19 @@ de vie de l'application.
   les colons au-delà des places d'abri (habitats enterrés, 4 places) perdent 1 de santé par sol.
   Réacteur à fission (60 kWh/sol constants), serre géante (sol vivant). Fin : 20 colons, tous abrités,
   note A. Joueur simulé : ère 3 vers le sol 150.
+- Choix exclusifs (`Research.rival`) : un par ère, des recherches à effet seul (jamais un module,
+  pour ne bloquer aucun objectif). Lancer l'une écarte l'autre pour toute la partie, dans toutes les
+  colonies (`network_research` : un choix en cours ailleurs compte déjà) ; confirmation avant.
+  Ère 2 : batteries à électrolyte solide (+50 % de stockage) ou panneaux renforcés (tempêtes ×1,6,
+  poussière ×0,5). Ère 3 : recyclage intégral (eau des colons ×0,5) ou forage profond (extracteurs
+  +50 %). Ère 4 : impression 3D au régolithe (four +40 %) ou maintenance prédictive (pannes −60 %).
+  Le joueur simulé prend batteries, recyclage et maintenance.
+- Météorites (Mars et Cérès, dès l'ère 2 ; pas sur Titan, protégée par son atmosphère épaisse) :
+  tous les 25 à 45 sols, une machine raccordée tombe en panne et 15 matériaux d'éclats sont
+  récupérés ; fiche « impacts » (InSight, décembre 2021). Coupées avec `breakdown_rate = 0`.
+- Aurores (Mars seulement, sans champ magnétique global) : à la fin de chaque éruption solaire,
+  une aurore verte d'un sol (+15 données, lueur dans le ciel de nuit) ; fiche « aurora »
+  (Perseverance, mars 2024).
 - Fiches : chacune a un chiffre clé, une illustration et un quiz à trois choix, tirés uniquement de
   son texte sourcé. Déblocage = écran plein « Nouvelle découverte » ; première lecture +5 données,
   bonne réponse au quiz +10 (une seule tentative).
@@ -122,23 +135,24 @@ Mesures d'octobre 2026 (Jezero, `_simulate_campaign`) :
 | Nuits sereines (150 kWh de stockage) | 43,8 |
 | Colonie modèle (note B, 12 modules) | 44,8 |
 | Autonomie (10 sols sans déficit réel, 8 colons) | 50,2 |
-| Carburant martien (ère 2) | 60,8 |
+| Carburant martien (ère 2) | 61,3 |
 | Ville (ère 2) | 64 |
 | Explorateurs (3 expéditions) | 85,6 |
-| Retour assuré (véhicule de retour) | 119,9 |
-| Abri, Nucléaire, Jardin (ère 3) | 139,5 à 148,3 |
-| Enracinés (fin de l'ère 3) | 148,3 |
-| Porte des étoiles (astroport) | 157 |
+| Retour assuré (véhicule de retour) | 120,5 |
+| Abri, Nucléaire, Jardin (ère 3) | 138,5 à 145,3 |
+| Enracinés (fin de l'ère 3) | 145,3 |
+| Porte des étoiles (astroport) | 156 |
 | Deuxième foyer, Cérès (fondation) | 251 |
 | Aux confins (Titan fondé), première livraison | 327 à 328 |
 | Capitale martienne (30 colons, un grand dôme pressurisé) | 404 |
 | Mine de la ceinture (Cérès exporte 200 matériaux) | 410 |
-| Station-service de Saturne (Titan exporte 200 kg de méthane) | 442 |
+| Station-service de Saturne (Titan exporte 200 kg de méthane) | 475 |
 
 L'ère 4 est jouée pour de vrai par le joueur simulé (`ColonyBot.network`) : astroport, fondation de
 Cérès puis de Titan, matériaux de Cérès vers les colonies qui ont de la place, méthane de Mars vers
 Cérès (qui n'en produit pas), méthane de Titan vers le réseau. Le trajet Mars ⇄ Titan (78 sols) fait
-l'essentiel de la durée de l'ère 4.
+l'essentiel de la durée de l'ère 4. L'astroport a un hangar de 200 matériaux : sans lui, Mars et
+Titan, pleines (400, la seule réserve de l'atterrisseur), ne pouvaient plus recevoir les exports de Cérès.
 
 Avant-postes seuls, sans aucune cargaison de Mars (80 sols, `_simulate_outposts`) : Cérès respire au
 sol 1,5 et raffine la saumure au sol 29 ; Titan respire au sol 0,8 et pompe le méthane au sol 16
@@ -240,5 +254,6 @@ fourchettes ; mettre ce tableau à jour après chaque rééquilibrage.
 ## Prochaines étapes
 
 1. Publication Google Play : AAB signé, fiche FR/EN, politique de confidentialité.
-2. Conception : branches de recherche exclusives (choix stratégiques).
-3. Plus d'événements (météorites, aurores) ; sauvegarde dans le cloud.
+2. Sauvegarde dans le cloud entre appareils (Google Play Games, après la publication) ; pour
+   l'instant, la sauvegarde automatique d'Android (`user_data_backup/allow`) garde les parties
+   dans le compte Google et les rend après une réinstallation ou sur un nouveau téléphone.

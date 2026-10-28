@@ -1,6 +1,7 @@
 class_name ResearchRow
 extends PanelContainer
-## Ligne d'une recherche : nom, effet, coût en données, état (verrouillée, disponible, en cours, faite).
+## Ligne d'une recherche : nom, effet, coût en données, état (verrouillée, disponible, en cours, faite,
+## écartée par un choix exclusif).
 
 var research: Defs.Research
 
@@ -48,7 +49,7 @@ func _ready() -> void:
 func refresh() -> void:
 	var engine := GameManager.engine
 	var state := engine.research_state(research.id)
-	theme_type_variation = "RowLocked" if state == "locked" else "Row"
+	theme_type_variation = "RowLocked" if state in ["locked", "excluded"] else "Row"
 	_bar.visible = state == "active"
 	_button.visible = state == "available"
 	match state:
@@ -59,6 +60,9 @@ func refresh() -> void:
 			_status.text = Tr.t("En cours… (%d %%)") % roundi(engine.state.research_progress * 100.0)
 			_status.add_theme_color_override("font_color", Palette.FAME)
 			_bar.value = engine.state.research_progress * 100.0
+		"excluded":
+			_status.text = Tr.t("Écartée : vous avez choisi « %s ».") % Tr.t(engine.research_defs[research.rival].name)
+			_status.add_theme_color_override("font_color", Palette.TEXT_DIM)
 		"locked" when research.era > engine.research_era():
 			_status.text = Tr.t("Ère %d : accomplissez d'abord l'ère en cours.") % research.era
 			_status.add_theme_color_override("font_color", Palette.TEXT_DIM)
@@ -68,6 +72,11 @@ func refresh() -> void:
 				names.append(Tr.t(engine.research_defs[req].name))
 			_status.text = Tr.t("Nécessite : %s") % ", ".join(names)
 			_status.add_theme_color_override("font_color", Palette.TEXT_DIM)
+		_ when not research.rival.is_empty():
+			_status.text = Tr.t("Choix exclusif : écarte « %s ».") % Tr.t(engine.research_defs[research.rival].name)
+			_status.add_theme_color_override("font_color", Palette.FAME)
+			var can := engine.state.research_active.is_empty() and engine.state.amount(ColonyContent.DATA) >= research.cost
+			_button.disabled = not can
 		_:
 			_status.text = Tr.t("Durée : %s sol") % NumberFormatter.format(research.duration)
 			_status.add_theme_color_override("font_color", Palette.TEXT_MUTED)
@@ -76,6 +85,29 @@ func refresh() -> void:
 
 
 func _on_start() -> void:
+	# Couche des fenêtres de l'écran de jeu (un parent de cette ligne).
+	var host: Control = null
+	var node := get_parent()
+	while node != null and host == null:
+		if "_modal_layer" in node:
+			host = node.get("_modal_layer")
+		node = node.get_parent()
+	if research.rival.is_empty() or host == null:
+		_start()
+		return
+	var rival: Defs.Research = GameManager.engine.research_defs[research.rival]
+	Modal.open(host, {
+		"icon": "data",
+		"title": Tr.t("Choisir « %s » ?") % Tr.t(research.name),
+		"body": Tr.t("C'est un choix pour toute la partie : « %s » ne sera plus possible.\n\n%s") % [Tr.t(rival.name), Tr.t(rival.summary)],
+		"confirm_text": Tr.t("Choisir"),
+		"confirm_style": "PurpleButton",
+		"cancel_text": Tr.t("Annuler"),
+		"on_confirm": _start,
+	})
+
+
+func _start() -> void:
 	if GameManager.engine.start_research(research.id):
 		AudioManager.play("click")
 		GameManager.vibrate(15)

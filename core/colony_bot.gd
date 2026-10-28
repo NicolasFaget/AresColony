@@ -5,7 +5,7 @@ extends RefCounted
 ## construit ce qui manque le plus, garde une réserve de matériaux, étend ses conduites vers la glace.
 
 const R = preload("res://core/colony_content.gd")
-const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate", "regolith", "sabatier", "rovers", "erv", "shielding", "fission", "soil", "spaceport", "brines", "cryogenics", "buffer_gas"]
+const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate", "regolith", "sabatier", "rovers", "erv", "solid_state", "shielding", "fission", "soil", "closed_loop", "spaceport", "brines", "cryogenics", "buffer_gas", "predictive"]
 
 
 ## Lance la prochaine recherche disponible, dans l'ordre conseillé.

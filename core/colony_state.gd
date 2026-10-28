@@ -25,6 +25,10 @@ var sites_done: Array[String] = []
 var expeditions: int = 0
 ## Éruptions solaires (ère 3) : prochaine, et fin de celle en cours.
 var next_flare: float = 1e9
+## Prochaine météorite (1e9 : pas encore programmée, elle l'est à l'ère 2).
+var next_meteor: float = 1e9
+## Fin de l'aurore en cours (-1 : aucune).
+var aurora_until: float = -1.0
 var flare_until: float = -1.0
 ## Fiches déjà lues (la première lecture rapporte des données).
 var cards_read: Array[String] = []
@@ -100,6 +104,8 @@ func to_dict() -> Dictionary:
 		"expeditions": expeditions,
 		"next_flare": next_flare,
 		"flare_until": flare_until,
+		"next_meteor": next_meteor,
+		"aurora_until": aurora_until,
 		"cards_read": cards_read.duplicate(),
 		"quiz_answers": quiz_answers.duplicate(),
 		"map_seed": map_seed,
@@ -165,6 +171,8 @@ static func from_dict(data: Dictionary) -> ColonyState:
 	state.expeditions = int(_num(data.get("expeditions"), 0))
 	state.next_flare = _num(data.get("next_flare"), state.next_flare)
 	state.flare_until = _num(data.get("flare_until"), -1.0)
+	state.next_meteor = _num(data.get("next_meteor"), state.next_meteor)
+	state.aurora_until = _num(data.get("aurora_until"), -1.0)
 	state.cards_read = _ids(data.get("cards_read"))
 	var answers: Variant = data.get("quiz_answers")
 	if answers is Dictionary:
