@@ -1,6 +1,7 @@
 extends SceneTree
 ## Fabrique les parties de test proposées au menu des versions de développement.
 ## Usage : godot --headless --path . -s tools/make_test_save.gd
+## - ere1.json : Mars au milieu de l'ère 1 (sol ERA1_SOL), premiers modules posés ;
 ## - ere2.json à ere4.json : Mars jouée par le joueur simulé jusqu'au début de cette ère ;
 ## - ceres.json, titan.json : le réseau joué jusqu'à la fondation de cette colonie (plus quelques
 ##   sols pour ses premiers modules), affichée au chargement.
@@ -8,10 +9,14 @@ extends SceneTree
 const DIR := "res://game/test_saves/"
 ## Sols joués après la fondation, le temps que le joueur simulé pose les premiers modules.
 const SETTLE_SOLS := 3.0
+## La partie « ère 1 » : à mi-chemin de l'ère 2 (vers le sol 51 avec le joueur simulé).
+const ERA1_SOL := 25.0
 
 
 func _initialize() -> void:
 	var engine := ColonyEngine.new(ColonyState.new())
+	ColonyBot.play(engine, ERA1_SOL)
+	_write("ere1", Campaign.from_engine(engine).to_dict())
 	for era in [2, 3, 4]:
 		while engine.state.era < era and engine.state.sol < 400.0:
 			ColonyBot.play(engine, engine.state.sol + 1.0)
