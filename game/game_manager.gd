@@ -191,6 +191,19 @@ func first_free_slot() -> String:
 	return ""
 
 
+## Partie de test des versions de développement (voir tools/make_test_save.gd).
+const TEST_SAVE := "res://game/test_saves/ere4.json"
+
+
+## Copie la partie de test dans l'emplacement `slot`, datée de maintenant (pas d'absence à rattraper).
+func install_test_save(slot: String) -> bool:
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(TEST_SAVE))
+	if not data is Dictionary:
+		return false
+	SaveService.new(FileSaveStorage.new(save_dir, slot)).save_campaign(Campaign.from_dict(data), SaveService.now_unix())
+	return true
+
+
 func delete_slot(slot: String) -> void:
 	var storage := FileSaveStorage.new(save_dir, slot)
 	for path in [storage.save_path, storage.backup_path, storage.temp_path]:

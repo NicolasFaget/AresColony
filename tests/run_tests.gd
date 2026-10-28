@@ -40,6 +40,7 @@ func _init() -> void:
 	_test_sanitize()
 	_test_campaign_offline()
 	_test_nitrogen()
+	_test_test_save()
 	_test_number_formatter()
 	_simulate_campaign()
 	_simulate_realtime()
@@ -1031,6 +1032,16 @@ func _test_campaign_offline() -> void:
 
 
 ## Azote : dôme vide sans azote, compresseur vingt fois moins efficace sur Mars, seconde vague de recrues.
+## La partie de test du menu (versions de développement) se charge en ère 4.
+func _test_test_save() -> void:
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://game/test_saves/ere4.json"))
+	_check(data is Dictionary, "partie de test lisible")
+	if data is Dictionary:
+		var campaign := Campaign.from_dict(data)
+		_check(campaign.engine().state.era == 4, "partie de test en ère 4")
+		_check(campaign.engine().recruits_left() > 0, "partie de test : seconde vague à venir")
+
+
 func _test_nitrogen() -> void:
 	var mars := _calm_engine()
 	for id in ["spaceport", "buffer_gas"]:

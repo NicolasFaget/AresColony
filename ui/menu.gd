@@ -103,6 +103,8 @@ func _build_layout() -> void:
 		UiFx.hbox(12, [_menu_button(Tr.t("Réglages"), "Button", _show_settings), _menu_button(Tr.t("À propos"), "Button", _show_about),
 				_menu_button(Tr.t("Quitter"), "Button", _quit)]),
 	])
+	if OS.is_debug_build():
+		buttons.add_child(_menu_button(Tr.t("Partie de test · ère 4"), "Button", _on_test_game))
 	for row in buttons.get_children():
 		if row is HBoxContainer:
 			for b in row.get_children():
@@ -180,6 +182,16 @@ func _on_new_game() -> void:
 		_show_slots(true)
 		return
 	_choose_region(slot)
+
+
+## Versions de développement : partie déjà en ère 4, dans un emplacement libre.
+func _on_test_game() -> void:
+	var slot := GameManager.first_free_slot()
+	if slot.is_empty():
+		_show_slots()
+		return
+	if GameManager.install_test_save(slot):
+		GameManager.open_game(slot)
 
 
 ## Choix du site d'atterrissage d'une nouvelle colonie.
