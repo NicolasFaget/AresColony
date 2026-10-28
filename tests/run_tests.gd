@@ -1040,6 +1040,8 @@ func _test_test_save() -> void:
 		var campaign := Campaign.from_dict(data)
 		_check(campaign.engine().state.era == 4, "partie de test en ère 4")
 		_check(campaign.engine().recruits_left() > 0, "partie de test : seconde vague à venir")
+	data = JSON.parse_string(FileAccess.get_file_as_string("res://game/test_saves/titan.json"))
+	_check(data is Dictionary and Campaign.from_dict(data).engine().planet_id() == "titan", "partie de test sur Titan")
 
 
 func _test_nitrogen() -> void:

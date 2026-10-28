@@ -104,7 +104,8 @@ func _build_layout() -> void:
 				_menu_button(Tr.t("Quitter"), "Button", _quit)]),
 	])
 	if OS.is_debug_build():
-		buttons.add_child(_menu_button(Tr.t("Partie de test · ère 4"), "Button", _on_test_game))
+		buttons.add_child(UiFx.hbox(12, [_menu_button(Tr.t("Test · ère 4"), "Button", _on_test_game.bind("ere4")),
+				_menu_button(Tr.t("Test · Titan"), "Button", _on_test_game.bind("titan"))]))
 	for row in buttons.get_children():
 		if row is HBoxContainer:
 			for b in row.get_children():
@@ -184,13 +185,13 @@ func _on_new_game() -> void:
 	_choose_region(slot)
 
 
-## Versions de développement : partie déjà en ère 4, dans un emplacement libre.
-func _on_test_game() -> void:
+## Versions de développement : partie de test (ère 4, Titan) dans un emplacement libre.
+func _on_test_game(test_name: String) -> void:
 	var slot := GameManager.first_free_slot()
 	if slot.is_empty():
 		_show_slots()
 		return
-	if GameManager.install_test_save(slot):
+	if GameManager.install_test_save(slot, test_name):
 		GameManager.open_game(slot)
 
 

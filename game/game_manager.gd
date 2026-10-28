@@ -191,13 +191,14 @@ func first_free_slot() -> String:
 	return ""
 
 
-## Partie de test des versions de développement (voir tools/make_test_save.gd).
-const TEST_SAVE := "res://game/test_saves/ere4.json"
+## Parties de test des versions de développement (voir tools/make_test_save.gd).
+const TEST_SAVES_DIR := "res://game/test_saves/"
 
 
-## Copie la partie de test dans l'emplacement `slot`, datée de maintenant (pas d'absence à rattraper).
-func install_test_save(slot: String) -> bool:
-	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(TEST_SAVE))
+## Copie la partie de test `test_name` (« ere4 », « titan ») dans l'emplacement `slot`, datée de
+## maintenant (pas d'absence à rattraper).
+func install_test_save(slot: String, test_name: String) -> bool:
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(TEST_SAVES_DIR + test_name + ".json"))
 	if not data is Dictionary:
 		return false
 	SaveService.new(FileSaveStorage.new(save_dir, slot)).save_campaign(Campaign.from_dict(data), SaveService.now_unix())
