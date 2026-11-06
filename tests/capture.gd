@@ -430,6 +430,29 @@ func _run() -> void:
 			main._world.world_event("europa")
 			await _frames(25)
 			await _shot("C7_geyser")
+		"encelade":
+			var campaign := Campaign.from_dict(JSON.parse_string(FileAccess.get_file_as_string("res://game/test_saves/enceladus.json")))
+			manager.campaign = campaign
+			manager.engine = campaign.engine()
+			engine = manager.engine
+			engine.state.speed = 0
+			engine.state.sol = floorf(engine.state.sol) + 1.45
+			main = await _open_main()
+			_close_modals(main)
+			if not main._window.collapsed:
+				main._window.toggle_collapsed()
+			await _frames(30)
+			await _shot("D1_encelade")
+			main._world.world_event("enceladus")
+			await _frames(25)
+			await _shot("D2_panache")
+			main._show_card("enceladus")
+			await _frames(10)
+			await _shot("D3_fiche_encelade")
+			_close_modals(main)
+			main._show_card("enceladus_phosphorus")
+			await _frames(10)
+			await _shot("D4_fiche_phosphore")
 		"arcadia":
 			manager.stop_game()
 			var menu: Control = load("res://ui/menu.tscn").instantiate()

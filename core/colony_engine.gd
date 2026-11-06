@@ -1490,6 +1490,16 @@ func _objective_met(objective_id: String) -> bool:
 			return _has_connected("cryobot")
 		"europa_thera":
 			return state.sites_done.has("thera")
+		"enceladus":
+			return campaign_planets.has("enceladus")
+		"enceladus_breath":
+			return _has_connected("electrolyser")
+		"enceladus_plume":
+			return _has_connected("plume_trap")
+		"enceladus_tiger":
+			return state.sites_done.has("tiger")
+		"enceladus_life":
+			return state.sites_done.has("grains")
 		"titan_breath":
 			return _has_connected("electrolyser")
 		"titan_pump":

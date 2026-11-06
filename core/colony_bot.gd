@@ -5,7 +5,7 @@ extends RefCounted
 ## construit ce qui manque le plus, garde une réserve de matériaux, étend ses conduites vers la glace.
 
 const R = preload("res://core/colony_content.gd")
-const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate", "regolith", "sabatier", "rovers", "erv", "solid_state", "shielding", "fission", "soil", "closed_loop", "spaceport", "brines", "cryogenics", "buffer_gas", "cryobot", "predictive"]
+const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate", "regolith", "sabatier", "rovers", "erv", "solid_state", "shielding", "fission", "soil", "closed_loop", "spaceport", "brines", "cryogenics", "buffer_gas", "cryobot", "plume_sampling", "predictive"]
 
 
 ## Lance la prochaine recherche disponible, dans l'ordre conseillé.
@@ -90,6 +90,8 @@ static func build(engine: ColonyEngine) -> void:
 		want = "bunker"
 	elif outpost and engine.planet_id() == "europa" and engine.is_unlocked(engine.building_defs["cryobot"]) and _count(engine, "cryobot") == 0:
 		want = "cryobot"
+	elif outpost and engine.planet_id() == "enceladus" and engine.is_unlocked(engine.building_defs["plume_trap"]) and _count(engine, "plume_trap") == 0:
+		want = "plume_trap"
 	elif outpost and engine.is_unlocked(engine.building_defs["garage"]) and _count(engine, "garage") == 0 \
 			and engine.state.amount(R.MATERIALS) >= 130.0:
 		want = "garage"
@@ -156,7 +158,7 @@ static func build(engine: ColonyEngine) -> void:
 	# Confort (habitat, batteries) : seulement si une réserve reste pour les urgences vitales.
 	if want in ["habitat", "battery", "garage", "erv", "sabatier", "bunker", "reactor", "biodome", "spaceport", "tank", "dome", "n2_compressor"] and engine.state.amount(R.MATERIALS) < engine.building_defs[want].cost + 50.0:
 		return
-	if want in ["extractor", "brine", "methane_pump", "cryobot"] and not (want == "extractor" and engine.planet().ice_everywhere):
+	if want in ["extractor", "brine", "methane_pump", "cryobot", "plume_trap"] and not (want == "extractor" and engine.planet().ice_everywhere):
 		reach_ice(engine, want)
 		return
 	var spot := connected_spot(engine, want)
@@ -199,7 +201,7 @@ static func network(campaign: Campaign) -> void:
 		if shipment.kind == "colony":
 			planets.append(Campaign.planet_of_region(shipment.region))
 	var mars := campaign.engines[0]
-	for region in ["ceres", "titan", "europa"]:
+	for region in ["ceres", "titan", "europa", "enceladus"]:
 		# Europe après la Capitale : ses colons manqueraient à Mars pour en loger 30.
 		if region == "europa" and not mars.state.objectives_done.has("capital"):
 			break
@@ -227,6 +229,11 @@ static func network(campaign: Campaign) -> void:
 					_ship(campaign, i, 0, R.NITROGEN, nitrogen)
 				# Cérès n'a pas de méthane : Mars lui en envoie, une fois Titan fondée.
 				if planets.has("titan") and colony.state.amount(R.METHANE) < 80.0 and colony.capacity(R.METHANE) >= 150.0 \
+						and mars.state.amount(R.METHANE) >= 300.0:
+					_ship(campaign, 0, i, R.METHANE, 150.0)
+			"enceladus":
+				# Du méthane pour les rovers.
+				if colony.state.amount(R.METHANE) < 80.0 and colony.capacity(R.METHANE) >= 150.0 \
 						and mars.state.amount(R.METHANE) >= 300.0:
 					_ship(campaign, 0, i, R.METHANE, 150.0)
 			"europa":

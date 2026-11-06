@@ -128,6 +128,21 @@ const TUTORIAL := [
 		"text": "Construisez un réservoir de méthane : les rovers d'Europe roulent au méthane livré par Mars." },
 	{ "id": "build_garage", "planet": "europa", "tab": TAB_BUILD, "target": "garage",
 		"text": "Construisez un garage à rovers : le lac de Thera Macula vous attend." },
+	# Encelade.
+	{ "id": "build_electrolyser", "planet": "enceladus", "tab": TAB_BUILD, "target": "electrolyser",
+		"text": "Pas d'air sur Encelade : l'oxygène viendra de la glace. Construisez un électrolyseur d'eau." },
+	{ "id": "build_extractor", "planet": "enceladus", "tab": TAB_BUILD, "target": "extractor",
+		"text": "Le sol d'Encelade est de la glace d'eau : posez un extracteur n'importe où." },
+	{ "id": "build_kiln", "planet": "enceladus", "tab": TAB_BUILD, "target": "kiln",
+		"text": "Aucun ravitaillement ici : un four à régolithe fabriquera vos matériaux." },
+	{ "id": "research_plume_sampling", "planet": "enceladus", "tab": TAB_RESEARCH, "target": "plume_sampling",
+		"text": "Recherchez « Chimie des panaches » pour récolter l'eau des geysers." },
+	{ "id": "build_plume_trap", "planet": "enceladus", "tab": TAB_BUILD, "target": "plume_trap",
+		"text": "Posez le collecteur de panache sur une rayure bleutée : les geysers jaillissent de là." },
+	{ "id": "build_tank", "planet": "enceladus", "tab": TAB_BUILD, "target": "tank",
+		"text": "Construisez un réservoir de méthane : les rovers d'Encelade roulent au méthane livré par le réseau." },
+	{ "id": "build_garage", "planet": "enceladus", "tab": TAB_BUILD, "target": "garage",
+		"text": "Construisez un garage à rovers : les geysers de Baghdad Sulcus vous attendent." },
 ]
 
 

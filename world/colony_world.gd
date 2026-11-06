@@ -216,6 +216,9 @@ func world_event(planet: String) -> void:
 			_dust_puff(lander + Vector3(0, 6, 0), 3.0, Color(0.55, 0.45, 0.3, 0.5), Vector3.DOWN)
 		"europa":
 			_dust_puff(lander + Vector3(6, 0, 5), 4.0, Color(0.9, 0.95, 1.0, 0.55))
+		"enceladus":
+			for offset: Vector3 in [Vector3(6, 0, 5), Vector3(-5, 0, 6), Vector3(7, 0, -3)]:
+				_dust_puff(lander + offset, 4.5, Color(0.85, 0.93, 1.0, 0.5))
 
 
 func _dust_puff(at: Vector3, strength: float, color := Color(0.78, 0.5, 0.34, 0.6), direction := Vector3.UP) -> void:
@@ -807,6 +810,12 @@ func _build_terrain() -> void:
 		mat.set_shader_parameter("light_sand", Color(0.86, 0.85, 0.82))
 		mat.set_shader_parameter("dark_color", Color(0.55, 0.42, 0.33))
 		mat.set_shader_parameter("rock_color", Color(0.66, 0.64, 0.62))
+	if _engine.planet_id() == "enceladus":
+		# Encelade : neige de glace presque pure, la surface la plus blanche du Système solaire.
+		mat.set_shader_parameter("sand_color", Color(0.8, 0.82, 0.84))
+		mat.set_shader_parameter("light_sand", Color(0.92, 0.93, 0.95))
+		mat.set_shader_parameter("dark_color", Color(0.58, 0.64, 0.7))
+		mat.set_shader_parameter("rock_color", Color(0.72, 0.75, 0.78))
 	mat.set_shader_parameter("noise_large", _noise_texture(0.012, 5, false, 1))
 	mat.set_shader_parameter("noise_fine", _noise_texture(0.08, 2, false, 2))
 	mat.set_shader_parameter("detail_normal", _noise_texture(0.05, 4, true, 3))
@@ -866,6 +875,8 @@ func _build_pebbles() -> void:
 	pebbles.material_override = (ModelBuilder.rock_material(Color("#2e2c2a"), 0.0) if not _engine.planet().atmosphere else ModelBuilder.rock_material(Color("#4e2516")))
 	if _engine.planet_id() == "europa":
 		pebbles.material_override = ModelBuilder.rock_material(Color("#b9b3aa"), 0.0)
+	elif _engine.planet_id() == "enceladus":
+		pebbles.material_override = ModelBuilder.rock_material(Color("#c4ccd4"), 0.0)
 	pebbles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(pebbles)
 
@@ -903,6 +914,8 @@ func _build_rocks() -> void:
 	# Europe : blocs de glace basculés, blancs teintés de sels.
 	if _engine.planet_id() == "europa":
 		rocks.material_override = ModelBuilder.rock_material(Color("#cfc8bd"), 0.0)
+	elif _engine.planet_id() == "enceladus":
+		rocks.material_override = ModelBuilder.rock_material(Color("#dfe5ea"), 0.0)
 	add_child(rocks)
 
 
@@ -926,6 +939,10 @@ func _build_ice() -> void:
 		mat.albedo_color = Color(0.05, 0.04, 0.03, 0.92)
 		mat.roughness = 0.04
 		mat.metallic = 0.3
+	elif _engine.planet_id() == "enceladus":
+		# Rayures du tigre : glace plus jeune et plus tiède, d'un bleu-vert.
+		mat.albedo_color = Color(0.32, 0.55, 0.62, 0.85)
+		mat.roughness = 0.35
 	elif _engine.planet_id() == "europa":
 		# Fractures d'Europe : bandes de glace brun-rouge (sels remontés de l'océan).
 		mat.albedo_color = Color(0.55, 0.3, 0.18, 0.85)

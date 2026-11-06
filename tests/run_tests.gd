@@ -45,6 +45,7 @@ func _init() -> void:
 	_test_meteors_and_aurora()
 	_test_world_events()
 	_test_europa()
+	_test_enceladus()
 	_test_number_formatter()
 	_simulate_campaign()
 	_simulate_realtime()
@@ -501,6 +502,7 @@ func _test_guides() -> void:
 	_check(first >= 0 and ColonyAdvisor.TUTORIAL[first].get("planet", "mars") == "ceres", "guide de Cérès dans l'avant-poste")
 	_check(ColonyAdvisor.era_steps(1, "titan").size() == 9, "guide de Titan")
 	_check(ColonyAdvisor.era_steps(1, "europa").size() == 8, "guide d'Europe")
+	_check(ColonyAdvisor.era_steps(1, "enceladus").size() == 7, "guide d'Encelade")
 
 
 # ---------- Ère 3 ----------
@@ -1095,6 +1097,36 @@ func _test_choices() -> void:
 	_check(copy.research_active == "closed_loop", "choix en cours sauvegardé")
 
 
+# ---------- Encelade ----------
+
+func _test_enceladus() -> void:
+	var mars := _rich_engine()
+	mars.state.era = 4
+	var campaign := Campaign.from_engine(mars)
+	var st := ColonyState.new()
+	st.region = "enceladus"
+	st.map_seed = 7920
+	campaign._add_colony(st)
+	var moon: ColonyEngine = campaign.engines[1]
+	var crew := []
+	for k in 4:
+		crew.append({ "name": "C%d" % k, "role": "x", "health": 1.0 })
+	moon.setup_outpost(crew, { R.MATERIALS: 300.0 })
+	campaign.sync_knowledge()
+	_check(moon.planet_id() == "enceladus" and moon.era_title().begins_with("Encelade"), "colonie sur Encelade")
+	_check(moon.state.buildings.any(func(b: Dictionary) -> bool: return b.id == "reactor"), "Encelade : l'équipage arrive avec un réacteur")
+	_check(not mars.placement_problem("plume_trap", mars.map.lander_cell + Vector2i(3, 0)).is_empty(), "le collecteur de panache est réservé à Encelade")
+	_check(not moon.placement_problem("cryobot", ColonyBot.connected_spot(moon, "extractor")).is_empty(), "pas de sonde cryobot sur Encelade")
+	moon.state.next_resupply = 1e9
+	moon.breakdown_rate = 0.0
+	moon.advance(2.0)
+	_check(moon.state.colonists.size() == 4 and moon.state.colonists.all(func(c: Dictionary) -> bool: return c.health > 0.9),
+			"Encelade : pas de radiations dangereuses")
+	_check(Campaign.route("titan", "enceladus").transit < 5.0, "Encelade et Titan : quelques sols de vol entre lunes de Saturne")
+	_check(Campaign.route("mars", "enceladus").transit == Campaign.route("mars", "titan").transit, "Encelade : aussi loin que Titan depuis Mars")
+	_check(ColonyContent.PLANETS.enceladus.launch_fuel < ColonyContent.PLANETS.ceres.launch_fuel, "Encelade : décollage le moins cher")
+
+
 # ---------- Europe ----------
 
 func _test_europa() -> void:
@@ -1234,7 +1266,7 @@ func _test_test_save() -> void:
 	for era in [1, 2, 3]:
 		data = JSON.parse_string(FileAccess.get_file_as_string("res://game/test_saves/ere%d.json" % era))
 		_check(data is Dictionary and Campaign.from_dict(data).engine().state.era == era, "partie de test en ère %d" % era)
-	for planet in ["ceres", "titan", "europa"]:
+	for planet in ["ceres", "titan", "europa", "enceladus"]:
 		data = JSON.parse_string(FileAccess.get_file_as_string("res://game/test_saves/%s.json" % planet))
 		_check(data is Dictionary and Campaign.from_dict(data).engine().planet_id() == planet, "partie de test sur " + planet)
 
@@ -1419,13 +1451,14 @@ func _simulate_campaign() -> void:
 	var campaign := Campaign.from_engine(engine)
 	var network_goals := ["spaceport", "outpost", "cargo", "ceres", "titan", "capital", "europa",
 			"ceres_breath", "ceres_brine", "ceres_ahuna", "ceres_export", "titan_breath", "titan_pump", "titan_selk", "titan_fuel",
-			"europa_breath", "europa_shelter", "europa_ocean", "europa_thera"]
+			"europa_breath", "europa_shelter", "europa_ocean", "europa_thera",
+			"enceladus", "enceladus_breath", "enceladus_plume", "enceladus_tiger", "enceladus_life"]
 	var reached := {}
 	var nitrogen_in := [0.0]
 	campaign.shipment_arrived.connect(func(shipment: Dictionary) -> void:
 		if shipment.kind == "cargo" and shipment.to == 0:
 			nitrogen_in[0] += float(shipment.cargo.get(R.NITROGEN, 0.0)))
-	while campaign.time < 1200.0 and reached.size() < network_goals.size():
+	while campaign.time < 1500.0 and reached.size() < network_goals.size():
 		ColonyBot.network(campaign)
 		campaign.advance(0.25)
 		for colony in campaign.engines:
@@ -1448,6 +1481,7 @@ func _simulate_campaign() -> void:
 		_check(reached.has(id), "ère 4 jouée : objectif %s" % id)
 	_check(reached.get("titan_fuel", INF) < 600.0, "Cérès et Titan complètes avant le sol 600")
 	_check(reached.get("europa_thera", INF) < 800.0, "Europe complète avant le sol 800")
+	_check(reached.get("enceladus_life", INF) < 1000.0, "Encelade complète avant le sol 1000")
 
 	print("\n--- Campagne « Survie » (joueur simulé) ---")
 	for objective in engine.objectives:
@@ -1521,7 +1555,7 @@ func _simulate_realtime() -> void:
 ## ils doivent survivre et atteindre leurs premiers objectifs sans aide du réseau.
 func _simulate_outposts() -> void:
 	print("\n--- Avant-postes (80 sols, sans aide) ---")
-	for region in ["ceres", "titan", "europa"]:
+	for region in ["ceres", "titan", "europa", "enceladus"]:
 		var mars := _engine()
 		for r: Defs.Research in mars.research_defs.values():
 			mars.state.research_done.append(r.id)
@@ -1551,5 +1585,5 @@ func _simulate_outposts() -> void:
 		print("%-6s objectifs %s · évacuations %d" % [region, done, evacuations[0]])
 		_check(evacuations[0] == 0, "%s : l'avant-poste survit seul" % region)
 		_check(done.has(region + "_breath"), "%s : premier oxygène" % region)
-		_check(done.has({ "ceres": "ceres_brine", "titan": "titan_pump", "europa": "europa_ocean" }[region]), "%s : premier module du monde" % region)
+		_check(done.has({ "ceres": "ceres_brine", "titan": "titan_pump", "europa": "europa_ocean", "enceladus": "enceladus_plume" }[region]), "%s : premier module du monde" % region)
 		_check(region != "titan" or done.get("titan_pump", INF) <= 25.0, "Titan : la pompe à méthane arrive tôt")

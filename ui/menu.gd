@@ -104,12 +104,13 @@ func _build_layout() -> void:
 				_menu_button(Tr.t("Quitter"), "Button", _quit)]),
 	])
 	if OS.is_debug_build():
-		var tests := UiFx.hbox(8, [])
-		for test: Array in [["ere1", Tr.t("Ère 1")], ["ere2", Tr.t("Ère 2")], ["ere3", Tr.t("Ère 3")], ["ere4", Tr.t("Ère 4")], ["ceres", Tr.t("Cérès")],
-				["titan", Tr.t("Titan")], ["europa", Tr.t("Europe")]]:
-			tests.add_child(_menu_button(test[1], "Button", _on_test_game.bind(test[0])))
 		buttons.add_child(UiFx.label(Tr.t("Parties de test"), "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER))
-		buttons.add_child(tests)
+		for row: Array in [[["ere1", Tr.t("Ère 1")], ["ere2", Tr.t("Ère 2")], ["ere3", Tr.t("Ère 3")], ["ere4", Tr.t("Ère 4")]],
+				[["ceres", Tr.t("Cérès")], ["titan", Tr.t("Titan")], ["europa", Tr.t("Europe")], ["enceladus", Tr.t("Encelade")]]]:
+			var tests := UiFx.hbox(8, [])
+			for test: Array in row:
+				tests.add_child(_menu_button(test[1], "Button", _on_test_game.bind(test[0])))
+			buttons.add_child(tests)
 	for row in buttons.get_children():
 		if row is HBoxContainer:
 			for b in row.get_children():

@@ -190,6 +190,11 @@ static func buildings() -> Array[Defs.Building]:
 			"requires_tile": ColonyMap.Tile.ICE, "inputs": { ENERGY: 20.0 }, "outputs": { DATA: 8.0, WATER: 4.0 }, "card": "thera",
 			"description": "Une sonde chauffée qui fond la glace pour descendre vers l'océan, son câble derrière elle : de l'eau, et des données sur un monde où la vie est peut-être possible. À poser sur une fracture rougeâtre.",
 		}),
+		Defs.Building.new({
+			"id": "plume_trap", "name": "Collecteur de panache", "size": Vector2i(2, 2), "cost": 150.0, "research": "plume_sampling",
+			"requires_tile": ColonyMap.Tile.ICE, "inputs": { ENERGY: 15.0 }, "outputs": { WATER: 6.0, DATA: 8.0 }, "card": "enceladus_ocean",
+			"description": "Une grande voile froide dressée au-dessus d'une rayure du tigre : les grains de glace du panache s'y collent. De l'eau, et des échantillons de l'océan sans avoir à forer. À poser sur une rayure bleutée.",
+		}),
 	]
 
 
@@ -216,6 +221,7 @@ const PLANETS := {
 		"air_nitrogen": 0.05,
 		"forbidden": { "brine": "Pas de saumure à pomper ici : c'est un module pour Cérès.",
 			"methane_pump": "Pas de lac de méthane sur Mars : c'est un module pour Titan.",
+			"plume_trap": "Pas de geysers à capter ici : c'est un module pour Encelade.",
 			"cryobot": "Pas d'océan à atteindre sous la glace ici : c'est un module pour Europe." } },
 	"ceres": { "name": "Cérès",
 		"ground": "Régolithe de Cérès : argiles, carbonates et glace mêlés, sous un vide presque parfait.",
@@ -226,6 +232,7 @@ const PLANETS := {
 		"forbidden": { "moxie": "Pas d'atmosphère de CO₂ sur Cérès.", "sabatier": "Pas d'atmosphère de CO₂ sur Cérès.",
 			"n2_compressor": "Pas d'air à comprimer sur Cérès : l'azote vient des sels de la raffinerie de saumure.",
 			"methane_pump": "Pas de lac de méthane sur Cérès : c'est un module pour Titan.",
+			"plume_trap": "Pas de geysers à capter ici : c'est un module pour Encelade.",
 			"cryobot": "Pas d'océan à atteindre sous la glace ici : c'est un module pour Europe." } },
 	"titan": { "name": "Titan",
 		"ground": "Un sol de glace d'eau, dure comme de la roche à −180 °C, couvert de grains organiques.",
@@ -236,6 +243,7 @@ const PLANETS := {
 		"forbidden": { "moxie": "L'air de Titan est fait d'azote et de méthane, presque sans CO₂.",
 			"sabatier": "L'air de Titan est fait d'azote et de méthane, presque sans CO₂.",
 			"brine": "Pas de saumure à pomper ici : c'est un module pour Cérès.",
+			"plume_trap": "Pas de geysers à capter ici : c'est un module pour Encelade.",
 			"cryobot": "Pas d'océan à atteindre sous la glace ici : c'est un module pour Europe." } },
 	# radiation : la surface baigne dans les particules de Jupiter ; les colons hors des abris en souffrent.
 	# starter_bunker : l'avant-poste arrive avec un habitat enterré.
@@ -250,10 +258,24 @@ const PLANETS := {
 			"n2_compressor": "Presque pas d'air sur Europe : rien à comprimer.",
 			"brine": "Pas de saumure à pomper ici : c'est un module pour Cérès.",
 			"methane_pump": "Pas de lac de méthane sur Europe : c'est un module pour Titan.",
+			"plume_trap": "Pas de geysers à capter ici : c'est un module pour Encelade.",
 			"habitat": "Les radiations de Jupiter frappent la surface : sur Europe, on vit dans des habitats enterrés.",
 			"dome": "Les radiations de Jupiter frappent la surface : sur Europe, on vit dans des habitats enterrés." } },
+	# Encelade : gravité minuscule (décollage presque gratuit), pas de radiations dangereuses.
+	"enceladus": { "name": "Encelade",
+		"ground": "Une neige de glace d'eau, la surface la plus blanche du Système solaire, vers −200 °C.",
+		"ice": "Une rayure du tigre : une fracture bleutée, plus tiède, d'où jaillissent les geysers.",
+		"rock": "Des blocs de glace fracturés : impossible de construire ici.",
+		"launch_fuel": 0.1, "atmosphere": false, "storms": false, "starter_reactor": true,
+		"ice_everywhere": true,
+		"forbidden": { "moxie": "Pas d'air sur Encelade : l'oxygène vient de la glace.",
+			"sabatier": "Pas d'air sur Encelade : pas de CO₂ à transformer.",
+			"n2_compressor": "Pas d'air sur Encelade : rien à comprimer.",
+			"brine": "Pas de saumure à pomper ici : c'est un module pour Cérès.",
+			"methane_pump": "Pas de lac de méthane sur Encelade : c'est un module pour Titan.",
+			"cryobot": "Inutile de forer ici : sur Encelade, l'océan remonte de lui-même par les geysers." } },
 }
-const PLANET_ORDER := ["mars", "ceres", "titan", "europa"]
+const PLANET_ORDER := ["mars", "ceres", "titan", "europa", "enceladus"]
 ## Un événement naturel propre à chaque monde (fiche sourcée), de temps en temps : un petit gain.
 ## news : texte de la nouvelle, %s reçoit les gains.
 const WORLD_EVENTS := {
@@ -265,6 +287,8 @@ const WORLD_EVENTS := {
 		"news": "Averse de méthane sur Titan ! Les collecteurs en récupèrent : %s." },
 	"europa": { "card": "europa_plume", "reward": { WATER: 15.0, DATA: 25.0 },
 		"news": "Un geyser jaillit d'une fracture d'Europe ! La colonie en recueille : %s." },
+	"enceladus": { "card": "enceladus_webb", "reward": { WATER: 20.0, DATA: 20.0 },
+		"news": "Le panache d'Encelade redouble ! Les collecteurs en recueillent : %s." },
 }
 ## Routes entre mondes (dans le jeu, un sol de voyage vaut environ un mois réel) : durée du trajet
 ## (orbite de Hohmann), période entre deux fenêtres de tir (période synodique), durée d'ouverture,
@@ -277,6 +301,11 @@ const ROUTES := {
 	"europa-mars": { "transit": 37.0, "synodic": 27.0, "open": 5.0, "fuel": 240.0, "phase": 7.0 },
 	"ceres-europa": { "transit": 48.0, "synodic": 90.0, "open": 8.0, "fuel": 200.0, "phase": 30.0 },
 	"europa-titan": { "transit": 120.0, "synodic": 238.0, "open": 12.0, "fuel": 280.0, "phase": 40.0 },
+	# Encelade : même voyage que vers Titan ; entre deux lunes de Saturne, quelques jours de vol.
+	"enceladus-mars": { "transit": 78.0, "synodic": 24.0, "open": 4.0, "fuel": 300.0, "phase": 14.0 },
+	"ceres-enceladus": { "transit": 92.0, "synodic": 65.0, "open": 6.0, "fuel": 260.0, "phase": 26.0 },
+	"enceladus-europa": { "transit": 120.0, "synodic": 238.0, "open": 12.0, "fuel": 280.0, "phase": 46.0 },
+	"enceladus-titan": { "transit": 3.0, "synodic": 8.0, "open": 4.0, "fuel": 40.0, "phase": 0.0 },
 }
 
 ## Ères propres à chaque monde (Mars utilise ERAS).
@@ -284,6 +313,7 @@ const PLANET_ERAS := {
 	"ceres": { 1: "Cérès · Avant-poste minier : glace, sels et minerais de la ceinture." },
 	"titan": { 1: "Titan · Mers de méthane : un monde glacé sous un ciel orangé." },
 	"europa": { 1: "Europe · Sous la glace : un océan caché, à l'abri des radiations de Jupiter." },
+	"enceladus": { 1: "Encelade · Les geysers de Saturne : l'océan jaillit vers l'espace." },
 }
 
 ## Régions d'atterrissage, choisies à la création de la colonie.
@@ -316,6 +346,13 @@ const REGIONS := {
 		"sites": ["frost", "thera"], "card": "europa",
 		"rim": "Des crêtes de glace jumelles, typiques d'Europe : trop raides pour bâtir.",
 	},
+	"enceladus": {
+		"name": "Baghdad Sulcus", "tagline": "Sur Encelade, la lune de Saturne, au bord d'une rayure du tigre.",
+		"traits": ["Des geysers d'eau salée jaillissent du sol", "Un soleil 90 fois plus faible que sur Terre, −200 °C"],
+		"planet": "enceladus", "effects": { "solar": 0.03, "heating": 2.0, "dust": 0.0 },
+		"sites": ["tiger", "grains"], "card": "enceladus",
+		"rim": "Des crêtes de glace plissées autour du pôle Sud : trop raides pour bâtir.",
+	},
 	"arcadia": {
 		"name": "Arcadia Planitia", "tagline": "Une plaine du nord où la glace affleure sous la poussière.",
 		"traits": ["Beaucoup de glace, presque pas de rochers", "Plus au nord : −20 % de soleil, +25 % de chauffage"],
@@ -325,7 +362,7 @@ const REGIONS := {
 }
 const REGION_ORDER := ["jezero", "arcadia"]
 ## Régions où l'on peut fonder une colonie depuis l'astroport.
-const FOUNDING_REGIONS := ["jezero", "arcadia", "ceres", "titan", "europa"]
+const FOUNDING_REGIONS := ["jezero", "arcadia", "ceres", "titan", "europa", "enceladus"]
 ## Modules chauffés : leur besoin d'énergie suit l'effet « heating » de la région.
 const HEATED := ["habitat", "greenhouse", "bunker", "biodome"]
 
@@ -345,6 +382,8 @@ const SITES := [
 	{ "id": "selk", "name": "Le cratère Selk", "card": "dragonfly", "reward": { DATA: 90.0 } },
 	{ "id": "frost", "name": "La glace qui respire", "card": "europa_oxygen", "reward": { OXYGEN: 40.0, DATA: 40.0 } },
 	{ "id": "thera", "name": "Le lac de Thera Macula", "card": "thera", "reward": { DATA: 90.0 } },
+	{ "id": "tiger", "name": "Au pied des geysers", "card": "enceladus_hydrogen", "reward": { WATER: 40.0, DATA: 60.0 } },
+	{ "id": "grains", "name": "Les grains de l'anneau E", "card": "enceladus_phosphorus", "reward": { DATA: 100.0 } },
 ]
 const PROSPECTION := { "id": "prospect", "name": "Prospection de minerais", "card": "", "reward": { MATERIALS: 50.0 } }
 
@@ -544,6 +583,9 @@ static func research() -> Array[Defs.Research]:
 		Defs.Research.new({ "id": "cryobot", "name": "Forage thermique", "cost": 130.0, "duration": 3.0, "era": 4,
 				"requires": ["spaceport"], "card": "thera",
 				"summary": "Débloque la sonde cryobot, pour la colonie d'Europe : fondre la glace jusqu'à l'océan." }),
+		Defs.Research.new({ "id": "plume_sampling", "name": "Chimie des panaches", "cost": 140.0, "duration": 3.0, "era": 4,
+				"requires": ["spaceport"], "card": "enceladus_ocean",
+				"summary": "Débloque le collecteur de panache, pour la colonie d'Encelade : goûter l'océan sans forer." }),
 	]
 
 
@@ -619,6 +661,9 @@ static func objectives() -> Array[Defs.Objective]:
 		Defs.Objective.new({ "id": "titan", "title": "Aux confins", "era": 4,
 				"description": "Fonder une colonie sur Titan, la lune de Saturne.",
 				"reward": { DATA: 200.0 } }),
+		Defs.Objective.new({ "id": "enceladus", "title": "Les geysers de Saturne", "era": 4,
+				"description": "Fonder une colonie sur Encelade, la lune de Saturne aux geysers.",
+				"reward": { DATA: 150.0 } }),
 		Defs.Objective.new({ "id": "europa", "title": "Lune de glace", "era": 4,
 				"description": "Fonder une colonie sur Europe, la lune de Jupiter.",
 				"reward": { DATA: 150.0 } }),
@@ -649,6 +694,18 @@ static func objectives() -> Array[Defs.Objective]:
 		Defs.Objective.new({ "id": "europa_thera", "title": "Le grand lac", "era": 1, "planet": "europa",
 				"description": "Mener une expédition jusqu'au lac caché sous Thera Macula.",
 				"reward": { DATA: 100.0 } }),
+		Defs.Objective.new({ "id": "enceladus_breath", "title": "Respirer à −200 °C", "era": 1, "planet": "enceladus",
+				"description": "Produire de l'oxygène en cassant l'eau de la glace (pas d'air ici).",
+				"reward": { DATA: 40.0 } }),
+		Defs.Objective.new({ "id": "enceladus_plume", "title": "Goûter l'océan", "era": 1, "planet": "enceladus",
+				"description": "Construire un collecteur de panache sur une rayure du tigre.",
+				"reward": { DATA: 100.0 } }),
+		Defs.Objective.new({ "id": "enceladus_tiger", "title": "Au pied des geysers", "era": 1, "planet": "enceladus",
+				"description": "Mener une expédition au pied des geysers de Baghdad Sulcus.",
+				"reward": { MATERIALS: 120.0 } }),
+		Defs.Objective.new({ "id": "enceladus_life", "title": "Les briques de la vie", "era": 1, "planet": "enceladus",
+				"description": "Analyser les grains de glace de l'anneau E, venus de l'océan d'Encelade.",
+				"reward": { DATA: 150.0 } }),
 	]
 
 
@@ -949,6 +1006,41 @@ static func cards() -> Array[Defs.Card]:
 			"in_game": "Parfois, un geyser jaillit d'une fracture près de la colonie : de l'eau et des données sur l'océan.",
 			"sources": [["Scientific American (2016)", "https://www.scientificamerican.com/article/jupiters-moon-europa-spotted-spouting-water"],
 				["EarthSky (2016)", "https://earthsky.org/space/possible-water-plumes-spotted-on-europa/"]] }),
+		Defs.Card.new({ "id": "enceladus", "figure": "101", "figure_label": "geysers cartographiés par Cassini au pôle Sud d'Encelade", "visual": "plume_trap",
+			"quiz": "D'où jaillissent les geysers d'Encelade ?", "choices": ["De quatre grandes fractures au pôle Sud", "De volcans de lave", "De tout l'équateur"], "answer": 0,
+			"title": "Encelade, la lune aux geysers", "status": "Mesuré",
+			"fact": "Encelade, une lune de Saturne d'à peine 500 km de diamètre, est couverte d'une glace si propre qu'elle renvoie presque toute la lumière du Soleil. En 2005, la sonde Cassini y a découvert des jets de vapeur et de grains de glace au pôle Sud, le long de quatre fractures d'environ 135 km de long, surnommées « rayures du tigre ». En 2014, après sept ans d'observations, l'équipe de Cassini a cartographié 101 geysers. Leur eau vient d'un océan caché sous la glace.",
+			"in_game": "La colonie s'installe au bord d'une rayure du tigre : le collecteur de panache s'y pose pour récolter l'eau des geysers.",
+			"sources": [["NASA JPL (2014) – 101 geysers", "https://www.jpl.nasa.gov/news/cassini-spacecraft-reveals-101-geysers-and-more-on-icy-saturn-moon"],
+				["Astronomy.com (2014)", "https://www.astronomy.com/science/cassini-spacecraft-reveals-101-geysers-and-more-on-icy-saturn-moon/"]] }),
+		Defs.Card.new({ "id": "enceladus_ocean", "figure": "0,1°", "figure_label": "d'oscillation : trop pour une lune solide, la signature d'un océan global", "visual": "extractor",
+			"quiz": "Comment Cassini a-t-elle montré que l'océan d'Encelade fait le tour de la lune ?", "choices": ["En mesurant son oscillation", "En s'y posant", "En entendant des vagues"], "answer": 0,
+			"title": "Un océan global", "status": "Mesuré",
+			"fact": "En analysant plus de sept ans d'images de Cassini, une équipe de l'université Cornell a mesuré qu'Encelade oscille légèrement en tournant autour de Saturne : environ un dixième de degré (Icarus, 2015). C'est beaucoup trop pour une lune solide. La seule explication : la croûte de glace flotte sur un océan d'eau liquide qui fait tout le tour de la lune, et glisse sur le cœur rocheux. Comment cet océan reste liquide, si loin du Soleil, reste une question ouverte.",
+			"in_game": "Le collecteur de panache récolte des grains venus de cet océan : de l'eau et des données, sans forer la glace.",
+			"sources": [["Astronomy.com (2015) – un océan global", "https://www.astronomy.com/science/cassini-finds-global-ocean-in-saturns-moon-enceladus/"],
+				["Sci.News (2015)", "https://www.sci.news/space/science-enceladus-global-subsurface-ocean-03245.html"]] }),
+		Defs.Card.new({ "id": "enceladus_hydrogen", "figure": "H₂", "figure_label": "du dihydrogène dans le panache : l'indice de sources chaudes au fond de l'océan", "visual": "reactor",
+			"quiz": "Que suggère le dihydrogène trouvé dans le panache d'Encelade ?", "choices": ["Des sources chaudes au fond de l'océan", "Des volcans de lave", "Une atmosphère épaisse"], "answer": 0,
+			"title": "Des sources chaudes", "status": "Mesuré",
+			"fact": "Le 28 octobre 2015, Cassini a traversé le panache d'Encelade et son spectromètre y a détecté du dihydrogène (Science, 2017). L'explication la plus plausible : de l'eau chaude réagit avec les roches du fond de l'océan, comme dans les sources hydrothermales des abysses terrestres. Sur Terre, des microbes tirent leur énergie de ce gaz. Les chercheurs restent prudents : aucune trace de vie n'a été trouvée, mais Encelade aurait une source d'énergie possible pour elle.",
+			"in_game": "L'expédition au pied des geysers rapporte de l'eau et beaucoup de données.",
+			"sources": [["SwRI (2017) – une région habitable", "https://www.swri.org/press-release/swri-scientists-discover-evidence-habitable-region-within-saturns-moon-enceladus"],
+				["Astronomy.com (2017)", "https://www.astronomy.com/science/enceladus-sea-floor-has-hydrothermal-vents-like-ours/"]] }),
+		Defs.Card.new({ "id": "enceladus_phosphorus", "figure": "×100", "figure_label": "au moins : le phosphate de l'océan d'Encelade, comparé aux océans terrestres", "visual": "garage",
+			"quiz": "Pourquoi le phosphore d'Encelade est-il une grande nouvelle ?", "choices": ["C'est une brique indispensable à la vie", "C'est un carburant de fusée", "Il rend la glace bleue"], "answer": 0,
+			"title": "Les briques de la vie", "status": "Mesuré",
+			"fact": "Les grains de glace des geysers d'Encelade s'échappent dans l'espace et forment l'anneau E de Saturne. Cassini en a analysé des milliers. En 2023, une équipe menée par Frank Postberg y a identifié des phosphates (Nature) : la première preuve de phosphore dans un océan hors de la Terre. Le phosphore est l'un des six éléments indispensables à la vie telle que nous la connaissons, et l'océan d'Encelade en contiendrait au moins cent fois plus que les nôtres.",
+			"in_game": "L'expédition vers les grains de l'anneau E rapporte beaucoup de données.",
+			"sources": [["Université d'Arizona (2023)", "https://science.arizona.edu/news/phosphate-found-enceladus-boosts-chances-life"],
+				["Freie Universität Berlin (2023)", "https://geo.fu-berlin.de/en/geol/fachrichtungen/planet/news/Postberg_Phosphates_Enceladus.html"]] }),
+		Defs.Card.new({ "id": "enceladus_webb", "figure": "9 600 km", "figure_label": "de long : le panache d'Encelade vu par le télescope James-Webb", "visual": "plume_trap",
+			"quiz": "Combien de fois le diamètre d'Encelade mesure le panache vu par Webb ?", "choices": ["Plus de 20 fois", "La moitié", "Autant"], "answer": 0,
+			"title": "Un panache géant", "status": "Mesuré",
+			"fact": "En 2023, le télescope spatial James-Webb a observé la vapeur d'eau qui s'échappe d'Encelade : le panache s'étend sur plus de 9 600 km, plus de vingt fois le diamètre de la lune (Nature Astronomy, 2023). Une partie de cette eau reste en orbite et forme un tore de vapeur le long de l'orbite d'Encelade autour de Saturne. L'activité des geysers varie : les sondes et les télescopes ne voient pas toujours le même débit.",
+			"in_game": "De temps en temps, le panache redouble près de la colonie : les collecteurs récupèrent de l'eau et des données.",
+			"sources": [["ESA/Webb (2023)", "https://esawebb.org/news/weic2314/"],
+				["SwRI (2023)", "https://www.swri.org/press-release/webb-telescope-finds-towering-plume-of-water-escaping-saturn-moon"]] }),
 		Defs.Card.new({ "id": "titan_light", "figure": "≈ 1 %", "figure_label": "de la lumière solaire reçue par la Terre, avant même la brume", "visual": "reactor",
 			"quiz": "Pourquoi fait-il si sombre sur Titan ?", "choices": ["Saturne est loin du Soleil et la brume arrête la lumière", "Titan tourne très vite sur elle-même", "Les anneaux de Saturne font de l'ombre"], "answer": 0,
 			"title": "Un midi de crépuscule", "status": "Mesuré",

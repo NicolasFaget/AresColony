@@ -184,6 +184,7 @@ static func building(building_id: String) -> Node3D:
 		"dome": _dome(root)
 		"n2_compressor": _n2_compressor(root)
 		"cryobot": _cryobot(root)
+		"plume_trap": _plume_trap(root)
 	return root
 
 
@@ -523,6 +524,19 @@ static func _n2_compressor(r: Node3D) -> void:
 	strut(r, Vector3(-0.05, 0.3, -0.3), Vector3(0.45, 0.3, -0.4), 0.03, GREY)
 	strut(r, Vector3(0.45, 0.2, -0.3), Vector3(0.3, 0.22, 0.45), 0.03, GREY)
 	light(r, Vector3(-0.35, 0.4, -0.04), LIGHT, 0.025, 2.0)
+
+
+## Collecteur de panache : une grande voile froide sur deux mâts, où se collent les grains des geysers.
+static func _plume_trap(r: Node3D) -> void:
+	_pad(r, 1.9)
+	for x in [-0.6, 0.6]:
+		strut(r, Vector3(x, 0, 0), Vector3(x, 1.7, 0), 0.04, GREY)
+	box(r, Vector3(0, 1.05, 0), Vector3(1.2, 1.1, 0.04), Color(0.75, 0.88, 0.95))
+	box(r, Vector3(0, 0.45, 0), Vector3(1.25, 0.06, 0.12), GREY)
+	cylinder(r, Vector3(0.55, 0.22, 0.55), 0.18, 0.44, WHITE, Vector3.ZERO, -1.0, 14)
+	box(r, Vector3(-0.5, 0.18, 0.55), Vector3(0.5, 0.36, 0.35), WHITE)
+	light(r, Vector3(0, 1.75, 0), RED, 0.03, 2.0)
+	light(r, Vector3(-0.5, 0.4, 0.75), LIGHT, 0.04, 2.0)
 
 
 ## Sonde cryobot : un derrick qui descend une sonde chauffée dans un puits de glace fondue.

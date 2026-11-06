@@ -21,7 +21,7 @@ func _init(seed_value := 1, p_region := "jezero") -> void:
 	var arcadia := region == "arcadia"
 	var ceres := region == "ceres"
 	var titan := region == "titan"
-	var europa := region == "europa"
+	var europa := region == "europa" or region == "enceladus"
 	tiles.resize(SIZE * SIZE)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value

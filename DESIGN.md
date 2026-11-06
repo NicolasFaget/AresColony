@@ -151,9 +151,11 @@ Mesures d'octobre 2026 (Jezero, `_simulate_campaign`) :
 | Aux confins (Titan fondé), première livraison | 327 à 328 |
 | Capitale martienne (30 colons, un grand dôme pressurisé) | 404 |
 | Mine de la ceinture (Cérès exporte 200 matériaux) | 410 |
-| Station-service de Saturne (Titan exporte 200 kg de méthane) | 466 |
+| Station-service de Saturne (Titan exporte 200 kg de méthane) | 442 |
 | Lune de glace (Europe fondée, après la Capitale) | 449 |
-| Europe : sonde cryobot, 8 colons abrités, lac de Thera Macula | 529 à 589 |
+| Europe : sonde cryobot, 8 colons abrités, lac de Thera Macula | 531 à 643 |
+| Les geysers de Saturne (Encelade fondée, après Europe) | 548 |
+| Encelade : collecteur de panache, geysers, grains de l'anneau E | 640 à 658 |
 
 L'ère 4 est jouée pour de vrai par le joueur simulé (`ColonyBot.network`) : astroport, fondation de
 Cérès puis de Titan, matériaux de Cérès vers les colonies qui ont de la place, méthane de Mars vers
@@ -164,7 +166,11 @@ Titan, pleines (400, la seule réserve de l'atterrisseur), ne pouvaient plus rec
 Europe est fondée après la Capitale martienne : ses 4 colons, puis 4 volontaires pour l'objectif
 « Sous la banquise », manqueraient à Mars pour en loger 30 (la seconde vague compte 24 recrues).
 
-Avant-postes seuls, sans aucune cargaison de Mars (80 sols, `_simulate_outposts`) : Europe respire
+Encelade, le dernier monde, est fondée une fois Europe lancée ; Mars lui envoie du méthane pour
+ses rovers. Ses 4 colons suffisent à ses objectifs.
+
+Avant-postes seuls, sans aucune cargaison de Mars (80 sols, `_simulate_outposts`) : Encelade respire
+au sol 0,75 et pose son collecteur de panache vers le sol 38 ; Europe respire
 au sol 0,75 et pose sa sonde cryobot vers le sol 48, sans évacuation ; Cérès respire au
 sol 1,5 et raffine la saumure au sol 29 ; Titan respire au sol 0,8 et pompe le méthane au sol 16
 (générateur à radio-isotopes de l'atterrisseur, +20 kWh/sol, comme Dragonfly ; pompe à 45 matériaux
@@ -213,6 +219,14 @@ fourchettes ; mettre ce tableau à jour après chaque rééquilibrage.
   Routes : Mars 37 sols (fenêtre de 5 sols tous les 27), Cérès 48, Titan 120 (tous les 238 sols).
   Fiches sourcées : Juno (glace d'environ 29 km, 2025), radiations (JPL 2018), oxygène (Juno 2024),
   lac de Thera Macula (hypothèse, 2011).
+- Encelade (région « Baghdad Sulcus », lune de Saturne, le dernier monde) : soleil ×0,03,
+  chauffage ×2, pas d'air, sol de glace partout, décollage ×0,1 (gravité minuscule), pas de
+  radiations dangereuses ; l'avant-poste arrive avec un réacteur. Module propre : le collecteur de
+  panache (recherche « Chimie des panaches », 150 matériaux, 15 kWh/sol → 6 kg d'eau et 8 données
+  par sol, sur une rayure du tigre). Objectifs : oxygène, collecteur, expédition au pied des geysers,
+  grains de l'anneau E. Routes : Titan 3 sols (fenêtre de 4 sols tous les 8), Mars 78 (comme Titan),
+  Cérès 92, Europe 120. Fiches sourcées : 101 geysers (Cassini 2014), océan global (2015), dihydrogène
+  (Science 2017), phosphates (Nature 2023), panache vu par Webb (2023, événement du monde).
 - Une nouvelle colonie : savoir partagé, pas de ravitaillement de matériaux depuis la Terre ni de
   volontaires (le réseau s'en charge), calendrier de la colonie de départ, carte propre.
 - Cérès (région « Cratère Occator ») : soleil ×0,3, chauffage ×1,5, pas d'air (ni tempêtes ni poussière,
