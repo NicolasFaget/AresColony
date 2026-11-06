@@ -14,7 +14,7 @@ SKIP_WORDS = {"Fermer", "Annuler", "Construire", "Colonie", "Recherche", "Savoir
               "Retour", "Compris", "Supprimer", "Charger", "Commencer", "Recommencer", "Réglages", "Sauvegardes",
               "Continuer", "Terminer", "Mesuré", "Expérimenté", "Chimie", "Hypothèse", "Expéditions", "Entretien",
               "Synergies", "Montrer", "Partir", "Choisir"}
-EXTRA = {"Azote", "urbaniste", "cuisinier", "maintenant", "rations", "pilote", "chimiste", "biologiste", "botaniste", "Eau", "Nourriture", "Batteries",
+EXTRA = {"Europe", "plombier", "informaticien", "pharmacienne", "soudeur", "glaciologue", "Azote", "urbaniste", "cuisinier", "maintenant", "rations", "pilote", "chimiste", "biologiste", "botaniste", "Eau", "Nourriture", "Batteries",
          "Atterrisseur", "Conduite", "Expéditions", "Garage", "Musique", "Vibrations"}
 pat = re.compile(r'"((?:[^"\\]|\\.)*)"')
 found = {}

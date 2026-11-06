@@ -185,6 +185,11 @@ static func buildings() -> Array[Defs.Building]:
 			"inputs": { ENERGY: 6.0 }, "outputs": { NITROGEN: 4.0 }, "storage": { NITROGEN: 60.0 }, "card": "nitrogen",
 			"description": "Aspire l'air et en sépare l'azote. Sur Titan, l'air en est presque entièrement fait ; sur Mars, il en tire vingt fois moins.",
 		}),
+		Defs.Building.new({
+			"id": "cryobot", "name": "Sonde cryobot", "size": Vector2i(2, 2), "cost": 140.0, "research": "cryobot",
+			"requires_tile": ColonyMap.Tile.ICE, "inputs": { ENERGY: 20.0 }, "outputs": { DATA: 8.0, WATER: 4.0 }, "card": "thera",
+			"description": "Une sonde chauffée qui fond la glace pour descendre vers l'océan, son câble derrière elle : de l'eau, et des données sur un monde où la vie est peut-être possible. À poser sur une fracture rougeâtre.",
+		}),
 	]
 
 
@@ -210,7 +215,8 @@ const PLANETS := {
 		"ice_everywhere": false,
 		"air_nitrogen": 0.05,
 		"forbidden": { "brine": "Pas de saumure à pomper ici : c'est un module pour Cérès.",
-			"methane_pump": "Pas de lac de méthane sur Mars : c'est un module pour Titan." } },
+			"methane_pump": "Pas de lac de méthane sur Mars : c'est un module pour Titan.",
+			"cryobot": "Pas d'océan à atteindre sous la glace ici : c'est un module pour Europe." } },
 	"ceres": { "name": "Cérès",
 		"ground": "Régolithe de Cérès : argiles, carbonates et glace mêlés, sous un vide presque parfait.",
 		"ice": "De la glace salée, à quelques mètres sous la surface : des saumures remontées des profondeurs.",
@@ -219,7 +225,8 @@ const PLANETS := {
 		"ice_everywhere": false,
 		"forbidden": { "moxie": "Pas d'atmosphère de CO₂ sur Cérès.", "sabatier": "Pas d'atmosphère de CO₂ sur Cérès.",
 			"n2_compressor": "Pas d'air à comprimer sur Cérès : l'azote vient des sels de la raffinerie de saumure.",
-			"methane_pump": "Pas de lac de méthane sur Cérès : c'est un module pour Titan." } },
+			"methane_pump": "Pas de lac de méthane sur Cérès : c'est un module pour Titan.",
+			"cryobot": "Pas d'océan à atteindre sous la glace ici : c'est un module pour Europe." } },
 	"titan": { "name": "Titan",
 		"ground": "Un sol de glace d'eau, dure comme de la roche à −180 °C, couvert de grains organiques.",
 		"ice": "La rive d'un lac de méthane et d'éthane liquides.",
@@ -228,9 +235,25 @@ const PLANETS := {
 		"ice_everywhere": true,
 		"forbidden": { "moxie": "L'air de Titan est fait d'azote et de méthane, presque sans CO₂.",
 			"sabatier": "L'air de Titan est fait d'azote et de méthane, presque sans CO₂.",
-			"brine": "Pas de saumure à pomper ici : c'est un module pour Cérès." } },
+			"brine": "Pas de saumure à pomper ici : c'est un module pour Cérès.",
+			"cryobot": "Pas d'océan à atteindre sous la glace ici : c'est un module pour Europe." } },
+	# radiation : la surface baigne dans les particules de Jupiter ; les colons hors des abris en souffrent.
+	# starter_bunker : l'avant-poste arrive avec un habitat enterré.
+	"europa": { "name": "Europe",
+		"ground": "De la glace d'eau à −160 °C, très blanche, marbrée de sels rougeâtres.",
+		"ice": "Une fracture rougeâtre : de la glace plus jeune, remontée des profondeurs.",
+		"rock": "Des blocs de glace basculés, comme une banquise figée : impossible de construire ici.",
+		"launch_fuel": 0.3, "atmosphere": false, "storms": false, "starter_reactor": true, "starter_bunker": true,
+		"radiation": true, "ice_everywhere": true,
+		"forbidden": { "moxie": "Presque pas d'air sur Europe : l'oxygène vient de la glace.",
+			"sabatier": "Presque pas d'air sur Europe : pas de CO₂ à transformer.",
+			"n2_compressor": "Presque pas d'air sur Europe : rien à comprimer.",
+			"brine": "Pas de saumure à pomper ici : c'est un module pour Cérès.",
+			"methane_pump": "Pas de lac de méthane sur Europe : c'est un module pour Titan.",
+			"habitat": "Les radiations de Jupiter frappent la surface : sur Europe, on vit dans des habitats enterrés.",
+			"dome": "Les radiations de Jupiter frappent la surface : sur Europe, on vit dans des habitats enterrés." } },
 }
-const PLANET_ORDER := ["mars", "ceres", "titan"]
+const PLANET_ORDER := ["mars", "ceres", "titan", "europa"]
 ## Routes entre mondes (dans le jeu, un sol de voyage vaut environ un mois réel) : durée du trajet
 ## (orbite de Hohmann), période entre deux fenêtres de tir (période synodique), durée d'ouverture,
 ## carburant de base et décalage de la première fenêtre.
@@ -238,12 +261,17 @@ const ROUTES := {
 	"ceres-mars": { "transit": 19.0, "synodic": 38.0, "open": 6.0, "fuel": 120.0, "phase": 4.0 },
 	"mars-titan": { "transit": 78.0, "synodic": 24.0, "open": 4.0, "fuel": 300.0, "phase": 10.0 },
 	"ceres-titan": { "transit": 92.0, "synodic": 65.0, "open": 6.0, "fuel": 260.0, "phase": 20.0 },
+	# Jupiter : 3 ans de voyage depuis Mars (une fenêtre tous les 27 mois) ; vers Saturne, 10 ans.
+	"europa-mars": { "transit": 37.0, "synodic": 27.0, "open": 5.0, "fuel": 240.0, "phase": 7.0 },
+	"ceres-europa": { "transit": 48.0, "synodic": 90.0, "open": 8.0, "fuel": 200.0, "phase": 30.0 },
+	"europa-titan": { "transit": 120.0, "synodic": 238.0, "open": 12.0, "fuel": 280.0, "phase": 40.0 },
 }
 
 ## Ères propres à chaque monde (Mars utilise ERAS).
 const PLANET_ERAS := {
 	"ceres": { 1: "Cérès · Avant-poste minier : glace, sels et minerais de la ceinture." },
 	"titan": { 1: "Titan · Mers de méthane : un monde glacé sous un ciel orangé." },
+	"europa": { 1: "Europe · Sous la glace : un océan caché, à l'abri des radiations de Jupiter." },
 }
 
 ## Régions d'atterrissage, choisies à la création de la colonie.
@@ -269,6 +297,13 @@ const REGIONS := {
 		"sites": ["ligeia", "huygens", "selk"], "card": "titan",
 		"rim": "Des collines de glace, sous la brume orangée.",
 	},
+	"europa": {
+		"name": "Thera Macula", "tagline": "Sur Europe, la lune de Jupiter, au bord d'un chaos de glace.",
+		"traits": ["Un océan sous 30 km de glace", "Radiations mortelles : on vit sous la glace, −160 °C"],
+		"planet": "europa", "effects": { "solar": 0.09, "heating": 1.75, "dust": 0.0 },
+		"sites": ["frost", "thera"], "card": "europa",
+		"rim": "Des crêtes de glace jumelles, typiques d'Europe : trop raides pour bâtir.",
+	},
 	"arcadia": {
 		"name": "Arcadia Planitia", "tagline": "Une plaine du nord où la glace affleure sous la poussière.",
 		"traits": ["Beaucoup de glace, presque pas de rochers", "Plus au nord : −20 % de soleil, +25 % de chauffage"],
@@ -278,7 +313,7 @@ const REGIONS := {
 }
 const REGION_ORDER := ["jezero", "arcadia"]
 ## Régions où l'on peut fonder une colonie depuis l'astroport.
-const FOUNDING_REGIONS := ["jezero", "arcadia", "ceres", "titan"]
+const FOUNDING_REGIONS := ["jezero", "arcadia", "ceres", "titan", "europa"]
 ## Modules chauffés : leur besoin d'énergie suit l'effet « heating » de la région.
 const HEATED := ["habitat", "greenhouse", "bunker", "biodome"]
 
@@ -296,6 +331,8 @@ const SITES := [
 	{ "id": "ligeia", "name": "Le large de Ligeia Mare", "card": "kraken", "reward": { METHANE: 80.0, DATA: 40.0 } },
 	{ "id": "huygens", "name": "Le site de Huygens", "card": "titan_light", "reward": { DATA: 60.0 } },
 	{ "id": "selk", "name": "Le cratère Selk", "card": "dragonfly", "reward": { DATA: 90.0 } },
+	{ "id": "frost", "name": "La glace qui respire", "card": "europa_oxygen", "reward": { OXYGEN: 40.0, DATA: 40.0 } },
+	{ "id": "thera", "name": "Le lac de Thera Macula", "card": "thera", "reward": { DATA: 90.0 } },
 ]
 const PROSPECTION := { "id": "prospect", "name": "Prospection de minerais", "card": "", "reward": { MATERIALS: 50.0 } }
 
@@ -492,6 +529,9 @@ static func research() -> Array[Defs.Research]:
 		Defs.Research.new({ "id": "buffer_gas", "name": "Air à l'azote", "cost": 120.0, "duration": 3.0, "era": 4,
 				"requires": ["spaceport"], "card": "nitrogen",
 				"summary": "Débloque le grand dôme (10 colons) et le compresseur d'azote. Mars manque d'azote : Titan et Cérès en ont." }),
+		Defs.Research.new({ "id": "cryobot", "name": "Forage thermique", "cost": 130.0, "duration": 3.0, "era": 4,
+				"requires": ["spaceport"], "card": "thera",
+				"summary": "Débloque la sonde cryobot, pour la colonie d'Europe : fondre la glace jusqu'à l'océan." }),
 	]
 
 
@@ -567,6 +607,9 @@ static func objectives() -> Array[Defs.Objective]:
 		Defs.Objective.new({ "id": "titan", "title": "Aux confins", "era": 4,
 				"description": "Fonder une colonie sur Titan, la lune de Saturne.",
 				"reward": { DATA: 200.0 } }),
+		Defs.Objective.new({ "id": "europa", "title": "Lune de glace", "era": 4,
+				"description": "Fonder une colonie sur Europe, la lune de Jupiter.",
+				"reward": { DATA: 150.0 } }),
 		Defs.Objective.new({ "id": "capital", "title": "Capitale martienne", "era": 4,
 				"description": "Loger 30 colons sur Mars, dont des habitants d'un grand dôme : il lui faut de l'azote pour son air.",
 				"reward": { DATA: 100.0 } }),
@@ -582,6 +625,18 @@ static func objectives() -> Array[Defs.Objective]:
 		Defs.Objective.new({ "id": "titan_fuel", "title": "Station-service de Saturne", "era": 1, "planet": "titan",
 				"description": "Expédier 200 kg de méthane depuis Titan vers d'autres colonies.",
 				"reward": { DATA: 120.0 } }),
+		Defs.Objective.new({ "id": "europa_breath", "title": "L'air de la glace", "era": 1, "planet": "europa",
+				"description": "Produire de l'oxygène en cassant l'eau de la glace (presque pas d'air ici).",
+				"reward": { DATA: 40.0 } }),
+		Defs.Objective.new({ "id": "europa_shelter", "title": "Sous la banquise", "era": 1, "planet": "europa",
+				"description": "Abriter 8 colons dans des habitats enterrés, loin des radiations de Jupiter.",
+				"reward": { MATERIALS: 120.0 } }),
+		Defs.Objective.new({ "id": "europa_ocean", "title": "Toucher l'océan", "era": 1, "planet": "europa",
+				"description": "Construire une sonde cryobot sur une fracture de la glace.",
+				"reward": { DATA: 100.0 } }),
+		Defs.Objective.new({ "id": "europa_thera", "title": "Le grand lac", "era": 1, "planet": "europa",
+				"description": "Mener une expédition jusqu'au lac caché sous Thera Macula.",
+				"reward": { DATA: 100.0 } }),
 	]
 
 
@@ -826,6 +881,34 @@ static func cards() -> Array[Defs.Card]:
 			"in_game": "Après une éruption solaire, une aurore verte peut éclairer la nuit martienne. Les colons en profitent pour faire des mesures : des données en plus.",
 			"sources": [["Science News (2025) – Perseverance et l'aurore", "https://www.sciencenews.org/article/perseverance-picture-martian-aurora"],
 				["Live Science (2025)", "https://www.livescience.com/space/mars/lights-on-mars-nasa-rover-photographs-visible-auroras-on-red-planet-for-the-first-time"]] }),
+		Defs.Card.new({ "id": "europa", "figure": "≈ 29 km", "figure_label": "de glace au-dessus de l'océan d'Europe, selon la sonde Juno", "visual": "bunker",
+			"quiz": "Que cache la surface glacée d'Europe ?", "choices": ["Un océan d'eau salée", "Un noyau de lave", "Un lac de méthane"], "answer": 0,
+			"title": "Europe, l'océan caché", "status": "Mesuré",
+			"fact": "Europe, une lune de Jupiter à peine plus petite que la nôtre, est couverte d'une croûte de glace à environ −160 °C. Dessous, les mesures des sondes indiquent un vaste océan d'eau liquide et salée, l'un des endroits les plus prometteurs pour chercher de la vie ailleurs. En 2022, la sonde Juno a survolé Europe à 360 km : son radiomètre estime l'épaisseur de la glace froide et rigide à environ 29 km. Lancée en octobre 2024, la sonde Europa Clipper doit arriver en 2030 pour étudier cette glace et cet océan.",
+			"in_game": "Europe sera le laboratoire du réseau : une sonde qui fond la glace rapporte des données précieuses.",
+			"sources": [["NASA JPL (2025) – Juno et la glace d'Europe", "https://www.jpl.nasa.gov/news/nasas-juno-measures-thickness-of-europas-ice-shell"],
+				["NASA – mission Europa Clipper", "https://science.nasa.gov/mission/europa-clipper/mission-science/"]] }),
+		Defs.Card.new({ "id": "europa_radiation", "figure": "> 50 %", "figure_label": "de la surface d'Europe dans les zones de radiations les plus fortes", "visual": "bunker",
+			"quiz": "D'où viennent les radiations qui frappent Europe ?", "choices": ["Des particules piégées par le champ magnétique de Jupiter", "Du noyau d'Europe", "Des volcans de glace"], "answer": 0,
+			"title": "Dans les ceintures de Jupiter", "status": "Mesuré",
+			"fact": "Le champ magnétique géant de Jupiter piège des particules chargées qui tournent autour de la planète et bombardent sans cesse la surface d'Europe. En 2018, à partir des données des sondes Galileo et Voyager, une équipe de la NASA a cartographié ces radiations : les zones les plus touchées couvrent plus de la moitié de la lune, et les particules y transforment la glace jusqu'à 10 à 20 cm de profondeur. Pour un humain sans protection, la dose serait dangereuse en très peu de temps.",
+			"in_game": "Sur Europe, les colons vivent dans des habitats enterrés. Un colon sans abri perd vite sa santé.",
+			"sources": [["NASA JPL (2018) – carte des radiations d'Europe", "https://www.jpl.nasa.gov/news/radiation-maps-of-jupiters-moon-europa-key-to-future-missions/"],
+				["Phys.org (2018)", "https://phys.org/news/2018-07-jupiter-moon-europakey-future-missions.pdf"]] }),
+		Defs.Card.new({ "id": "europa_oxygen", "figure": "≈ 12 kg/s", "figure_label": "d'oxygène arraché à la glace d'Europe par les particules de Jupiter", "visual": "electrolyser",
+			"quiz": "Comment se forme l'oxygène à la surface d'Europe ?", "choices": ["Les particules de Jupiter cassent les molécules d'eau de la glace", "Des plantes le fabriquent", "Il sort des volcans"], "answer": 0,
+			"title": "La glace qui respire", "status": "Mesuré",
+			"fact": "Les particules chargées de Jupiter cassent les molécules d'eau de la glace d'Europe en hydrogène et en oxygène. L'hydrogène, léger, s'échappe ; l'oxygène forme une atmosphère extrêmement ténue. En 2022, la sonde Juno a mesuré directement ces particules : Europe produirait environ 12 kg d'oxygène par seconde, de quoi faire respirer un million de personnes pendant une journée (Nature Astronomy, 2024). C'est bien moins que certaines estimations passées.",
+			"in_game": "L'expédition vers la glace de surface rapporte un peu d'oxygène. Au quotidien, il vient de l'électrolyse de l'eau.",
+			"sources": [["SwRI (2024) – Juno et l'oxygène d'Europe", "https://www.swri.org/press-release/juno-spacecraft-measures-oxygen-production-jupiter-s-moon-europa"],
+				["Universe Today (2024)", "https://www.universetoday.com/articles/juno-measures-how-much-oxygen-is-being-produced-by-europa"]] }),
+		Defs.Card.new({ "id": "thera", "figure": "3 km", "figure_label": "de glace, peut-être, au-dessus d'un lac sous Thera Macula", "visual": "cryobot",
+			"quiz": "Que pourrait cacher la glace sous Thera Macula ?", "choices": ["Un lac aussi grand que les Grands Lacs d'Amérique", "Une grotte de lave", "Un ancien vaisseau"], "answer": 0,
+			"title": "Le lac de Thera Macula", "status": "Hypothèse",
+			"fact": "Thera Macula est un « chaos » : une région d'Europe où la glace est cassée en radeaux, comme une banquise qui aurait fondu puis regelé. En 2011, une équipe de l'université du Texas a réanalysé les images de la sonde Galileo : selon elle, un lac d'eau liquide aussi grand que les Grands Lacs d'Amérique du Nord se cacherait à environ 3 km sous la surface (Nature). C'est une hypothèse, que la sonde Europa Clipper pourra tester avec son radar.",
+			"in_game": "La sonde cryobot se pose sur les fractures : la glace y est plus jeune. L'expédition vers Thera Macula rapporte beaucoup de données.",
+			"sources": [["Université du Texas (2011)", "https://www.jsg.utexas.edu/news/2011/11/scientists-find-evidence-for-great-lake-on-europa/"],
+				["Phys.org (2011)", "https://phys.org/news/2011-11-scientists-evidence-great-lake-jupiter.pdf"]] }),
 		Defs.Card.new({ "id": "titan_light", "figure": "≈ 1 %", "figure_label": "de la lumière solaire reçue par la Terre, avant même la brume", "visual": "reactor",
 			"quiz": "Pourquoi fait-il si sombre sur Titan ?", "choices": ["Saturne est loin du Soleil et la brume arrête la lumière", "Titan tourne très vite sur elle-même", "Les anneaux de Saturne font de l'ombre"], "answer": 0,
 			"title": "Un midi de crépuscule", "status": "Mesuré",
@@ -857,7 +940,9 @@ const RECRUITS := [["Yuki", "chimiste"], ["Léo", "pilote"], ["Sofia", "ingénie
 const RECRUITS_ERA4 := [["Iris", "urbaniste"], ["Sami", "pilote"], ["Chloé", "botaniste"], ["Jonas", "électricien"],
 		["Aya", "médecin"], ["Victor", "mécanicien"], ["Leila", "chimiste"], ["Noé", "géologue"],
 		["Rosa", "ingénieure"], ["Kenji", "agronome"], ["Fatou", "biologiste"], ["Hugo", "maçon"],
-		["Mila", "astrophysicienne"], ["Ravi", "radiologue"], ["Jade", "pilote de rover"], ["Oscar", "cuisinier"]]
+		["Mila", "astrophysicienne"], ["Ravi", "radiologue"], ["Jade", "pilote de rover"], ["Oscar", "cuisinier"],
+		["Lina", "géophysicienne"], ["Marco", "plombier"], ["Zoé", "océanographe"], ["Idris", "informaticien"],
+		["Nora", "pharmacienne"], ["Tariq", "soudeur"], ["Ève", "glaciologue"], ["Paulo", "électronicien"]]
 
 ## Messages d'ambiance du bandeau (avec une touche d'humour).
 const CHATTER := [

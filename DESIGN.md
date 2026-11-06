@@ -146,7 +146,9 @@ Mesures d'octobre 2026 (Jezero, `_simulate_campaign`) :
 | Aux confins (Titan fondé), première livraison | 327 à 328 |
 | Capitale martienne (30 colons, un grand dôme pressurisé) | 404 |
 | Mine de la ceinture (Cérès exporte 200 matériaux) | 410 |
-| Station-service de Saturne (Titan exporte 200 kg de méthane) | 475 |
+| Station-service de Saturne (Titan exporte 200 kg de méthane) | 466 |
+| Lune de glace (Europe fondée, après la Capitale) | 449 |
+| Europe : sonde cryobot, 8 colons abrités, lac de Thera Macula | 529 à 589 |
 
 L'ère 4 est jouée pour de vrai par le joueur simulé (`ColonyBot.network`) : astroport, fondation de
 Cérès puis de Titan, matériaux de Cérès vers les colonies qui ont de la place, méthane de Mars vers
@@ -154,7 +156,11 @@ Cérès (qui n'en produit pas), méthane de Titan vers le réseau. Le trajet Mar
 l'essentiel de la durée de l'ère 4. L'astroport a un hangar de 200 matériaux : sans lui, Mars et
 Titan, pleines (400, la seule réserve de l'atterrisseur), ne pouvaient plus recevoir les exports de Cérès.
 
-Avant-postes seuls, sans aucune cargaison de Mars (80 sols, `_simulate_outposts`) : Cérès respire au
+Europe est fondée après la Capitale martienne : ses 4 colons, puis 4 volontaires pour l'objectif
+« Sous la banquise », manqueraient à Mars pour en loger 30 (la seconde vague compte 24 recrues).
+
+Avant-postes seuls, sans aucune cargaison de Mars (80 sols, `_simulate_outposts`) : Europe respire
+au sol 0,75 et pose sa sonde cryobot vers le sol 48, sans évacuation ; Cérès respire au
 sol 1,5 et raffine la saumure au sol 29 ; Titan respire au sol 0,8 et pompe le méthane au sol 16
 (générateur à radio-isotopes de l'atterrisseur, +20 kWh/sol, comme Dragonfly ; pompe à 45 matériaux
 et 4 kWh/sol) ; aucune évacuation.
@@ -183,7 +189,7 @@ fourchettes ; mettre ce tableau à jour après chaque rééquilibrage.
   vitale baisse). Sauvegarde v2 = `Campaign.to_dict()` ; une ancienne sauvegarde devient une campagne.
 - Le besoin de Mars en ère 4 : l'azote (8ᵉ ressource). L'air martien n'en a qu'environ 2,6 %, sous
   moins de 1 % de la pression terrestre ; Titan en est faite (≈ 95 %) ; Cérès a des sels d'ammonium.
-  La Terre envoie une seconde vague de 16 volontaires (`RECRUITS_ERA4`, Mars, ère 4) ; l'objectif
+  La Terre envoie une seconde vague de 24 volontaires (`RECRUITS_ERA4`, Mars, ère 4) ; l'objectif
   « Capitale martienne » demande 30 colons et un grand dôme pressurisé. Grand dôme (recherche « Air à
   l'azote ») : 10 places, 0,8 kg d'azote/sol de fuites, ne loge personne sous 90 % de rendement
   (`is_pressurized`). Compresseur d'azote : 4 kg/sol × part d'azote de l'air (Titan 1, Mars 0,05,
@@ -193,6 +199,15 @@ fourchettes ; mettre ce tableau à jour après chaque rééquilibrage.
 - Ère 4 « Interplanétaire » (après « Racines ») : astroport, fondation d'une colonie (4 colons,
   150 matériaux, 60 kg de méthane), cargaisons (soute 300 unités, un colon = 10 ; carburant
   20 kg + 0,1 kg par unité). Saut entre deux sites de Mars : 1 sol.
+- Europe (région « Thera Macula », lune de Jupiter) : soleil ×0,09, chauffage ×1,75, pas d'air,
+  sol de glace partout, décollage ×0,3. Radiations de Jupiter en permanence : un colon hors des abris
+  perd 0,6 de santé par sol (`JUPITER_DAMAGE`) ; l'avant-poste arrive avec un réacteur et un habitat
+  enterré, et les habitats de surface et grands dômes y sont interdits. Module propre : la sonde
+  cryobot (recherche « Forage thermique », 140 matériaux, 20 kWh/sol → 8 données et 4 kg d'eau par
+  sol, sur une fracture). Objectifs : oxygène, 8 colons abrités, sonde cryobot, lac de Thera Macula.
+  Routes : Mars 37 sols (fenêtre de 5 sols tous les 27), Cérès 48, Titan 120 (tous les 238 sols).
+  Fiches sourcées : Juno (glace d'environ 29 km, 2025), radiations (JPL 2018), oxygène (Juno 2024),
+  lac de Thera Macula (hypothèse, 2011).
 - Une nouvelle colonie : savoir partagé, pas de ravitaillement de matériaux depuis la Terre ni de
   volontaires (le réseau s'en charge), calendrier de la colonie de départ, carte propre.
 - Cérès (région « Cratère Occator ») : soleil ×0,3, chauffage ×1,5, pas d'air (ni tempêtes ni poussière,

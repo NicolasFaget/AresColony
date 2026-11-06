@@ -394,6 +394,26 @@ func _run() -> void:
 			engine.state.speed = 1
 			await _frames(8)
 			await _shot("B4_meteorite")
+		"europe":
+			var campaign := Campaign.from_dict(JSON.parse_string(FileAccess.get_file_as_string("res://game/test_saves/europa.json")))
+			manager.campaign = campaign
+			manager.engine = campaign.engine()
+			engine = manager.engine
+			engine.state.speed = 0
+			engine.state.sol = floorf(engine.state.sol) + 1.45
+			main = await _open_main()
+			_close_modals(main)
+			if not main._window.collapsed:
+				main._window.toggle_collapsed()
+			await _frames(30)
+			await _shot("C3_europe")
+			main._show_card("europa")
+			await _frames(10)
+			await _shot("C4_fiche_europe")
+			_close_modals(main)
+			main._show_card("thera")
+			await _frames(10)
+			await _shot("C5_fiche_thera")
 		"arcadia":
 			manager.stop_game()
 			var menu: Control = load("res://ui/menu.tscn").instantiate()

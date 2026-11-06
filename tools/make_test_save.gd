@@ -3,7 +3,7 @@ extends SceneTree
 ## Usage : godot --headless --path . -s tools/make_test_save.gd
 ## - ere1.json : Mars au milieu de l'ère 1 (sol ERA1_SOL), premiers modules posés ;
 ## - ere2.json à ere4.json : Mars jouée par le joueur simulé jusqu'au début de cette ère ;
-## - ceres.json, titan.json : le réseau joué jusqu'à la fondation de cette colonie (plus quelques
+## - ceres.json, titan.json, europa.json : le réseau joué jusqu'à la fondation de cette colonie (plus quelques
 ##   sols pour ses premiers modules), affichée au chargement.
 
 const DIR := "res://game/test_saves/"
@@ -23,10 +23,10 @@ func _initialize() -> void:
 		_write("ere%d" % era, Campaign.from_engine(engine).to_dict())
 
 	var campaign := Campaign.from_engine(ColonyEngine.new(ColonyState.new()))
-	var pending := ["ceres", "titan"]
+	var pending := ["ceres", "titan", "europa"]
 	## Planète -> sol où écrire sa partie.
 	var founded := {}
-	while not pending.is_empty() and campaign.time < 900.0:
+	while not pending.is_empty() and campaign.time < 1200.0:
 		ColonyBot.network(campaign)
 		campaign.advance(0.25)
 		for i in campaign.colonies.size():

@@ -183,6 +183,7 @@ static func building(building_id: String) -> Node3D:
 		"biodome": _biodome(root)
 		"dome": _dome(root)
 		"n2_compressor": _n2_compressor(root)
+		"cryobot": _cryobot(root)
 	return root
 
 
@@ -522,6 +523,21 @@ static func _n2_compressor(r: Node3D) -> void:
 	strut(r, Vector3(-0.05, 0.3, -0.3), Vector3(0.45, 0.3, -0.4), 0.03, GREY)
 	strut(r, Vector3(0.45, 0.2, -0.3), Vector3(0.3, 0.22, 0.45), 0.03, GREY)
 	light(r, Vector3(-0.35, 0.4, -0.04), LIGHT, 0.025, 2.0)
+
+
+## Sonde cryobot : un derrick qui descend une sonde chauffée dans un puits de glace fondue.
+static func _cryobot(r: Node3D) -> void:
+	_pad(r, 1.9)
+	cylinder(r, Vector3(0, 0.03, 0), 0.32, 0.06, Color("#1d3550"), Vector3.ZERO, -1.0, 20)
+	for corner in [Vector3(-0.45, 0, -0.45), Vector3(0.45, 0, -0.45), Vector3(-0.45, 0, 0.45), Vector3(0.45, 0, 0.45)]:
+		strut(r, corner, Vector3(0, 1.5, 0), 0.04, GREY)
+	box(r, Vector3(0, 1.5, 0), Vector3(0.3, 0.12, 0.3), WHITE)
+	cylinder(r, Vector3(0, 0.95, 0), 0.015, 1.1, DARK, Vector3.ZERO, -1.0, 6)
+	cylinder(r, Vector3(0, 0.45, 0), 0.07, 0.3, ORANGE, Vector3.ZERO, -1.0, 12)
+	box(r, Vector3(0.7, 0.25, -0.55), Vector3(0.45, 0.4, 0.4), WHITE)
+	cylinder(r, Vector3(-0.65, 0.2, 0.6), 0.16, 0.4, GREY, Vector3.ZERO, -1.0, 14)
+	light(r, Vector3(0, 0.08, 0), LIGHT, 0.06, 3.0)
+	light(r, Vector3(0, 1.6, 0), RED, 0.03, 2.0)
 
 
 static func _biodome(r: Node3D) -> void:

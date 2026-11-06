@@ -106,7 +106,7 @@ func _build_layout() -> void:
 	if OS.is_debug_build():
 		var tests := UiFx.hbox(8, [])
 		for test: Array in [["ere1", Tr.t("Ère 1")], ["ere2", Tr.t("Ère 2")], ["ere3", Tr.t("Ère 3")], ["ere4", Tr.t("Ère 4")], ["ceres", Tr.t("Cérès")],
-				["titan", Tr.t("Titan")]]:
+				["titan", Tr.t("Titan")], ["europa", Tr.t("Europe")]]:
 			tests.add_child(_menu_button(test[1], "Button", _on_test_game.bind(test[0])))
 		buttons.add_child(UiFx.label(Tr.t("Parties de test"), "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER))
 		buttons.add_child(tests)

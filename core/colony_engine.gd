@@ -78,6 +78,8 @@ const RETURN_METHANE := 200.0
 const FLARE_WARNING_SOLS := 0.5
 const FLARE_SOLS := 0.3
 const FLARE_DAMAGE := 1.0
+## Europe : santé perdue par sol par un colon hors des abris (radiations de Jupiter, en permanence).
+const JUPITER_DAMAGE := 0.6
 ## Météorites (Mars et Cérès, à partir de l'ère 2) : intervalle en sols, éclats récupérés.
 const METEOR_ERA := 2
 const METEOR_MIN_SOLS := 25.0
@@ -104,6 +106,7 @@ const CAUSES := {
 	ColonyContent.WATER: "Manque d'eau. Recherchez la glace souterraine et posez un extracteur dessus.",
 	ColonyContent.FOOD: "Manque de nourriture. Les ravitaillements diminuent : il faut des serres.",
 	"radiation": "Radiations d'une éruption solaire. Construisez des habitats enterrés pour abriter tout le monde.",
+	"jupiter": "Radiations de Jupiter. Sur Europe, chaque colon doit vivre dans un habitat enterré.",
 }
 
 var state: ColonyState
@@ -990,16 +993,20 @@ func _update_health(satisfied: Dictionary, ds: float) -> void:
 			if satisfied.get(r, 1.0) < worst:
 				worst = satisfied.get(r, 1.0)
 				cause = r
-	var flare := is_flare()
+	var dose := FLARE_DAMAGE if is_flare() else 0.0
+	var dose_cause := "radiation"
+	if planet().get("radiation", false) and dose < JUPITER_DAMAGE:
+		dose = JUPITER_DAMAGE
+		dose_cause = "jupiter"
 	var shelter := shelter_capacity()
 	for i in range(state.colonists.size() - 1, -1, -1):
 		var colonist: Dictionary = state.colonists[i]
 		var mine := loss
 		var why := cause
 		# Les premiers colons trouvent place dans les abris ; les autres prennent les radiations.
-		if flare and i >= shelter:
-			mine += FLARE_DAMAGE
-			why = "radiation"
+		if dose > 0.0 and i >= shelter:
+			mine += dose
+			why = dose_cause
 		if mine <= 0.0:
 			colonist.health = minf(1.0, colonist.health + 0.3 * ds)
 		elif not _autopilot:
@@ -1443,6 +1450,16 @@ func _objective_met(objective_id: String) -> bool:
 			return state.exported_materials >= 200.0
 		"titan":
 			return campaign_planets.has("titan")
+		"europa":
+			return campaign_planets.has("europa")
+		"europa_breath":
+			return _has_connected("electrolyser")
+		"europa_shelter":
+			return state.colonists.size() >= 8 and shelter_capacity() >= state.colonists.size()
+		"europa_ocean":
+			return _has_connected("cryobot")
+		"europa_thera":
+			return state.sites_done.has("thera")
 		"titan_breath":
 			return _has_connected("electrolyser")
 		"titan_pump":
@@ -1618,6 +1635,14 @@ func setup_outpost(crew: Array, cargo: Dictionary) -> void:
 		if spot.x >= 0:
 			state.buildings.append({ "id": "reactor", "x": spot.x, "y": spot.y, "level": 1 })
 			_rebuild()
+	# Europe : l'équipage arrive avec un habitat enterré (les radiations ne laissent pas le choix).
+	if planet().get("starter_bunker", false):
+		var spot := _spot_beside_lander(Vector2i(2, 2))
+		if spot.x >= 0:
+			state.buildings.append({ "id": "bunker", "x": spot.x, "y": spot.y, "level": 1 })
+			_rebuild()
+	if planet().get("radiation", false):
+		unlock_card("europa_radiation")
 	changed.emit()
 
 

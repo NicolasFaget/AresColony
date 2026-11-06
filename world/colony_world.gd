@@ -119,7 +119,7 @@ func sync_with_game() -> void:
 		_signature = signature
 		_rebuild_buildings()
 	_update_lights()
-	var ice := _engine.state.research_done.has("ice") or _engine.planet_id() == "titan"
+	var ice: bool = _engine.state.research_done.has("ice") or _engine.planet().ice_everywhere
 	if ice != _ice_visible:
 		_ice_visible = ice
 		_ice_root.visible = ice
@@ -786,6 +786,12 @@ func _build_terrain() -> void:
 		mat.set_shader_parameter("light_sand", Color(0.33, 0.32, 0.3))
 		mat.set_shader_parameter("dark_color", Color(0.1, 0.1, 0.1))
 		mat.set_shader_parameter("rock_color", Color(0.17, 0.16, 0.15))
+	if _engine.planet_id() == "europa":
+		# Europe : glace très blanche, veinée de sels brun-rouge.
+		mat.set_shader_parameter("sand_color", Color(0.74, 0.72, 0.68))
+		mat.set_shader_parameter("light_sand", Color(0.86, 0.85, 0.82))
+		mat.set_shader_parameter("dark_color", Color(0.55, 0.42, 0.33))
+		mat.set_shader_parameter("rock_color", Color(0.66, 0.64, 0.62))
 	mat.set_shader_parameter("noise_large", _noise_texture(0.012, 5, false, 1))
 	mat.set_shader_parameter("noise_fine", _noise_texture(0.08, 2, false, 2))
 	mat.set_shader_parameter("detail_normal", _noise_texture(0.05, 4, true, 3))
@@ -843,6 +849,8 @@ func _build_pebbles() -> void:
 	var pebbles := MultiMeshInstance3D.new()
 	pebbles.multimesh = multimesh
 	pebbles.material_override = (ModelBuilder.rock_material(Color("#2e2c2a"), 0.0) if not _engine.planet().atmosphere else ModelBuilder.rock_material(Color("#4e2516")))
+	if _engine.planet_id() == "europa":
+		pebbles.material_override = ModelBuilder.rock_material(Color("#b9b3aa"), 0.0)
 	pebbles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(pebbles)
 
@@ -877,6 +885,9 @@ func _build_rocks() -> void:
 	var rocks := MultiMeshInstance3D.new()
 	rocks.multimesh = multimesh
 	rocks.material_override = ModelBuilder.rock_material(Color("#3a3734"), 0.0) if not _engine.planet().atmosphere else ModelBuilder.rock_material()
+	# Europe : blocs de glace basculés, blancs teintés de sels.
+	if _engine.planet_id() == "europa":
+		rocks.material_override = ModelBuilder.rock_material(Color("#cfc8bd"), 0.0)
 	add_child(rocks)
 
 
@@ -900,6 +911,10 @@ func _build_ice() -> void:
 		mat.albedo_color = Color(0.05, 0.04, 0.03, 0.92)
 		mat.roughness = 0.04
 		mat.metallic = 0.3
+	elif _engine.planet_id() == "europa":
+		# Fractures d'Europe : bandes de glace brun-rouge (sels remontés de l'océan).
+		mat.albedo_color = Color(0.55, 0.3, 0.18, 0.85)
+		mat.roughness = 0.5
 	# Toutes les plaques de glace dans un seul maillage.
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(1.0, 1.0)

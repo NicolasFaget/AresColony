@@ -111,6 +111,23 @@ const TUTORIAL := [
 		"text": "Construisez un astroport, et des réservoirs : Titan sera la station-service du réseau." },
 	{ "id": "first_export", "planet": "titan", "tab": TAB_COLONY, "target": "network",
 		"text": "Envoyez une cargaison de méthane vers une autre colonie (bouton planète, en haut) : 200 kg au total pour l'objectif." },
+	# Europe.
+	{ "id": "build_electrolyser", "planet": "europa", "tab": TAB_BUILD, "target": "electrolyser",
+		"text": "Presque pas d'air sur Europe : l'oxygène viendra de la glace. Construisez un électrolyseur d'eau." },
+	{ "id": "build_extractor", "planet": "europa", "tab": TAB_BUILD, "target": "extractor",
+		"text": "Le sol d'Europe est de la glace d'eau : posez un extracteur n'importe où." },
+	{ "id": "build_kiln", "planet": "europa", "tab": TAB_BUILD, "target": "kiln",
+		"text": "Aucun ravitaillement ici : un four à régolithe fabriquera vos matériaux." },
+	{ "id": "build_bunker", "planet": "europa", "tab": TAB_BUILD, "target": "bunker",
+		"text": "Les radiations de Jupiter frappent la surface : chaque colon doit vivre dans un habitat enterré. Préparez des places avant d'en faire venir." },
+	{ "id": "research_cryobot", "planet": "europa", "tab": TAB_RESEARCH, "target": "cryobot",
+		"text": "Recherchez « Forage thermique » pour descendre vers l'océan." },
+	{ "id": "build_cryobot", "planet": "europa", "tab": TAB_BUILD, "target": "cryobot",
+		"text": "Posez la sonde cryobot sur une fracture rougeâtre : la glace y est plus jeune." },
+	{ "id": "build_tank", "planet": "europa", "tab": TAB_BUILD, "target": "tank",
+		"text": "Construisez un réservoir de méthane : les rovers d'Europe roulent au méthane livré par Mars." },
+	{ "id": "build_garage", "planet": "europa", "tab": TAB_BUILD, "target": "garage",
+		"text": "Construisez un garage à rovers : le lac de Thera Macula vous attend." },
 ]
 
 
@@ -192,6 +209,14 @@ static func alerts(engine: ColonyEngine) -> Array[Dictionary]:
 				"advice": Tr.t("Construisez des habitats enterrés : 4 places à l'abri chacun.") if researched
 						else Tr.t("Recherchez « Blindage en régolithe » pour construire des abris."),
 				"tab": TAB_BUILD if researched else TAB_RESEARCH, "target": "bunker" if researched else "shielding" })
+	# Europe : les radiations de Jupiter ne s'arrêtent jamais.
+	if engine.planet().get("radiation", false):
+		var exposed := maxi(0, engine.state.colonists.size() - engine.shelter_capacity())
+		if exposed > 0:
+			list.insert(0, { "level": "danger", "resource": "", "sols": 0.0,
+				"title": Tr.t("Radiations de Jupiter : %d colon%s sans abri") % [exposed, "s" if exposed > 1 else ""],
+				"advice": Tr.t("Construisez des habitats enterrés : 4 places à l'abri chacun."),
+				"tab": TAB_BUILD, "target": "bunker" })
 	var broken := engine.broken_count()
 	if broken > 0:
 		list.append({ "level": "warning", "resource": "", "sols": INF,
