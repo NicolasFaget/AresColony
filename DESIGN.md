@@ -114,6 +114,11 @@ de vie de l'application.
 - Aurores (Mars seulement, sans champ magnétique global) : à la fin de chaque éruption solaire,
   une aurore verte d'un sol (+15 données, lueur dans le ciel de nuit) ; fiche « aurora »
   (Perseverance, mars 2024).
+- Événements propres à chaque monde (`WORLD_EVENTS`, tous les 30 à 50 sols, dès l'ère 2 sur Mars,
+  sans dégâts, coupés avec `breakdown_rate = 0`) : séisme martien (+20 données ; InSight, magnitude 5
+  en 2022), vapeur d'eau de Cérès (+20 eau, +10 données ; Herschel 2014), averse de méthane sur
+  Titan (+25 méthane, +10 données ; Cassini 2010), geyser d'Europe (+15 eau, +25 données ;
+  Hubble 2016, hypothèse). Chacun débloque sa fiche et s'accompagne d'un nuage dans la scène.
 - Fiches : chacune a un chiffre clé, une illustration et un quiz à trois choix, tirés uniquement de
   son texte sourcé. Déblocage = écran plein « Nouvelle découverte » ; première lecture +5 données,
   bonne réponse au quiz +10 (une seule tentative).

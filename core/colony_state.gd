@@ -27,6 +27,8 @@ var expeditions: int = 0
 var next_flare: float = 1e9
 ## Prochaine météorite (1e9 : pas encore programmée, elle l'est à l'ère 2).
 var next_meteor: float = 1e9
+## Prochain événement propre au monde (séisme, geyser… ; 1e9 : pas encore programmé).
+var next_world_event: float = 1e9
 ## Fin de l'aurore en cours (-1 : aucune).
 var aurora_until: float = -1.0
 var flare_until: float = -1.0
@@ -106,6 +108,7 @@ func to_dict() -> Dictionary:
 		"flare_until": flare_until,
 		"next_meteor": next_meteor,
 		"aurora_until": aurora_until,
+		"next_world_event": next_world_event,
 		"cards_read": cards_read.duplicate(),
 		"quiz_answers": quiz_answers.duplicate(),
 		"map_seed": map_seed,
@@ -173,6 +176,7 @@ static func from_dict(data: Dictionary) -> ColonyState:
 	state.flare_until = _num(data.get("flare_until"), -1.0)
 	state.next_meteor = _num(data.get("next_meteor"), state.next_meteor)
 	state.aurora_until = _num(data.get("aurora_until"), -1.0)
+	state.next_world_event = _num(data.get("next_world_event"), state.next_world_event)
 	state.cards_read = _ids(data.get("cards_read"))
 	var answers: Variant = data.get("quiz_answers")
 	if answers is Dictionary:

@@ -203,7 +203,22 @@ func impact(index: int) -> void:
 	_dust_puff(at, 2.5)
 
 
-func _dust_puff(at: Vector3, strength: float) -> void:
+## Événement propre au monde : poussière (séisme), vapeur blanche (Cérès, geyser d'Europe), averse (Titan).
+func world_event(planet: String) -> void:
+	var lander := Vector3(_engine.map.lander_cell.x, 0.0, _engine.map.lander_cell.y)
+	match planet:
+		"mars":
+			for offset: Vector3 in [Vector3(3, 0, 2), Vector3(-2, 0, 4), Vector3(5, 0, -2)]:
+				_dust_puff(lander + offset, 1.5)
+		"ceres":
+			_dust_puff(lander + Vector3(6, 0, 4), 2.5, Color(0.92, 0.94, 0.98, 0.5))
+		"titan":
+			_dust_puff(lander + Vector3(0, 6, 0), 3.0, Color(0.55, 0.45, 0.3, 0.5), Vector3.DOWN)
+		"europa":
+			_dust_puff(lander + Vector3(6, 0, 5), 4.0, Color(0.9, 0.95, 1.0, 0.55))
+
+
+func _dust_puff(at: Vector3, strength: float, color := Color(0.78, 0.5, 0.34, 0.6), direction := Vector3.UP) -> void:
 	var puff := CPUParticles3D.new()
 	var mesh := SphereMesh.new()
 	mesh.radius = 0.12
@@ -211,7 +226,7 @@ func _dust_puff(at: Vector3, strength: float) -> void:
 	mesh.radial_segments = 6
 	mesh.rings = 3
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.78, 0.5, 0.34, 0.6)
+	mat.albedo_color = color
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mesh.material = mat
@@ -220,8 +235,8 @@ func _dust_puff(at: Vector3, strength: float) -> void:
 	puff.one_shot = true
 	puff.explosiveness = 0.9
 	puff.lifetime = 1.0
-	puff.direction = Vector3.UP
-	puff.spread = 80.0
+	puff.direction = direction
+	puff.spread = 80.0 if direction == Vector3.UP else 25.0
 	puff.initial_velocity_min = 0.6 * strength
 	puff.initial_velocity_max = 1.6 * strength
 	puff.gravity = Vector3(0, -1.0, 0)

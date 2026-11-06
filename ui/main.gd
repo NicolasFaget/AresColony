@@ -242,6 +242,12 @@ func _connect_engine() -> void:
 		AudioManager.play("milestone")
 		_news.post(Tr.t("Une aurore verte illumine la nuit martienne ! Les mesures des colons rapportent %d données.")
 				% roundi(ColonyEngine.AURORA_DATA)))
+	_engine.world_event.connect(func(planet: String, gains: Dictionary) -> void:
+		AudioManager.play("milestone")
+		GameManager.vibrate(60 if planet == "mars" else 30)
+		_world.world_event(planet)
+		var gained := ColonyPage._reward_text(gains) if not gains.is_empty() else Tr.t("rien, faute de place")
+		_news.post(Tr.t(ColonyContent.WORLD_EVENTS[planet].news) % gained))
 	_engine.dust_devil.connect(func(count: int) -> void:
 		_news.post((Tr.t("Un tourbillon de poussière a balayé %d panneaux. Merci le vent !") % count) if count > 1
 				else Tr.t("Un tourbillon de poussière a balayé un panneau. Merci le vent !")))

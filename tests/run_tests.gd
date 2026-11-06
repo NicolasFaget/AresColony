@@ -43,6 +43,7 @@ func _init() -> void:
 	_test_test_save()
 	_test_choices()
 	_test_meteors_and_aurora()
+	_test_world_events()
 	_test_europa()
 	_test_number_formatter()
 	_simulate_campaign()
@@ -1185,6 +1186,41 @@ func _test_meteors_and_aurora() -> void:
 	ceres.state.next_flare = ceres.state.sol + 0.01
 	ceres.advance(ColonyEngine.FLARE_SOLS + 0.1)
 	_check(not ceres.is_aurora(), "pas d'aurore sur Cérès (pas d'atmosphère)")
+
+
+## Un événement propre à chaque monde : programmé, sans dégâts, un gain et une fiche.
+func _test_world_events() -> void:
+	for planet: String in ColonyContent.PLANET_ORDER:
+		var state := ColonyState.new()
+		if planet != "mars":
+			state.region = planet
+		state.era = 2
+		var engine := ColonyEngine.new(state)
+		engine.breakdown_rate = 1e-9
+		var seen := []
+		engine.world_event.connect(func(p: String, gains: Dictionary) -> void: seen.append([p, gains]))
+		engine.advance(0.05)
+		_check(engine.state.next_world_event > engine.state.sol + ColonyEngine.WORLD_EVENT_MIN_SOLS - 0.1
+				and engine.state.next_world_event < engine.state.sol + ColonyEngine.WORLD_EVENT_MAX_SOLS,
+				"événement programmé : %s" % planet)
+		engine.state.next_world_event = engine.state.sol + 0.01
+		var data := engine.state.amount(R.DATA)
+		engine.advance(0.05)
+		var event: Dictionary = ColonyContent.WORLD_EVENTS[planet]
+		_check(seen.size() == 1 and seen[0][0] == planet, "événement survenu : %s" % planet)
+		_check(engine.state.amount(R.DATA) > data + 5.0 and seen[0][1].has(R.DATA), "événement : des données (%s)" % planet)
+		_check(engine.state.cards_unlocked.has(event.card), "fiche de l'événement : %s" % planet)
+		_check(engine.state.next_world_event > engine.state.sol + ColonyEngine.WORLD_EVENT_MIN_SOLS - 0.2, "suivant reprogrammé : %s" % planet)
+		var copy := ColonyState.from_dict(engine.state.to_dict())
+		_check(_near(copy.next_world_event, engine.state.next_world_event), "prochain événement sauvegardé : %s" % planet)
+	var early := ColonyEngine.new(ColonyState.new())
+	early.breakdown_rate = 1e-9
+	early.advance(1.0)
+	_check(early.state.next_world_event >= 1e8, "pas de séisme martien à l'ère 1")
+	var calm := _calm_engine()
+	calm.state.era = 3
+	calm.advance(1.0)
+	_check(calm.state.next_world_event >= 1e8, "pas d'événement quand les aléas sont coupés")
 
 
 ## La partie de test du menu (versions de développement) se charge en ère 4.

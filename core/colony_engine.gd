@@ -28,6 +28,8 @@ signal dust_devil(cleaned: int)
 ## Météorite : le module touché (endommagé), ou -1 si elle est tombée à côté.
 signal meteor_impact(index: int)
 signal aurora_started
+## Événement propre au monde (ColonyContent.WORLD_EVENTS) : gains réellement reçus.
+signal world_event(planet: String, gains: Dictionary)
 
 ## Durée d'un sol en jeu, à vitesse ×1 (secondes réelles).
 const SECONDS_PER_SOL := 60.0
@@ -88,6 +90,8 @@ const METEOR_SALVAGE := 15.0
 ## Aurore martienne après une éruption solaire : durée (sols) et données des observations.
 const AURORA_SOLS := 1.0
 const AURORA_DATA := 15.0
+const WORLD_EVENT_MIN_SOLS := 30.0
+const WORLD_EVENT_MAX_SOLS := 50.0
 ## Ère 3 : colons visés et note demandée.
 const ROOTED_CREW := 20
 const ROOTED_SCORE := 85.0
@@ -1069,6 +1073,7 @@ func _events(ds: float) -> void:
 	_dust_devils()
 	_breakdowns(ds)
 	_meteors()
+	_world_event()
 	_finish_expedition()
 	_flares()
 	if state.aurora_until > 0.0 and state.sol >= state.aurora_until:
@@ -1229,6 +1234,31 @@ func _meteors() -> void:
 	_add(ColonyContent.MATERIALS, METEOR_SALVAGE)
 	unlock_card("impacts")
 	meteor_impact.emit(hit)
+	changed.emit()
+
+
+## Un événement naturel propre à chaque monde (séisme martien, vapeur de Cérès, pluie de Titan,
+## geyser d'Europe) : sans dégâts, un petit gain et une fiche. Dès l'ère 2 sur Mars.
+func _world_event() -> void:
+	var event: Dictionary = ColonyContent.WORLD_EVENTS.get(planet_id(), {})
+	if breakdown_rate <= 0.0 or event.is_empty() or (planet_id() == "mars" and state.era < 2):
+		return
+	if state.next_world_event >= 1e8:
+		state.next_world_event = state.sol + _rng.randf_range(WORLD_EVENT_MIN_SOLS, WORLD_EVENT_MAX_SOLS)
+		state.event_seed = _rng.state
+		return
+	if state.sol < state.next_world_event:
+		return
+	state.next_world_event = state.sol + _rng.randf_range(WORLD_EVENT_MIN_SOLS, WORLD_EVENT_MAX_SOLS)
+	state.event_seed = _rng.state
+	var gains := {}
+	for r: String in event.reward:
+		var before := state.amount(r)
+		_add(r, event.reward[r])
+		if state.amount(r) - before >= 0.5:
+			gains[r] = state.amount(r) - before
+	unlock_card(event.card)
+	world_event.emit(planet_id(), gains)
 	changed.emit()
 
 
@@ -1574,6 +1604,8 @@ func _shift_schedule(shift: float) -> void:
 		state.next_meteor += shift
 	if state.aurora_until > 0.0:
 		state.aurora_until += shift
+	if state.next_world_event < 1e8:
+		state.next_world_event += shift
 
 
 # ---------- Campagne : astroport, cargaisons ----------

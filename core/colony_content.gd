@@ -254,6 +254,18 @@ const PLANETS := {
 			"dome": "Les radiations de Jupiter frappent la surface : sur Europe, on vit dans des habitats enterrés." } },
 }
 const PLANET_ORDER := ["mars", "ceres", "titan", "europa"]
+## Un événement naturel propre à chaque monde (fiche sourcée), de temps en temps : un petit gain.
+## news : texte de la nouvelle, %s reçoit les gains.
+const WORLD_EVENTS := {
+	"mars": { "card": "marsquake", "reward": { DATA: 20.0 },
+		"news": "Séisme martien ! Les sismomètres de la colonie l'ont enregistré : %s." },
+	"ceres": { "card": "ceres_vapour", "reward": { WATER: 20.0, DATA: 10.0 },
+		"news": "La glace de Cérès se sublime au soleil : un panache de vapeur d'eau. Les pièges froids récupèrent %s." },
+	"titan": { "card": "titan_rain", "reward": { METHANE: 25.0, DATA: 10.0 },
+		"news": "Averse de méthane sur Titan ! Les collecteurs en récupèrent : %s." },
+	"europa": { "card": "europa_plume", "reward": { WATER: 15.0, DATA: 25.0 },
+		"news": "Un geyser jaillit d'une fracture d'Europe ! La colonie en recueille : %s." },
+}
 ## Routes entre mondes (dans le jeu, un sol de voyage vaut environ un mois réel) : durée du trajet
 ## (orbite de Hohmann), période entre deux fenêtres de tir (période synodique), durée d'ouverture,
 ## carburant de base et décalage de la première fenêtre.
@@ -909,6 +921,34 @@ static func cards() -> Array[Defs.Card]:
 			"in_game": "La sonde cryobot se pose sur les fractures : la glace y est plus jeune. L'expédition vers Thera Macula rapporte beaucoup de données.",
 			"sources": [["Université du Texas (2011)", "https://www.jsg.utexas.edu/news/2011/11/scientists-find-evidence-for-great-lake-on-europa/"],
 				["Phys.org (2011)", "https://phys.org/news/2011-11-scientists-evidence-great-lake-jupiter.pdf"]] }),
+		Defs.Card.new({ "id": "marsquake", "figure": "5", "figure_label": "de magnitude : le plus fort séisme martien enregistré par InSight, en 2022", "visual": "lander",
+			"quiz": "Combien de séismes InSight a-t-il enregistrés sur Mars ?", "choices": ["Plus de 1 300", "Aucun", "Une dizaine"], "answer": 0,
+			"title": "Mars tremble", "status": "Mesuré",
+			"fact": "Mars n'a pas de plaques tectoniques comme la Terre, mais elle tremble : en refroidissant, la planète se contracte et sa croûte se fissure. Posé en novembre 2018, l'atterrisseur InSight a déposé un sismomètre sur le sol et enregistré plus de 1 300 séismes. Le 4 mai 2022, il a mesuré le plus fort : magnitude 5, un séisme moyen sur Terre, mais proche du maximum espéré sur Mars. Les ondes de ces séismes ont permis de mesurer la croûte, le manteau et le noyau de la planète.",
+			"in_game": "De temps en temps, un séisme secoue la colonie. Sans danger pour les modules : les mesures rapportent des données.",
+			"sources": [["Phys.org (2022) – InSight et le séisme record", "https://phys.org/news/2022-05-nasa-insight-monster-quake-mars.html"],
+				["Space.com (2022)", "https://www.space.com/mars-insight-lander-strongest-marsquake-yet"]] }),
+		Defs.Card.new({ "id": "ceres_vapour", "figure": "≈ 6 kg/s", "figure_label": "de vapeur d'eau s'échappant de Cérès, selon le télescope Herschel", "visual": "brine",
+			"quiz": "Quand Cérès libère-t-elle de la vapeur d'eau ?", "choices": ["Quand elle est plus proche du Soleil", "Pendant ses éclipses", "Jamais"], "answer": 0,
+			"title": "Cérès fume", "status": "Mesuré",
+			"fact": "En 2014, le télescope spatial Herschel de l'ESA a détecté pour la première fois de la vapeur d'eau autour de Cérès : environ 6 kg par seconde, venant presque entièrement de deux taches sombres de la surface (Nature, 2014). Quand Cérès se rapproche du Soleil, de la glace proche de la surface se réchauffe et passe directement à l'état de gaz : c'est la sublimation, comme sur une comète. Plus loin du Soleil, la vapeur disparaît.",
+			"in_game": "Parfois, la glace de Cérès se sublime près de la colonie : les pièges froids récupèrent de l'eau et des données.",
+			"sources": [["ESA (2014) – Herschel et la vapeur d'eau de Cérès", "https://www.esa.int/Science_Exploration/Space_Science/Herschel/Herschel_discovers_water_vapour_around_dwarf_planet_Ceres"],
+				["NASA Astrobiology (2014)", "https://astrobiology.nasa.gov/news/water-detected-on-dwarf-planet-ceres/"]] }),
+		Defs.Card.new({ "id": "titan_rain", "figure": "≈ 600 000 km²", "figure_label": "de sol assombri en quelques semaines par des pluies de méthane, en 2010", "visual": "methane_pump",
+			"quiz": "Que tombe-t-il quand il pleut sur Titan ?", "choices": ["Du méthane liquide", "De l'eau", "Du sable"], "answer": 0,
+			"title": "Pluie de méthane", "status": "Mesuré",
+			"fact": "Titan est le seul monde connu, avec la Terre, où il pleut sur le sol. Mais là-bas, à −180 °C, les nuages et la pluie sont faits de méthane. Fin 2010, la sonde Cassini a vu de grands nuages se former à l'équateur ; quelques semaines plus tard, une surface grande comme l'Arizona et le Nouveau-Mexique réunis était assombrie, encore mouillée par la pluie (Science, 2011). Ces averses saisonnières creusent les rivières et les vallées que l'on voit à sa surface.",
+			"in_game": "De temps en temps, une averse de méthane tombe sur la colonie : les collecteurs en récupèrent un peu.",
+			"sources": [["NASA JPL (2011) – Cassini et les pluies de Titan", "https://www.jpl.nasa.gov/news/cassini-sees-seasonal-rains-transform-titans-surface/"],
+				["Johns Hopkins APL (2011)", "https://www.jhuapl.edu/news/news-releases/110317-cassini-sees-seasonal-rains-transform-titans-surface"]] }),
+		Defs.Card.new({ "id": "europa_plume", "figure": "≈ 200 km", "figure_label": "de haut : les panaches d'eau que Hubble aurait vus jaillir d'Europe", "visual": "cryobot",
+			"quiz": "Comment Hubble a-t-il repéré les panaches d'Europe ?", "choices": ["En la regardant passer devant Jupiter", "En se posant dessus", "Grâce à un radar"], "answer": 0,
+			"title": "Les geysers d'Europe", "status": "Hypothèse",
+			"fact": "En 2016, une équipe de la NASA a annoncé que le télescope Hubble avait peut-être vu des panaches de vapeur d'eau jaillir d'Europe, jusqu'à environ 200 km de haut. En observant Europe passer devant Jupiter dix fois en 15 mois, elle a repéré ces « doigts » sombres à trois reprises, surtout près du pôle Sud. Si l'eau de l'océan s'échappe ainsi, une sonde pourrait l'étudier sans forer la glace. Mais ces panaches semblent irréguliers et n'ont pas encore été confirmés.",
+			"in_game": "Parfois, un geyser jaillit d'une fracture près de la colonie : de l'eau et des données sur l'océan.",
+			"sources": [["Scientific American (2016)", "https://www.scientificamerican.com/article/jupiters-moon-europa-spotted-spouting-water"],
+				["EarthSky (2016)", "https://earthsky.org/space/possible-water-plumes-spotted-on-europa/"]] }),
 		Defs.Card.new({ "id": "titan_light", "figure": "≈ 1 %", "figure_label": "de la lumière solaire reçue par la Terre, avant même la brume", "visual": "reactor",
 			"quiz": "Pourquoi fait-il si sombre sur Titan ?", "choices": ["Saturne est loin du Soleil et la brume arrête la lumière", "Titan tourne très vite sur elle-même", "Les anneaux de Saturne font de l'ombre"], "answer": 0,
 			"title": "Un midi de crépuscule", "status": "Mesuré",
