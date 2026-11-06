@@ -164,7 +164,7 @@ func _refresh() -> void:
 	if not slot.is_empty():
 		# Ligne 1 : emplacement et site ; ligne 2 : sol, colons, objectifs, date.
 		var parts := _summary_text(GameManager.slot_summary(slot)).split(" · ", true, 1)
-		_continue_info.text = "%s · %s\n%s" % [Tr.t(SLOT_NAMES[slot]), parts[0], parts[1] if parts.size() > 1 else ""]
+		_continue_info.text = Tr.t(SLOT_NAMES[slot]) + " · " + parts[0] + ("\n" + parts[1] if parts.size() > 1 else "")
 
 
 static func _objective_count(region: String) -> int:
