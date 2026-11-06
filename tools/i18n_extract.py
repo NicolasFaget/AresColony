@@ -20,7 +20,7 @@ pat = re.compile(r'"((?:[^"\\]|\\.)*)"')
 found = {}
 for f in glob.glob(os.path.join(root, "**", "*.gd"), recursive=True):
     rel = os.path.relpath(f, root).replace("\\", "/")
-    if rel.startswith(("tests/", "addons/", "tools/")):
+    if rel.startswith(("tests/", "addons/", "tools/", "build/", ".godot/")):
         continue
     for n, line in enumerate(open(f, encoding="utf-8"), 1):
         stripped = line.strip()

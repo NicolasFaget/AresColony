@@ -31,18 +31,19 @@ jobs:
       - name: Tests de simulation
         run: $GODOT --headless --path . -s tests/run_tests.gd
 
-      - name: Contrôle du menu (sauvegardes)
+      - name: Contrôle du menu (sauvegardes, retour au menu, mémoire)
         run: |
           set +e
           $GODOT --headless --path . -s tests/ui_menu_check.gd > ui.log 2>&1
-          echo "::notice::code de sortie $?"
+          code=$?
           set -e
           cat ui.log
-          # Résumé visible dans les annotations de la CI.
-          grep -vE "^ +at:|^Godot Engine|^$" ui.log | head -30 | while IFS= read -r line; do echo "::notice::$line"; done
-          ! grep -q "SCRIPT ERROR" ui.log
-          grep -q "continuer visible = false" ui.log
-          grep -q "partie fermée = true" ui.log
+          # Chaque contrôle raté donne un code de sortie 1 ; une erreur de script ou d'écriture
+          # de sauvegarde (« Sauvegarde impossible ») fait aussi échouer l'étape.
+          grep "ÉCHEC" ui.log | while IFS= read -r line; do echo "::error::$line"; done
+          test "$code" -eq 0
+          ! grep -qE "SCRIPT ERROR|Sauvegarde impossible" ui.log
+          grep -q "Contrôle du menu : 0 échec" ui.log
 
       - name: Traductions
         run: python3 tools/i18n_check.py

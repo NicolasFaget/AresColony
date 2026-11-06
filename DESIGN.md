@@ -251,7 +251,15 @@ fourchettes ; mettre ce tableau à jour après chaque rééquilibrage.
 - Colonies en arrière-plan : pas d'événements, mais les rovers rentrent quand même.
 - Sauvegarde : une campagne illisible est mise de côté et signalée (`CORRUPTED`) ; modules, régions,
   recherches et cargaisons inconnus d'une autre version sont écartés au chargement ; niveaux bornés,
-  atterrisseur toujours en tête (reposé s'il manque).
+  atterrisseur toujours en tête (reposé s'il manque). Un JSON valide sans partie dedans (`{}`, liste de
+  colonies vide, colonie sans sol, ressources, modules ou colons) compte comme illisible : la copie
+  de secours prend le relais (`SaveService.is_campaign_data`).
+- Savoir partagé : une fiche lue ou un quiz répondu est partagé tout de suite avec le réseau (même en
+  pause) ; recherches et fiches débloquées le sont au pas suivant ou au changement de colonie.
+- Mémoire : la campagne écoute ses colonies par des méthodes, pas des fonctions anonymes (elles
+  formaient des références circulaires : chaque partie fermée restait en mémoire). Le contrôle du
+  menu (`tests/ui_menu_check.gd`) vérifie que la partie fermée est libérée, et échoue (code 1) au
+  moindre contrôle raté.
 - Absence : l'horloge de la campagne avance du temps écoulé, même si la colonie affichée se met en
   veille (les fusées continuent leur route).
 

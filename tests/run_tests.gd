@@ -377,6 +377,31 @@ func _test_network_outposts() -> void:
 	_check("titan_selk" in titan.state.objectives_done and "titan_fuel" in titan.state.objectives_done, "objectifs Selk et carburant de Titan")
 
 
+# ---------- Savoir partagé : lectures et quiz ----------
+
+## Lire une fiche ou répondre à son quiz dans une colonie vaut pour tout le réseau, tout de suite
+## (même en pause) : la récompense ne se gagne qu'une fois.
+func _test_shared_reading() -> void:
+	var mars := _rich_engine()
+	var campaign := Campaign.from_engine(mars)
+	var st := ColonyState.new()
+	st.region = "ceres"
+	campaign._add_colony(st)
+	var ceres: ColonyEngine = campaign.engines[1]
+	mars.unlock_card("impacts")
+	campaign.sync_knowledge()
+	_check(mars.read_card("impacts") > 0.0, "première lecture récompensée")
+	_check(ceres.state.cards_read.has("impacts") and ceres.read_card("impacts") == 0.0, "relire dans une autre colonie ne rapporte rien")
+	mars.unlock_card("aurora")
+	campaign.switch_to(1)
+	_check(ceres.state.cards_unlocked.has("aurora"), "fiche débloquée partagée au changement de colonie")
+	var data := ceres.state.amount(R.DATA)
+	mars.answer_quiz("aurora", 0)
+	_check(ceres.state.quiz_answers.has("aurora"), "quiz partagé tout de suite")
+	ceres.answer_quiz("aurora", 0)
+	_check(_near(ceres.state.amount(R.DATA), data), "quiz déjà répondu ailleurs : pas de seconde récompense")
+
+
 # ---------- Sauvegarde de campagne ----------
 
 func _test_campaign_save() -> void:
@@ -394,6 +419,27 @@ func _test_campaign_save() -> void:
 	service = SaveService.new(SaveStorage.new())
 	service.load_campaign()
 	_check(service.last_result == SaveService.LoadResult.NEW_GAME, "aucune sauvegarde : nouvelle partie")
+	# JSON valide mais sans partie dedans : jamais « chargé », la copie de secours prend le relais.
+	var real := Campaign.from_state(ColonyState.new())
+	real.colonies[0].sol = 42.0
+	for bad in ["{}", "[]", "{\"colonies\": []}", "{\"colonies\": [{}]}", "{\"colonies\": 3}",
+			"{\"sol\": \"beaucoup\", \"resources\": {}, \"buildings\": [], \"colonists\": []}"]:
+		var store := SaveStorage.new()
+		var saver := SaveService.new(store)
+		saver.save_campaign(real, 1_700_000_000)
+		saver.save_campaign(real, 1_700_000_100)
+		store.write(bad)
+		var back := saver.load_campaign()
+		_check(saver.last_result == SaveService.LoadResult.RESTORED_FROM_BACKUP and _near(back.colonies[0].sol, 42.0),
+				"sauvegarde sans partie (%s) : copie de secours" % bad)
+		store = SaveStorage.new()
+		saver = SaveService.new(store)
+		store.write(bad)
+		saver.load_campaign()
+		_check(saver.last_result == SaveService.LoadResult.CORRUPTED, "sauvegarde sans partie (%s), sans secours : signalée" % bad)
+	_test_shared_reading()
+	_check(SaveService.is_campaign_data(real.to_dict()) and SaveService.is_campaign_data(real.colonies[0].to_dict()),
+			"une vraie campagne et une ancienne sauvegarde restent valides")
 
 	# Données d'une autre version : module inconnu, région inconnue, cargaisons abîmées.
 	var data := campaign.to_dict()
@@ -1516,6 +1562,16 @@ func _simulate_campaign() -> void:
 	idle.advance(20.0)
 	print("Sans rien faire : première évacuation au sol %.1f" % first[0])
 	_check(first[0] >= 5.0 and first[0] <= 15.0, "sans rien faire : danger réel, mais pas avant le sol 5")
+	# Ces fonctions anonymes retiennent leur moteur : on les détache pour qu'il soit libéré.
+	_disconnect_all(engine)
+	_disconnect_all(idle)
+
+
+## Détache tout ce qui écoute `object` (fonctions anonymes qui le retiennent : référence circulaire).
+func _disconnect_all(object: Object) -> void:
+	for sig in object.get_signal_list():
+		for connection in object.get_signal_connection_list(sig.name):
+			object.disconnect(sig.name, connection.callable)
 
 
 ## Ère 1 jouée comme sur le téléphone : vitesse ×4, un tout petit pas par image (60 images/s).

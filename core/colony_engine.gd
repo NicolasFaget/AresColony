@@ -9,6 +9,8 @@ signal changed
 signal building_placed(index: int)
 signal research_completed(research_id: String)
 signal card_unlocked(card_id: String)
+## Une fiche lue ou un quiz répondu : le savoir partagé du réseau doit suivre tout de suite.
+signal card_read(card_id: String)
 signal objective_completed(objective_id: String)
 signal colonist_evacuated(colonist_name: String, cause: String)
 signal colonist_arrived(colonist_name: String)
@@ -771,6 +773,7 @@ func read_card(card_id: String) -> float:
 		return 0.0
 	state.cards_read.append(card_id)
 	_add(ColonyContent.DATA, CARD_READ_REWARD)
+	card_read.emit(card_id)
 	changed.emit()
 	return CARD_READ_REWARD
 
@@ -785,6 +788,7 @@ func answer_quiz(card_id: String, choice: int) -> bool:
 	state.quiz_answers[card_id] = correct
 	if correct:
 		_add(ColonyContent.DATA, QUIZ_REWARD)
+	card_read.emit(card_id)
 	changed.emit()
 	return correct
 

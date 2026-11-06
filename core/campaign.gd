@@ -140,6 +140,8 @@ func switch_to(index: int) -> void:
 	if index >= 0 and index < engines.size():
 		active = index
 		standby.erase(index)
+		if _knowledge_dirty:
+			sync_knowledge()
 
 
 # ---------- Savoir partagé ----------
@@ -420,11 +422,24 @@ func _add_colony(state: ColonyState, existing: ColonyEngine = null) -> int:
 		state.name = ColonyContent.REGIONS[state.region].name
 	colonies.append(state)
 	var colony := existing if existing != null else ColonyEngine.new(state)
-	colony.research_completed.connect(func(_id: String) -> void: _knowledge_dirty = true)
-	colony.card_unlocked.connect(func(_id: String) -> void: _knowledge_dirty = true)
+	# Des méthodes, pas des fonctions anonymes : celles-ci retiendraient la campagne depuis chaque
+	# colonie (références circulaires : la campagne ne serait jamais libérée).
+	colony.research_completed.connect(_on_knowledge_gained)
+	colony.card_unlocked.connect(_on_knowledge_gained)
+	colony.card_read.connect(_on_card_read)
 	engines.append(colony)
 	_update_info()
 	return engines.size() - 1
+
+
+func _on_knowledge_gained(_id: String) -> void:
+	_knowledge_dirty = true
+
+
+## Une fiche lue ou un quiz répondu : partagé tout de suite, même en pause, pour que la
+## récompense de lecture ne soit pas gagnée une seconde fois dans une autre colonie.
+func _on_card_read(_id: String) -> void:
+	sync_knowledge()
 
 
 ## Ce que les objectifs d'une colonie doivent savoir de la campagne.
