@@ -88,13 +88,26 @@ func _build_layout() -> void:
 	subtitle.add_theme_color_override("font_outline_color", Color(0.05, 0.02, 0.0, 0.6))
 	subtitle.add_theme_constant_override("outline_size", 6)
 
-	_continue = _menu_button(Tr.t("Continuer"), "GreenButton", _on_continue)
+	# « Continuer » : le titre, puis le résumé de la partie sur deux lignes, coupées par « … » si
+	# besoin (le résumé ne fait jamais déborder le menu de l'écran).
+	_continue = _menu_button("", "GreenButton", _on_continue)
+	_continue.custom_minimum_size.y = 118
+	var continue_title := UiFx.label(Tr.t("Continuer"), "HeadingLabel", HORIZONTAL_ALIGNMENT_CENTER)
+	continue_title.add_theme_font_size_override("font_size", 24)
+	continue_title.add_theme_color_override("font_color", Palette.ON_ACCENT)
 	_continue_info = UiFx.label("", "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	_continue_info.add_theme_color_override("font_color", Palette.ON_ACCENT)
-	_continue_info.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	_continue_info.offset_top = -30
-	_continue_info.offset_bottom = -8
-	_continue.add_child(_continue_info)
+	_continue_info.clip_text = true
+	_continue_info.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	var continue_box := UiFx.vbox(2, [continue_title, _continue_info])
+	continue_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	continue_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	continue_box.offset_left = 12
+	continue_box.offset_right = -12
+	continue_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for child in continue_box.get_children():
+		child.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_continue.add_child(continue_box)
 
 	var buttons := UiFx.vbox(12, [
 		_continue,
@@ -136,6 +149,9 @@ func _menu_button(text: String, style: String, action: Callable) -> Button:
 	button.custom_minimum_size.y = 74
 	button.focus_mode = Control.FOCUS_NONE
 	button.add_theme_font_size_override("font_size", 24)
+	# Un texte trop long (traduction, petit écran) est coupé par « … » au lieu d'élargir le menu.
+	button.clip_text = true
+	button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	button.pressed.connect(func() -> void:
 		AudioManager.play("click")
 		action.call())
@@ -146,9 +162,9 @@ func _refresh() -> void:
 	var slot := GameManager.most_recent_slot()
 	_continue.visible = not slot.is_empty()
 	if not slot.is_empty():
-		_continue.custom_minimum_size.y = 96
-		_continue.add_theme_constant_override("content_margin_bottom", 26)
-		_continue_info.text = Tr.t("%s · %s") % [Tr.t(SLOT_NAMES[slot]), _summary_text(GameManager.slot_summary(slot))]
+		# Ligne 1 : emplacement et site ; ligne 2 : sol, colons, objectifs, date.
+		var parts := _summary_text(GameManager.slot_summary(slot)).split(" · ", true, 1)
+		_continue_info.text = "%s · %s\n%s" % [Tr.t(SLOT_NAMES[slot]), parts[0], parts[1] if parts.size() > 1 else ""]
 
 
 static func _objective_count(region: String) -> int:

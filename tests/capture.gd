@@ -42,6 +42,28 @@ func _run() -> void:
 			menu._show_slots()
 			await _frames(30)
 			await _shot("18_sauvegardes")
+		"menu_plein":
+			# Trois parties enregistrées (dossier à part : les sauvegardes du joueur ne sont pas touchées).
+			manager.stop_game()
+			manager.save_dir = "user://capture_slots"
+			DirAccess.make_dir_recursive_absolute(manager.save_dir)
+			for pair in [["save", "enceladus"], ["save2", "ere4"], ["save3", "titan"]]:
+				manager.install_test_save(pair[0], pair[1])
+			var menu: Control = load("res://ui/menu.tscn").instantiate()
+			root.add_child(menu)
+			await _frames(150)
+			await _shot("19_menu_plein")
+			menu._show_slots()
+			await _frames(30)
+			await _shot("20_sauvegardes_pleines")
+			for m in menu._modal_layer.get_children():
+				m.queue_free()
+			await _frames(5)
+			menu._on_new_game()
+			await _frames(30)
+			await _shot("21_remplacer")
+			for slot in manager.SLOTS:
+				manager.delete_slot(slot)
 		"debut":
 			main = await _open_main()
 			await _shot("1_bienvenue")
