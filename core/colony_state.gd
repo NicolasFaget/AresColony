@@ -58,6 +58,16 @@ var recruits_sent: int = 0
 var evacuated: int = 0
 ## Sols consécutifs sans déficit vital (objectif « Autonomie »).
 var autonomy_streak: float = 0.0
+## Décision en attente : { "id", "until" (sol limite), "name" (colon cité) } ou {}.
+var dilemma: Dictionary = {}
+var next_dilemma: float = 1e9
+var last_dilemma: String = ""
+## Panneaux repliés pour la tempête en cours (choix « Replier les panneaux »).
+var shelter: bool = false
+## Défi en cours : { "id", "start" (valeur de départ), "progress", "until" } ou {}.
+var challenge: Dictionary = {}
+var next_challenge: float = 0.0
+var challenges_done: int = 0
 var last_saved_unix: int = 0
 
 # Préférences du joueur.
@@ -125,6 +135,13 @@ func to_dict() -> Dictionary:
 		"recruits_sent": recruits_sent,
 		"evacuated": evacuated,
 		"autonomy_streak": autonomy_streak,
+		"dilemma": dilemma.duplicate(),
+		"next_dilemma": next_dilemma,
+		"last_dilemma": last_dilemma,
+		"shelter": shelter,
+		"challenge": challenge.duplicate(),
+		"next_challenge": next_challenge,
+		"challenges_done": challenges_done,
 		"last_saved_unix": last_saved_unix,
 		"settings": {
 			"speed": speed, "haptics": haptics_enabled, "music": music_enabled, "sound": sound_enabled,
@@ -198,6 +215,18 @@ static func from_dict(data: Dictionary) -> ColonyState:
 	state.evacuated = int(_num(data.get("evacuated"), 0))
 	state.autonomy_streak = maxf(0.0, _num(data.get("autonomy_streak"), 0.0))
 	state.last_saved_unix = int(_num(data.get("last_saved_unix"), 0))
+	var pending: Variant = data.get("dilemma")
+	if pending is Dictionary and ColonyContent.DILEMMAS.has(pending.get("id")):
+		state.dilemma = { "id": pending.id, "until": _num(pending.get("until"), 0.0), "name": str(pending.get("name", "")) }
+	state.next_dilemma = _num(data.get("next_dilemma"), state.next_dilemma)
+	state.last_dilemma = str(data.get("last_dilemma", "")) if data.get("last_dilemma") is String else ""
+	state.shelter = data.get("shelter") == true
+	var current: Variant = data.get("challenge")
+	if current is Dictionary and ColonyContent.CHALLENGES.has(current.get("id")):
+		state.challenge = { "id": current.id, "start": _num(current.get("start"), 0.0),
+				"progress": _num(current.get("progress"), 0.0), "until": _num(current.get("until"), 0.0) }
+	state.next_challenge = _num(data.get("next_challenge"), 0.0)
+	state.challenges_done = maxi(0, int(_num(data.get("challenges_done"), 0)))
 	var settings: Variant = data.get("settings")
 	if settings is Dictionary:
 		var speed: int = int(_num(settings.get("speed"), 1))

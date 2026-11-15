@@ -253,6 +253,14 @@ static func alerts(engine: ColonyEngine) -> Array[Dictionary]:
 			"advice": Tr.t("Construisez un four à régolithe pour fabriquer vos matériaux.") if researched
 					else Tr.t("Recherchez « Frittage du régolithe » pour fabriquer vos propres matériaux."),
 			"tab": TAB_BUILD if researched else TAB_RESEARCH, "target": "kiln" if researched else "regolith" })
+	var dilemma := engine.pending_dilemma()
+	if not dilemma.is_empty():
+		var left := maxf(0.0, float(engine.state.dilemma.until) - engine.state.sol)
+		list.append({ "level": "warning", "resource": "", "sols": INF,
+			"title": Tr.t("Décision : %s") % Tr.t(dilemma.title),
+			"advice": Tr.t("À trancher dans %s sol%s, sinon : « %s ».") % [NumberFormatter.format(left), "s" if left >= 2.0 else "",
+					Tr.t(dilemma.choices[engine.default_choice()].label)],
+			"tab": TAB_COLONY, "target": "dilemma" })
 	return list
 
 

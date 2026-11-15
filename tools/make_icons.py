@@ -52,6 +52,8 @@ icons["moon"] = ui(f'<path d="M40 6 A26 26 0 1 0 58 42 A20 20 0 1 1 40 6 Z" fill
 icons["storm"] = ui(stroke("M6 22 H40 a8 8 0 1 0 -8 -8 M6 34 H52 a8 8 0 1 1 -8 8 M10 46 H30", 5))
 
 # ---------- Divers ----------
+icons["camera"] = ui(f'<path fill-rule="evenodd" d="M8 18 H20 L25 10 H39 L44 18 H56 a4 4 0 0 1 4 4 V50 a4 4 0 0 1 -4 4 H8 a4 4 0 0 1 -4 -4 V22 a4 4 0 0 1 4 -4 Z M32 24 a12 12 0 1 0 0.01 0 Z" fill="{W}"/>'
+                    f'<circle cx="32" cy="36" r="6" fill="{W}"/>')
 icons["gear"] = ui(f'<path fill-rule="evenodd" d="M27 4 h10 l2 7 l5 2 l6 -4 l7 7 l-4 6 l2 5 l7 2 v10 l-7 2 l-2 5 l4 6 l-7 7 l-6 -4 l-5 2 l-2 7 h-10 l-2 -7 l-5 -2 l-6 4 l-7 -7 l4 -6 l-2 -5 l-7 -2 v-10 l7 -2 l2 -5 l-4 -6 l7 -7 l6 4 l5 -2 Z M32 23 a9 9 0 1 0 0.01 0 Z" fill="{W}"/>')
 icons["lock"] = ui(f'<path d="M20 28 V20 a12 12 0 0 1 24 0 V28" stroke="{W}" stroke-width="6" fill="none"/><rect x="12" y="28" width="40" height="30" rx="7" fill="{W}"/>')
 icons["check"] = ui(stroke("M12 34 L26 48 L52 18", 8))

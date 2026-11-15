@@ -46,6 +46,15 @@ Reste avant publication : fiche Google Play, signature, politique de confidentia
   lumière), ravitaillements de la Terre tous les 8 sols (matériaux, nourriture qui diminue,
   recrues s'il y a de la place).
 - **Temps** : pause, ×1, ×2, ×4. Un sol dure 60 s à ×1.
+- **Décider** : de temps en temps, une situation à deux issues (tempête : replier les panneaux ou
+  tenir ; heures supplémentaires ; moisissure dans la serre…). Sans réponse à temps, le choix le
+  plus prudent s'applique.
+- **Défis** : après le guide, un petit défi facultatif à la fois (réserve pleine, sols sans panne,
+  fiches à lire…), avec un délai et une récompense ; affiché dans l'onglet Colonie.
+- **Colons** : chacun a un prénom et un métier ; ils commentent la vie de la colonie dans le
+  bandeau, et toucher un astronaute affiche sa fiche.
+- **Photo** : le bouton appareil photo masque l'interface ; on tourne autour de la colonie, le ciel
+  du monde apparaît (Jupiter, Saturne, la Terre, les étoiles), et la photo va dans Images › Ares Colony.
 
 ## Architecture
 
@@ -129,6 +138,18 @@ de vie de l'application.
   fois `STEP`) : 8 h d'absence avec cinq colonies se rattrapent en ~0,7 s sur PC (7,7 s avant).
 - Air des grands dômes : le rendement moyen d'un dôme est gardé dans la sauvegarde (`air`) ; un
   dôme vide le reste après un rechargement. À la démolition, le rendement moyen suit son module.
+- Décisions (`ColonyContent.DILEMMAS`) : la première vers les sols 8 à 12, puis tous les 10 à 18
+  sols, 2 sols pour répondre (`DILEMMA_*`). Un choix a un coût (`cost`, à payer), un gain ou une
+  perte (`gain`), un effet sur la santé (`health`, jamais d'évacuation), un risque (`risk`), ou
+  replie les panneaux (`shelter`). Sans réponse, `default_choice()` : le plus prudent, ou l'autre
+  s'il n'est pas payable. La tempête a sa décision, posée au moment de l'alerte : panneaux repliés,
+  plus de lumière (`_storm_factor` à 0) mais ni poussière ni panne jusqu'à la fin de la tempête.
+  Comme les pannes, coupées quand `breakdown_rate` vaut 0 (tests d'équilibrage).
+- Défis (`ColonyContent.CHALLENGES`) : un à la fois après le guide, 1 sol de pause entre deux ;
+  la valeur de départ est notée (`challenge.start`), l'avancement se lit dans `challenge_progress()`.
+  Délai dépassé : un autre défi, sans pénalité. Coupés aussi quand `breakdown_rate` vaut 0.
+- Retour d'absence : le rapport du pilote automatique liste aussi les recherches et objectifs
+  terminés et les réserves pleines (surplus perdu) ; l'écran ajoute le conseil le plus utile.
 
 ## Équilibrage mesuré (joueur simulé, tests/run_tests.gd)
 
@@ -289,6 +310,13 @@ fourchettes ; mettre ce tableau à jour après chaque rééquilibrage.
   ne change pas.
 - `_simulate_realtime()` (tests) rejoue l'ère 1 image par image à ×4 : mêmes résultats qu'en gros pas.
 - Téléphone (Mali-G57) : ~43 images/s en début de partie, ~39 avec 64 modules (limite : le GPU).
+- Vie de la colonie (`world/colony_life.gd`) sans surcoût notable : les pièces mobiles (nœuds
+  « Rotor… » des modèles, fusionnées à part par `ModelBuilder.bake`) ne bougent que par leur
+  transformation ; les lampes (`lamp.gdshader`) lisent un paramètre d'instance `lit` mis à jour
+  seulement s'il change ; les flaques de lumière forment une seule MultiMesh ; vapeur et fumée sont
+  deux émetteurs à points pour toute la colonie. Le cache des modèles garde des maillages, pas des
+  nœuds (sinon fuite à la sortie). Partie de 65 modules : ~183 000 primitives, 419 appels de dessin.
+- Le ciel du mode photo (`world/world_scenery.gd`) n'est visible qu'en mode photo.
 
 ## Langues
 

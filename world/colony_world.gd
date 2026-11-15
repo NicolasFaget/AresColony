@@ -7,6 +7,8 @@ extends Node3D
 signal cell_tapped(cell: Vector2i, building_index: int)
 ## Le fantôme de placement a changé de case.
 signal ghost_moved(cell: Vector2i)
+## Toucher sur un astronaute visible : index du colon.
+signal colonist_tapped(index: int)
 
 ## Le paysage s'étend bien au-delà du cratère et se perd dans la brume.
 const TERRAIN_EXTENT := 36.0
@@ -61,6 +63,11 @@ var _rover: Node3D
 var _rover_trail: CPUParticles3D
 var _rover_route: Array[Vector3] = []
 var _rover_key := ""
+var _rover_beam: MeshInstance3D
+## Panneaux orientables, lampes, vapeur (voir ColonyLife).
+var _life: ColonyLife
+## Décor propre à chaque monde, et ciel du mode photo (voir WorldScenery).
+var _scenery: WorldScenery
 
 
 func _ready() -> void:
@@ -71,6 +78,8 @@ func _ready() -> void:
 	_build_rocks()
 	_build_ice()
 	_build_grid()
+	_life = ColonyLife.new(self, _engine, _sun)
+	_scenery = WorldScenery.new(self, _engine)
 	_flow_on = _flow_material(1.0)
 	_flow_off = _flow_material(0.0)
 	_network_root = Node3D.new()
@@ -87,6 +96,19 @@ func _process(delta: float) -> void:
 	_update_dust_devils(delta)
 	_update_astronauts(delta)
 	_update_rover()
+	_life.update(delta)
+	_scenery.update(delta, rig)
+	if rig.photo:
+		_keep_camera_above_ground()
+
+
+## Mode photo : la caméra ne passe jamais sous le sol (les collines autour du cratère).
+func _keep_camera_above_ground() -> void:
+	for k in 30:
+		var eye := rig.camera.global_position
+		if eye.y >= height(eye.x, eye.z) + 0.5 or rig.rotation_degrees.x <= -75.0:
+			return
+		rig.rotation_degrees.x -= 1.0
 
 
 # ---------- Coordonnées ----------
@@ -148,6 +170,8 @@ func _rebuild_buildings() -> void:
 			var mark := ModelBuilder.box(node, Vector3(-def.size.x * 0.32 + k * 0.16, _model_height(node) + 0.1, def.size.y * 0.32),
 					Vector3(0.09, 0.09, 0.09), SYNERGY_GOLD, Vector3(45, 45, 0), 1.6)
 			mark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		node.set_meta("top", _model_height(node))
+	_life.rebuild(_building_nodes)
 	_rebuild_connectors()
 	_rebuild_walk_cells()
 	# Un module vient d'être posé : il tombe en place avec un nuage de poussière.
@@ -171,9 +195,9 @@ func _update_lights() -> void:
 		light.visible = color != Color("#5be49b")
 	for i in mini(_building_nodes.size(), _engine.state.buildings.size()):
 		if _engine.def_of(i).solar:
-			for mesh in _building_nodes[i].get_children():
-				if mesh is GeometryInstance3D:
-					(mesh as GeometryInstance3D).set_instance_shader_parameter("dust", _engine.dust_of(i))
+			for mesh: GeometryInstance3D in _building_nodes[i].find_children("*", "GeometryInstance3D", true, false):
+				mesh.set_instance_shader_parameter("dust", _engine.dust_of(i))
+	_life.refresh()
 
 
 static func _model_height(node: Node3D) -> float:
@@ -297,10 +321,43 @@ func _update_rover() -> void:
 	var pos := Vector3(from.x, height(from.x, from.z) + 0.06, from.z)
 	_rover.visible = true
 	_rover.position = pos
+	if _rover_beam == null:
+		_rover_beam = _headlight_beam()
+		_rover.add_child(_rover_beam)
+	_rover_beam.visible = _life.night() > 0.4
 	var heading := (ahead - from) if progress < ROVER_DRIVE else (from - ahead)
 	if heading.length() > 0.001:
 		_rover.rotation.y = atan2(-heading.z, heading.x)
 	_rover_trail.emitting = _engine.state.speed > 0
+
+
+## Faisceau des phares du rover, la nuit : un cône de lumière translucide vers l'avant (+X).
+func _headlight_beam() -> MeshInstance3D:
+	var cone := CylinderMesh.new()
+	cone.top_radius = 0.04
+	cone.bottom_radius = 0.42
+	cone.height = 1.8
+	cone.radial_segments = 10
+	cone.rings = 1
+	cone.cap_top = false
+	cone.cap_bottom = false
+	var shader := Shader.new()
+	shader.code = """
+shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;
+void fragment() {
+	ALBEDO = vec3(1.0, 0.85, 0.6) * (1.0 - UV.y) * 0.35;
+}
+"""
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	var beam := MeshInstance3D.new()
+	beam.mesh = cone
+	beam.material_override = mat
+	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	beam.rotation_degrees = Vector3(0, 0, 90)
+	beam.position = Vector3(1.25, 0.26, 0)
+	return beam
 
 
 ## Trajet du rover : du garage au bord du cratère (côté caméra) en évitant les modules, puis au loin.
@@ -451,8 +508,40 @@ func tap(screen_position: Vector2) -> void:
 		return
 	if is_placing():
 		move_ghost(cell)
+		return
+	var colonist := _astronaut_at(screen_position)
+	if colonist >= 0:
+		colonist_tapped.emit(colonist)
 	else:
 		cell_tapped.emit(cell, _engine.building_at(cell))
+
+
+## Astronaute visible sous le doigt (index du colon), ou -1.
+func _astronaut_at(screen_position: Vector2) -> int:
+	var best := -1
+	var best_distance := 34.0
+	for i in mini(_agents.size(), _engine.state.colonists.size()):
+		var a: Astronaut = _agents[i].node
+		if not a.visible:
+			continue
+		var point := a.global_position + Vector3(0, 0.2, 0)
+		if rig.camera.is_position_behind(point):
+			continue
+		var distance := rig.camera.unproject_position(point).distance_to(screen_position)
+		if distance < best_distance:
+			best_distance = distance
+			best = i
+	return best
+
+
+## Mode photo : caméra libre en perspective, ciel du monde (planète géante, étoiles) visible.
+func set_photo_mode(on: bool) -> void:
+	if on:
+		stop_placement()
+		rig.enter_photo()
+	else:
+		rig.exit_photo()
+	_scenery.set_photo(on)
 
 
 func focus_cell(cell: Vector2i) -> void:
@@ -568,6 +657,12 @@ func _update_airless_sky() -> void:
 	_env.ambient_light_sky_contribution = 0.2
 	_env.ambient_light_color = Color(0.5, 0.52, 0.6)
 	_env.ambient_light_energy = lerpf(0.55, 0.42, daylight)
+	if _engine.planet_id() == "europa":
+		# Lumière de Jupiter : la nuit, la planète géante éclaire la glace d'un reflet orangé.
+		_env.ambient_light_color = Color(0.5, 0.52, 0.6).lerp(Color(0.85, 0.62, 0.42), 1.0 - daylight)
+		_env.ambient_light_energy = lerpf(0.75, 0.42, daylight)
+		if daylight <= 0.08:
+			_sun.light_color = Color(0.95, 0.72, 0.5)
 	_env.fog_density = 0.0
 	_motes.emitting = false
 	_dust.emitting = false
@@ -590,7 +685,8 @@ func _update_titan_sky() -> void:
 	_env.ambient_light_sky_contribution = 0.6
 	_env.ambient_light_color = Color(0.85, 0.55, 0.3)
 	_env.ambient_light_energy = lerpf(0.45, 0.8, daylight)
-	_env.fog_density = 0.009
+	# Averse de méthane : la brume s'épaissit.
+	_env.fog_density = 0.009 + 0.008 * (_scenery.rain if _scenery != null else 0.0)
 	_env.fog_light_color = Color(0.62, 0.4, 0.2).lerp(Color(0.2, 0.12, 0.07), 1.0 - daylight)
 	_motes.emitting = false
 	_dust.emitting = false

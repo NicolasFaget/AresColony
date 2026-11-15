@@ -44,6 +44,8 @@ var _press_position := Vector2.ZERO
 var _dragged := false
 var _pinch_distance := 0.0
 var _next_chatter := 2.0
+## Mode photo : interface masquée, barre réduite en bas.
+var _photo_bar: Control
 
 
 func _ready() -> void:
@@ -63,6 +65,7 @@ func _ready() -> void:
 	_world = ColonyWorld.new()
 	add_child(_world)
 	_world.cell_tapped.connect(_on_cell_tapped)
+	_world.colonist_tapped.connect(_show_colonist)
 	_world.ghost_moved.connect(func(_c: Vector2i) -> void: _refresh_placement())
 	_build_layout()
 	_connect_engine()
@@ -104,6 +107,7 @@ func _build_layout() -> void:
 	_status = StatusPanel.new()
 	_status.settings_requested.connect(_show_settings)
 	_status.network_requested.connect(_show_network)
+	_status.photo_requested.connect(_show_photo_mode)
 	_status.resource_requested.connect(_show_resource)
 	root.add_child(_status)
 	_alert = AlertBanner.new()
@@ -253,6 +257,25 @@ func _connect_engine() -> void:
 		_world.world_event(planet)
 		var gained := ColonyPage._reward_text(gains) if not gains.is_empty() else Tr.t("rien, faute de place")
 		_news.post(Tr.t(ColonyContent.WORLD_EVENTS[planet].news) % gained))
+	_engine.dilemma_raised.connect(func(_id: String) -> void:
+		AudioManager.play("alert")
+		GameManager.vibrate(30)
+		_show_dilemma())
+	_engine.dilemma_resolved.connect(func(report: Dictionary) -> void:
+		if report.auto:
+			_news.post(Tr.t("Sans réponse à temps, la colonie a choisi la prudence : %s") % report.text)
+		else:
+			_news.post(Tr.t("%s : %s") % [Tr.t(ColonyContent.DILEMMAS[report.id].title), report.text]))
+	_engine.challenge_started.connect(func(id: String) -> void:
+		_news.post(Tr.t("Nouveau défi : %s. %s") % [Tr.t(ColonyContent.CHALLENGES[id].title), Tr.t(ColonyContent.CHALLENGES[id].text)]))
+	_engine.challenge_completed.connect(func(id: String) -> void:
+		var def: Dictionary = ColonyContent.CHALLENGES[id]
+		AudioManager.play("milestone")
+		GameManager.vibrate(30)
+		UiFx.float_text(Tr.t("Défi réussi ! %s") % ColonyPage._reward_text(def.reward), Vector2(size.x / 2.0, size.y * 0.4), Palette.MONEY)
+		_news.post(Tr.t("Défi réussi : %s. Récompense : %s.") % [Tr.t(def.title), ColonyPage._reward_text(def.reward)]))
+	_engine.challenge_expired.connect(func(id: String) -> void:
+		_news.post(Tr.t("Défi « %s » non tenu à temps. Un autre arrive.") % Tr.t(ColonyContent.CHALLENGES[id].title)))
 	_engine.dust_devil.connect(func(count: int) -> void:
 		_news.post((Tr.t("Un tourbillon de poussière a balayé %d panneaux. Merci le vent !") % count) if count > 1
 				else Tr.t("Un tourbillon de poussière a balayé un panneau. Merci le vent !")))
@@ -300,7 +323,8 @@ func _refresh() -> void:
 	AudioManager.set_wind(1.0 if _engine.is_storm() else 0.0)
 	if _engine.state.sol >= _next_chatter and _engine.state.speed > 0:
 		_next_chatter = _engine.state.sol + CHATTER_EVERY + randf()
-		_news.post(ColonyContent.CHATTER[randi() % ColonyContent.CHATTER.size()])
+		var line := _colonist_line()
+		_news.post(line if not line.is_empty() and randf() < 0.6 else ColonyContent.CHATTER[randi() % ColonyContent.CHATTER.size()])
 
 
 ## Alertes et guide : affichés sans gêner le placement.
@@ -339,6 +363,9 @@ func _go_to(tab: int, target: String) -> void:
 		return
 	if target == "network":
 		_show_network()
+		return
+	if target == "dilemma":
+		_show_dilemma()
 		return
 	_select_tab(tab)
 	_pages[tab].highlight(target)
@@ -449,7 +476,7 @@ func _on_world_input(event: InputEvent) -> void:
 				if event.pressed:
 					_press_position = event.position
 					_dragged = false
-				elif not _dragged and _touches.size() <= 1:
+				elif not _dragged and _touches.size() <= 1 and _photo_bar == null:
 					_world.tap(event.position)
 	elif event is InputEventMouseMotion and event.button_mask & MOUSE_BUTTON_MASK_LEFT:
 		if _touches.size() >= 2:
@@ -551,6 +578,9 @@ func _on_resupply(report: Dictionary) -> void:
 
 ## Bouton Retour (Android) : ferme la fenêtre du dessus, sinon revient au menu principal.
 func on_back() -> void:
+	if _photo_bar != null:
+		_close_photo_mode()
+		return
 	for i in range(_modal_layer.get_child_count() - 1, -1, -1):
 		var child := _modal_layer.get_child(i)
 		if child is Modal:
@@ -1213,6 +1243,9 @@ func _show_maintenance() -> void:
 			if _engine.repair(i):
 				AudioManager.play("build")
 				GameManager.vibrate(25)
+				var fixer := _repairer()
+				if not fixer.is_empty():
+					_news.post(Tr.t(ColonyContent.REPAIR_LINE) % [fixer, Tr.t(_engine.def_of(i).name)])
 				reopen.call())
 		box.add_child(UiFx.hbox(8, [UiFx.image(UiFx.icon("warning"), 24, Palette.WARNING), name, fix]))
 	if not any:
@@ -1467,21 +1500,64 @@ func _show_resource(resource: String) -> void:
 
 
 func _show_offline_report(report: Dictionary) -> void:
+	var box := UiFx.vbox(10)
 	var lines: Array[String] = []
 	for r in ColonyContent.RESOURCES:
 		var delta: float = report.gains.get(r, 0.0)
 		if absf(delta) >= 0.5:
 			lines.append(Tr.t("%s : %s%s") % [Tr.t(ColonyContent.RESOURCE_NAMES[r]), "+" if delta > 0.0 else "", NumberFormatter.format(delta)])
+	if not lines.is_empty():
+		box.add_child(_report_section(Tr.t("Production"), "  ·  ".join(lines)))
+	var done: Array[String] = []
+	for id: String in report.get("research", []):
+		done.append("✓ " + Tr.t(_engine.research_defs[id].name))
+	for id: String in report.get("objectives", []):
+		for o in _engine.objectives:
+			if o.id == id:
+				done.append("★ " + Tr.t(o.title))
+	if not done.is_empty():
+		box.add_child(_report_section(Tr.t("Terminé"), "\n".join(done), Palette.SUCCESS))
+	var full: Array = report.get("full", [])
+	if not full.is_empty():
+		var names: Array[String] = []
+		for r: String in full:
+			names.append(Tr.t(ColonyContent.RESOURCE_NAMES[r]))
+		box.add_child(_report_section(Tr.t("Réserves pleines"), Tr.t("%s : le surplus a été perdu. Plus de stockage, ou de quoi l'utiliser ?") % ", ".join(names), Palette.WARNING))
+	box.add_child(_report_section(Tr.t("Et maintenant ?"), _next_step_hint(), Palette.ACCENT))
 	var body := Tr.t("Absence : %s. La colonie a tourné en pilote automatique pendant %s sol%s, sans tempête ni danger.") % [
 		NumberFormatter.duration(report.elapsed), NumberFormatter.format(report.sols), "s" if report.sols >= 2.0 else ""]
 	if not report.standby.is_empty():
 		body += Tr.t("\n\nVeille sécurisée déclenchée : la réserve %s allait s'épuiser. %s") % [
 			Tr.t(ColonyContent.RESOURCE_PARTITIVE[report.standby]), Tr.t(ColonyEngine.CAUSES.get(report.standby, ""))]
 	Modal.open(_modal_layer, {
-		"icon": "clock", "title": Tr.t("Rapport du pilote automatique"), "body": body,
-		"extra": UiFx.paragraph("\n".join(lines), "BodyLabel", HORIZONTAL_ALIGNMENT_CENTER),
+		"icon": "clock", "title": Tr.t("Pendant votre absence"), "body": body, "extra": box,
 		"confirm_text": "Reprendre",
 	})
+
+
+func _report_section(title: String, text: String, color := Palette.TEXT) -> Control:
+	var caption := UiFx.label(title.to_upper(), "CaptionLabel")
+	caption.add_theme_color_override("font_color", color)
+	return UiFx.vbox(2, [caption, UiFx.paragraph(text, "SmallLabel")])
+
+
+## Le conseil le plus utile au retour : l'alerte la plus urgente, sinon l'objectif ou un défi,
+## sinon les modules qu'on peut s'offrir.
+func _next_step_hint() -> String:
+	var alerts := ColonyAdvisor.alerts(_engine)
+	if not alerts.is_empty():
+		return "%s. %s" % [alerts[0].title, alerts[0].advice]
+	var challenge := _engine.current_challenge()
+	if not challenge.is_empty():
+		return Tr.t("Défi en cours : %s. %s") % [Tr.t(challenge.title), Tr.t(challenge.text)]
+	var affordable: Array[String] = []
+	for def in _engine.buildable_defs():
+		if _engine.is_unlocked(def) and def.id != "link" and def.cost <= _engine.state.amount(ColonyContent.MATERIALS):
+			affordable.append(Tr.t(def.name))
+	if not affordable.is_empty():
+		return Tr.t("Matériaux suffisants pour : %s.") % ", ".join(affordable.slice(0, 4))
+	var objective := _engine.current_objective()
+	return Tr.t("Objectif : %s.") % Tr.t(objective.title) if objective != null else Tr.t("Tout tourne. Bon retour, commandant !")
 
 
 func _show_settings() -> void:
@@ -1517,3 +1593,214 @@ func _show_load_problem() -> void:
 				"body": Tr.t("Une nouvelle colonie commence. L'ancien fichier a été conservé à part et ne sera pas effacé."),
 				"confirm_text": Tr.t("Compris"),
 			})
+
+
+# ---------- Décisions et colons ----------
+
+## Décision en attente : deux choix, chacun avec ce qu'il coûte et rapporte. « Plus tard » la garde
+## dans le bandeau d'alerte jusqu'à l'échéance.
+func _show_dilemma() -> void:
+	var def := _engine.pending_dilemma()
+	if def.is_empty():
+		return
+	for modal in _modal_layer.get_children():
+		if modal.has_meta("dilemma") and not modal._closing:
+			return
+	var holder: Array[Modal] = []
+	var box := UiFx.vbox(10)
+	for i in def.choices.size():
+		var option: Dictionary = def.choices[i]
+		var button := Button.new()
+		button.text = Tr.t(option.label)
+		button.theme_type_variation = "GoldButton" if i == 0 else "Button"
+		button.custom_minimum_size = Vector2(0, 60)
+		button.focus_mode = Control.FOCUS_NONE
+		var problem := _engine.dilemma_problem(i)
+		button.disabled = not problem.is_empty()
+		var outcome := UiFx.paragraph(Tr.t(option.outcome) if problem.is_empty() else problem, "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
+		outcome.add_theme_color_override("font_color", Palette.TEXT_MUTED if problem.is_empty() else Palette.WARNING)
+		button.pressed.connect(func() -> void:
+			var report := _engine.resolve_dilemma(i)
+			if report.is_empty():
+				return
+			AudioManager.play("click")
+			holder[0].close()
+			Modal.open(_modal_layer, {
+				"icon": "check", "title": Tr.t(def.title), "body": report.text, "confirm_text": Tr.t("Compris"),
+			}))
+		box.add_child(UiFx.vbox(4, [button, outcome]))
+	var left := maxf(0.0, float(_engine.state.dilemma.until) - _engine.state.sol)
+	var deadline := UiFx.label(Tr.t("Sans réponse dans %s sol%s : « %s ».") % [NumberFormatter.format(left), "s" if left >= 2.0 else "",
+			Tr.t(def.choices[_engine.default_choice()].label)], "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER)
+	box.add_child(deadline)
+	var modal := Modal.open(_modal_layer, {
+		"icon": "storm" if _engine.state.dilemma.id == "storm_shelter" else "warning",
+		"title": Tr.t(def.title), "body": _engine.dilemma_text(), "extra": box,
+		"confirm_text": Tr.t("Plus tard"), "confirm_style": "Button",
+	})
+	modal.set_meta("dilemma", true)
+	holder.append(modal)
+
+
+## Prénom du colon qui répare : de préférence un profil technique.
+func _repairer() -> String:
+	var colonists := _engine.state.colonists
+	if colonists.is_empty():
+		return ""
+	for c in colonists:
+		var role := str(c.role)
+		if role.begins_with("ingén") or role.begins_with("mécan") or role.begins_with("électri") or role.begins_with("soud"):
+			if randf() < 0.7:
+				return c.name
+	return colonists[randi() % colonists.size()].name
+
+
+## Réplique d'un colon selon la situation, ou selon son métier ("" sans colon).
+func _colonist_line() -> String:
+	var colonists := _engine.state.colonists
+	if colonists.is_empty():
+		return ""
+	var colonist: Dictionary = colonists[randi() % colonists.size()]
+	var moods: Array[String] = []
+	if _engine.is_storm():
+		moods.append("storm")
+	if _engine.is_aurora():
+		moods.append("aurora")
+	if _engine.broken_count() > 0:
+		moods.append("broken")
+	if _engine.state.colonists.size() >= _engine.housing() and _engine.housing() > 0:
+		moods.append("crowded")
+	if _engine.is_night() and _engine.planet_id() == "mars":
+		moods.append("night")
+	var lines: Array = []
+	if not moods.is_empty() and randf() < 0.6:
+		lines = ColonyContent.MOOD_LINES[moods[randi() % moods.size()]]
+	else:
+		lines = _role_lines(str(colonist.role))
+		if lines.is_empty():
+			lines = ColonyContent.MOOD_LINES.happy
+	return Tr.t(lines[randi() % lines.size()]) % colonist.name
+
+
+static func _role_lines(role: String) -> Array:
+	for key: String in ColonyContent.ROLE_LINES:
+		if role.begins_with(key):
+			return ColonyContent.ROLE_LINES[key]
+	return []
+
+
+## Fiche d'un colon touché dans la vue 3D : prénom, métier, santé, une réplique.
+func _show_colonist(index: int) -> void:
+	if index < 0 or index >= _engine.state.colonists.size():
+		return
+	var colonist: Dictionary = _engine.state.colonists[index]
+	var bar := ProgressBar.new()
+	bar.show_percentage = false
+	bar.custom_minimum_size.y = 14
+	bar.value = colonist.health * 100.0
+	bar.theme_type_variation = "ProgressBar" if colonist.health > 0.5 else "MilestoneBar"
+	var lines := _role_lines(str(colonist.role))
+	var quote := Tr.t(lines[randi() % lines.size()]) % colonist.name if not lines.is_empty() else ""
+	var health := UiFx.label(Tr.t("Santé : %d %%") % roundi(colonist.health * 100.0), "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
+	var extra := UiFx.vbox(8, [health, bar])
+	if not quote.is_empty():
+		extra.add_child(UiFx.paragraph(quote, "BodyLabel", HORIZONTAL_ALIGNMENT_CENTER))
+	Modal.open(_modal_layer, {
+		"icon": "person", "title": Tr.t("%s, %s") % [colonist.name, Tr.t(colonist.role)], "extra": extra,
+		"confirm_text": Tr.t("Fermer"),
+	})
+
+
+# ---------- Mode photo ----------
+
+## Mode photo : l'interface disparaît, on fait tourner la caméra autour de la colonie, et le ciel
+## du monde apparaît (Jupiter, Saturne, la Terre, les étoiles). Le temps continue de passer.
+func _show_photo_mode() -> void:
+	if _photo_bar != null:
+		return
+	_stop_placement()
+	_world.set_photo_mode(true)
+	_safe_area.visible = false
+	_news.visible = false
+	if OS.has_feature("mobile"):
+		get_viewport().scaling_3d_scale = 0.85
+	var hint := UiFx.label(Tr.t("Glissez pour tourner, pincez pour zoomer."), "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
+	hint.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	hint.add_theme_constant_override("shadow_offset_y", 2)
+	var close := Button.new()
+	close.text = Tr.t("Fermer")
+	close.custom_minimum_size = Vector2(180, 64)
+	close.focus_mode = Control.FOCUS_NONE
+	close.pressed.connect(func() -> void:
+		AudioManager.play("click")
+		_close_photo_mode())
+	var shoot := Button.new()
+	shoot.text = Tr.t("Prendre la photo")
+	shoot.icon = UiFx.icon("camera")
+	shoot.expand_icon = false
+	shoot.add_theme_constant_override("icon_max_width", 28)
+	shoot.theme_type_variation = "GoldButton"
+	shoot.custom_minimum_size = Vector2(280, 64)
+	shoot.focus_mode = Control.FOCUS_NONE
+	shoot.pressed.connect(_take_photo)
+	var row := UiFx.hbox(12, [close, shoot])
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	var bar := UiFx.vbox(8, [hint, row])
+	bar.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	bar.offset_top = -170
+	bar.offset_bottom = -40
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(bar)
+	move_child(bar, _modal_layer.get_index())
+	_photo_bar = bar
+
+
+func _close_photo_mode() -> void:
+	if _photo_bar == null:
+		return
+	_photo_bar.queue_free()
+	_photo_bar = null
+	_world.set_photo_mode(false)
+	_safe_area.visible = true
+	_news.visible = true
+	if OS.has_feature("mobile"):
+		get_viewport().scaling_3d_scale = 0.55
+	_layout_changed()
+
+
+## Capture de l'écran sans l'interface, enregistrée dans les images de l'appareil (dossier
+## « Ares Colony »), sinon dans les données du jeu.
+func _take_photo() -> void:
+	if _photo_bar == null:
+		return
+	_photo_bar.visible = false
+	await RenderingServer.frame_post_draw
+	await RenderingServer.frame_post_draw
+	var image := get_viewport().get_texture().get_image()
+	if _photo_bar == null:
+		return
+	_photo_bar.visible = true
+	AudioManager.play("click")
+	GameManager.vibrate(20)
+	var path := save_photo(image)
+	var flash := ColorRect.new()
+	flash.color = Color(1, 1, 1, 0.8)
+	flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(flash)
+	flash.create_tween().tween_property(flash, "color:a", 0.0, 0.35).finished.connect(flash.queue_free)
+	UiFx.float_text(Tr.t("Photo enregistrée dans Images › Ares Colony") if not path.begins_with("user://")
+			else Tr.t("Photo enregistrée"), Vector2(size.x / 2.0, size.y * 0.45), Palette.TEXT, 24)
+
+
+## Enregistre une image ; retourne son chemin ("" en cas d'échec).
+static func save_photo(image: Image) -> String:
+	var name := "ares_colony_%s.png" % Time.get_datetime_string_from_system().replace(":", "-").replace("T", "_")
+	var pictures := OS.get_system_dir(OS.SYSTEM_DIR_PICTURES)
+	for folder: String in ([pictures.path_join("Ares Colony")] if not pictures.is_empty() else []) + ["user://photos"]:
+		if DirAccess.make_dir_recursive_absolute(folder) != OK and not DirAccess.dir_exists_absolute(folder):
+			continue
+		var path := folder.path_join(name)
+		if image.save_png(path) == OK:
+			return path
+	return ""

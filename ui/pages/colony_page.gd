@@ -15,6 +15,10 @@ var _rating_bars: Array[ProgressBar] = []
 var _rating_values: Array[Label] = []
 var _rating_tip: Label
 var _care: Button
+var _challenge: PanelContainer
+var _challenge_title: Label
+var _challenge_text: Label
+var _challenge_bar: ProgressBar
 
 signal maintenance_requested
 signal expeditions_requested
@@ -41,6 +45,22 @@ func _ready() -> void:
 	]))
 	objective.mouse_filter = Control.MOUSE_FILTER_PASS
 	list.add_child(objective)
+
+	_challenge_title = UiFx.label("", "HeadingLabel")
+	_challenge_text = UiFx.paragraph("", "SmallLabel")
+	_challenge_bar = ProgressBar.new()
+	_challenge_bar.show_percentage = false
+	_challenge_bar.custom_minimum_size.y = 10
+	_challenge_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_challenge_bar.theme_type_variation = "MilestoneBar"
+	var caption := UiFx.label("Défi facultatif", "CaptionLabel")
+	caption.add_theme_color_override("font_color", Palette.MONEY)
+	_challenge = UiFx.panel("Row", UiFx.vbox(4, [
+		UiFx.hbox(8, [UiFx.image(UiFx.icon("check"), 24, Palette.MONEY), caption]),
+		_challenge_title, _challenge_text, _challenge_bar,
+	]))
+	_challenge.mouse_filter = Control.MOUSE_FILTER_PASS
+	list.add_child(_challenge)
 
 	_care = Button.new()
 	_care.custom_minimum_size = Vector2(0, 60)
@@ -98,6 +118,15 @@ func refresh() -> void:
 			done.append("✓ " + Tr.t(o.title))
 	_objectives_done.text = "  ".join(done)
 	_objectives_done.visible = not done.is_empty()
+
+	var challenge := engine.current_challenge()
+	_challenge.visible = not challenge.is_empty()
+	if not challenge.is_empty():
+		var left := maxf(0.0, float(engine.state.challenge.until) - engine.state.sol)
+		_challenge_title.text = Tr.t(challenge.title)
+		_challenge_text.text = Tr.t("%s Récompense : %s · encore %s sol%s.") % [Tr.t(challenge.text), _reward_text(challenge.reward),
+				NumberFormatter.format(left), "s" if left >= 2.0 else ""]
+		_challenge_bar.value = engine.challenge_progress() * 100.0
 
 	_crew_title.text = Tr.t("Équipage : %d colons · %d places") % [engine.state.colonists.size(), engine.housing()]
 	if engine.state.era >= 3:

@@ -5,6 +5,7 @@ extends PanelContainer
 
 signal settings_requested
 signal network_requested
+signal photo_requested
 signal resource_requested(resource: String)
 
 const SPEED_STEPS: Array[int] = [1, 2, 4]
@@ -38,6 +39,8 @@ func _ready() -> void:
 	_speed.custom_minimum_size.x = 64
 	_network = _icon_button("planet", func() -> void: network_requested.emit())
 	_network.add_theme_color_override("icon_normal_color", Palette.MONEY)
+	var photo := _icon_button("camera", func() -> void: photo_requested.emit())
+	photo.add_theme_color_override("icon_normal_color", Palette.TEXT_MUTED)
 	var settings := _icon_button("gear", func() -> void: settings_requested.emit())
 	settings.add_theme_color_override("icon_normal_color", Palette.TEXT_MUTED)
 
@@ -45,7 +48,7 @@ func _ready() -> void:
 	for r in ColonyContent.RESOURCES:
 		resources.add_child(_resource_chip(r))
 
-	add_child(UiFx.vbox(6, [UiFx.hbox(8, [_weather_icon, _clock, _network, _play, _speed, settings]), resources]))
+	add_child(UiFx.vbox(6, [UiFx.hbox(8, [_weather_icon, _clock, _network, photo, _play, _speed, settings]), resources]))
 	refresh()
 
 

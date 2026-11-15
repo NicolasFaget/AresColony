@@ -32,6 +32,13 @@ signal meteor_impact(index: int)
 signal aurora_started
 ## Événement propre au monde (ColonyContent.WORLD_EVENTS) : gains réellement reçus.
 signal world_event(planet: String, gains: Dictionary)
+## Une décision attend le joueur (ColonyContent.DILEMMAS), puis son compte rendu.
+signal dilemma_raised(dilemma_id: String)
+signal dilemma_resolved(report: Dictionary)
+## Défis facultatifs (ColonyContent.CHALLENGES).
+signal challenge_started(challenge_id: String)
+signal challenge_completed(challenge_id: String)
+signal challenge_expired(challenge_id: String)
 
 ## Durée d'un sol en jeu, à vitesse ×1 (secondes réelles).
 const SECONDS_PER_SOL := 60.0
@@ -101,6 +108,13 @@ const WORLD_EVENT_MAX_SOLS := 50.0
 const ROOTED_CREW := 20
 const ROOTED_SCORE := 85.0
 const AUTONOMY_CREW := 8
+## Décisions : la première vers le sol 8, puis tous les 10 à 18 sols ; 2 sols pour répondre.
+const DILEMMA_START := 6.0
+const DILEMMA_MIN_SOLS := 10.0
+const DILEMMA_MAX_SOLS := 18.0
+const DILEMMA_SOLS := 2.0
+## Pause entre deux défis.
+const CHALLENGE_PAUSE := 1.0
 ## Sols après une tempête pendant lesquels le compteur d'autonomie reste en pause.
 const AUTONOMY_STORM_GRACE := 2.0
 
@@ -177,6 +191,7 @@ var _storm_warned := false
 var _flare_warned := false
 var _shortage_flags := {}
 var _autopilot := false
+var _last_challenge := ""
 
 
 func _init(p_state: ColonyState) -> void:
@@ -1041,7 +1056,10 @@ func _output_rate(index: int, resource: String, sun: float) -> float:
 
 
 func _storm_factor() -> float:
-	return STORM_SOLAR * effect("storm_solar") if is_storm() else 1.0
+	if not is_storm():
+		return 1.0
+	# Panneaux repliés : plus aucune lumière, mais ni poussière ni panne.
+	return 0.0 if state.shelter else STORM_SOLAR * effect("storm_solar")
 
 
 # ---------- Colons ----------
@@ -1096,7 +1114,11 @@ func _events(ds: float) -> void:
 	if not is_storm() and not _storm_warned and state.sol >= state.next_storm - STORM_WARNING_SOLS:
 		_storm_warned = true
 		storm_warning.emit()
+		if state.dilemma.is_empty() and not state.shelter and breakdown_rate > 0.0 and _solar_indices().size() > 1:
+			_raise_dilemma("storm_shelter", state.next_storm)
 	if state.storm_until < 0.0 and state.sol >= state.next_storm:
+		if state.dilemma.get("id", "") == "storm_shelter":
+			resolve_dilemma(default_choice(), true)
 		state.storm_until = state.sol + _rng.randf_range(3.0, 6.0)
 		state.next_storm = state.storm_until + _rng.randf_range(12.0, 20.0)
 		state.event_seed = _rng.state
@@ -1104,6 +1126,7 @@ func _events(ds: float) -> void:
 		unlock_card("storm")
 	elif state.storm_until > 0.0 and state.sol >= state.storm_until:
 		state.storm_until = -1.0
+		state.shelter = false
 		_storm_calm_at = state.sol + AUTONOMY_STORM_GRACE
 		_storm_warned = false
 		storm_ended.emit()
@@ -1135,6 +1158,8 @@ func _events(ds: float) -> void:
 	_breakdowns(ds)
 	_meteors()
 	_world_event()
+	_dilemmas()
+	_challenges(ds)
 	_finish_expedition()
 	_flares()
 	if state.aurora_until > 0.0 and state.sol >= state.aurora_until:
@@ -1166,7 +1191,7 @@ func average_dust() -> float:
 
 func _settle_dust(ds: float) -> void:
 	var rate := (DUST_STORM_RATE if is_storm() else dust_rate) * effect("dust") * (1.0 if dust_rate > 0.0 else 0.0)
-	if rate <= 0.0:
+	if rate <= 0.0 or (state.shelter and is_storm()):
 		return
 	for i in _solar_indices():
 		state.buildings[i].dust = minf(1.0, dust_of(i) + rate * ds)
@@ -1257,7 +1282,7 @@ func repair(index: int) -> bool:
 
 
 func _breakdowns(ds: float) -> void:
-	if breakdown_rate <= 0.0 or state.sol < BREAKDOWN_START:
+	if breakdown_rate <= 0.0 or state.sol < BREAKDOWN_START or (state.shelter and is_storm()):
 		return
 	var drew := false
 	for i in _breakable:
@@ -1321,6 +1346,243 @@ func _world_event() -> void:
 	unlock_card(event.card)
 	world_event.emit(planet_id(), gains)
 	changed.emit()
+
+
+# ---------- Décisions ----------
+
+## Décision en attente (définition de ColonyContent.DILEMMAS), ou {}.
+func pending_dilemma() -> Dictionary:
+	if state.dilemma.is_empty():
+		return {}
+	return ColonyContent.DILEMMAS.get(state.dilemma.id, {})
+
+
+## Texte de la décision en attente, avec le prénom du colon cité.
+func dilemma_text() -> String:
+	var def := pending_dilemma()
+	if def.is_empty():
+		return ""
+	return Tr.t(def.text).replace("{name}", str(state.dilemma.get("name", "")))
+
+
+## Choix appliqué sans réponse à temps : le plus prudent, ou l'autre s'il n'est pas payable.
+func default_choice() -> int:
+	var def := pending_dilemma()
+	if def.is_empty():
+		return 0
+	var pick: int = def.get("default", 1)
+	return pick if dilemma_problem(pick).is_empty() else 1 - pick
+
+
+## Raison pour laquelle un choix est impossible ("" s'il est possible).
+func dilemma_problem(choice: int) -> String:
+	var def := pending_dilemma()
+	if def.is_empty() or choice < 0 or choice >= def.choices.size():
+		return Tr.t("Plus rien à décider.")
+	var cost: Dictionary = def.choices[choice].get("cost", {})
+	for r: String in cost:
+		if state.amount(r) < cost[r]:
+			return Tr.t("Pas assez %s.") % Tr.t(ColonyContent.RESOURCE_PARTITIVE[r])
+	return ""
+
+
+## Applique un choix. Retourne le compte rendu { "id", "choice", "auto", "text" } ({} si impossible).
+func resolve_dilemma(choice: int, auto := false) -> Dictionary:
+	if not auto and not dilemma_problem(choice).is_empty():
+		return {}
+	var def := pending_dilemma()
+	if def.is_empty():
+		return {}
+	var option: Dictionary = def.choices[choice]
+	var report := { "id": state.dilemma.id, "choice": choice, "auto": auto, "text": Tr.t(option.outcome) }
+	state.last_dilemma = state.dilemma.id
+	state.dilemma = {}
+	if option.has("cost") and _can_pay(option.cost):
+		for r: String in option.cost:
+			_add(r, -option.cost[r])
+	for r: String in option.get("gain", {}):
+		_add(r, option.gain[r])
+	if option.has("health"):
+		for colonist in state.colonists:
+			# Une décision fatigue ou repose, mais n'évacue jamais personne.
+			colonist.health = clampf(colonist.health + option.health, minf(colonist.health, 0.3), 1.0)
+	if option.has("risk"):
+		var risk: Dictionary = option.risk
+		if _rng.randf() < risk.chance:
+			for r: String in risk.gain:
+				_add(r, risk.gain[r])
+			report.text = Tr.t(risk.text)
+		else:
+			report.text = Tr.t(risk.safe)
+		state.event_seed = _rng.state
+	if option.get("shelter", false):
+		state.shelter = true
+	dilemma_resolved.emit(report)
+	changed.emit()
+	return report
+
+
+## Vrai si le coût est payable (un choix automatique sans les moyens ne paie rien).
+func _can_pay(cost: Dictionary) -> bool:
+	for r: String in cost:
+		if state.amount(r) < cost[r]:
+			return false
+	return true
+
+
+func _raise_dilemma(dilemma_id: String, until: float) -> void:
+	var name := ""
+	if not state.colonists.is_empty():
+		name = state.colonists[_rng.randi_range(0, state.colonists.size() - 1)].name
+	state.dilemma = { "id": dilemma_id, "until": until, "name": name }
+	state.event_seed = _rng.state
+	dilemma_raised.emit(dilemma_id)
+
+
+## Une décision tous les 10 à 18 sols (comme les pannes, coupées dans les tests d'équilibrage).
+func _dilemmas() -> void:
+	if not state.dilemma.is_empty():
+		if state.sol >= float(state.dilemma.until):
+			resolve_dilemma(default_choice(), true)
+		return
+	if breakdown_rate <= 0.0 or state.colonists.is_empty():
+		return
+	if state.next_dilemma >= 1e8:
+		state.next_dilemma = maxf(state.sol, DILEMMA_START) + _rng.randf_range(2.0, 6.0)
+		state.event_seed = _rng.state
+		return
+	if state.sol < state.next_dilemma:
+		return
+	state.next_dilemma = state.sol + _rng.randf_range(DILEMMA_MIN_SOLS, DILEMMA_MAX_SOLS)
+	var choices: Array[String] = []
+	for id: String in ColonyContent.DILEMMAS:
+		var def: Dictionary = ColonyContent.DILEMMAS[id]
+		if def.get("special", false) or id == state.last_dilemma:
+			continue
+		if def.has("need") and not _has_connected(def.need):
+			continue
+		choices.append(id)
+	if choices.is_empty():
+		return
+	_raise_dilemma(choices[_rng.randi_range(0, choices.size() - 1)], state.sol + DILEMMA_SOLS)
+
+
+# ---------- Défis ----------
+
+## Défi en cours (définition de ColonyContent.CHALLENGES), ou {}.
+func current_challenge() -> Dictionary:
+	if state.challenge.is_empty():
+		return {}
+	return ColonyContent.CHALLENGES.get(state.challenge.id, {})
+
+
+## Avancement du défi en cours, de 0 à 1.
+func challenge_progress() -> float:
+	var def := current_challenge()
+	if def.is_empty():
+		return 0.0
+	var value := _challenge_value(def)
+	var start: float = state.challenge.start
+	match def.kind:
+		"full":
+			return clampf(value / def.target, 0.0, 1.0)
+		"no_breakdown":
+			return clampf(float(state.challenge.progress) / def.target, 0.0, 1.0)
+		"clean":
+			return 1.0 if value <= def.target else clampf((start - value) / maxf(start - def.target, 0.01), 0.0, 0.99)
+	return clampf((value - start) / def.target, 0.0, 1.0)
+
+
+func _challenge_value(def: Dictionary) -> float:
+	match def.kind:
+		"full":
+			var cap := capacity(def.resource)
+			return state.amount(def.resource) / cap if cap > 0.0 and not is_inf(cap) else 0.0
+		"no_breakdown":
+			return float(state.challenge.get("progress", 0.0))
+		"clean":
+			return average_dust()
+		"read":
+			return state.cards_read.size()
+		"build":
+			return state.buildings.size() - _count_of("link")
+		"synergy":
+			return active_synergy_count()
+		"upgrade":
+			var levels := 0
+			for i in state.buildings.size():
+				levels += level_of(i)
+			return levels
+		"research":
+			return state.research_done.size()
+	return 0.0
+
+
+func _challenge_possible(def: Dictionary) -> bool:
+	match def.kind:
+		"full":
+			var cap := capacity(def.resource)
+			return cap > 0.0 and not is_inf(cap) and state.amount(def.resource) / cap < def.target - 0.2
+		"no_breakdown":
+			return state.sol >= BREAKDOWN_START and _breakable.size() >= 2
+		"clean":
+			return _solar_indices().size() >= 3 and average_dust() > 0.15
+		"read":
+			return unread_cards() >= int(def.target)
+		"upgrade":
+			for i in state.buildings.size():
+				if _connected[i] and not next_upgrade(i).is_empty():
+					return true
+			return false
+		"research":
+			if not state.research_active.is_empty():
+				return true
+			for id: String in research_defs:
+				if research_state(id) == "available":
+					return true
+			return false
+	return true
+
+
+## Un défi après l'autre, dès la fin du guide. Délai dépassé : un autre défi, sans pénalité.
+func _challenges(ds: float) -> void:
+	if breakdown_rate <= 0.0 or not state.tutorial_done:
+		return
+	var def := current_challenge()
+	if def.is_empty():
+		if state.sol < state.next_challenge:
+			return
+		var choices: Array[String] = []
+		for id: String in ColonyContent.CHALLENGES:
+			if id != _last_challenge and _challenge_possible(ColonyContent.CHALLENGES[id]):
+				choices.append(id)
+		state.next_challenge = state.sol + 1.0
+		if choices.is_empty():
+			return
+		var pick := choices[_rng.randi_range(0, choices.size() - 1)]
+		state.event_seed = _rng.state
+		state.challenge = { "id": pick, "start": 0.0, "progress": 0.0, "until": state.sol + float(ColonyContent.CHALLENGES[pick].sols) }
+		state.challenge.start = _challenge_value(ColonyContent.CHALLENGES[pick])
+		challenge_started.emit(pick)
+		return
+	if def.kind == "no_breakdown":
+		state.challenge.progress = 0.0 if broken_count() > 0 else float(state.challenge.progress) + ds
+	var id: String = state.challenge.id
+	if challenge_progress() >= 1.0:
+		state.challenge = {}
+		_last_challenge = id
+		state.challenges_done += 1
+		for r: String in def.reward:
+			_add(r, def.reward[r])
+		state.next_challenge = state.sol + CHALLENGE_PAUSE
+		challenge_completed.emit(id)
+		changed.emit()
+	elif state.sol >= float(state.challenge.until):
+		state.challenge = {}
+		_last_challenge = id
+		state.next_challenge = state.sol + CHALLENGE_PAUSE
+		challenge_expired.emit(id)
+		changed.emit()
 
 
 # ---------- Expéditions (ère 2) ----------
@@ -1677,6 +1939,13 @@ func _shift_schedule(shift: float) -> void:
 		state.aurora_until += shift
 	if state.next_world_event < 1e8:
 		state.next_world_event += shift
+	if state.next_dilemma < 1e8:
+		state.next_dilemma += shift
+	if not state.dilemma.is_empty():
+		state.dilemma.until = float(state.dilemma.until) + shift
+	state.next_challenge += shift
+	if not state.challenge.is_empty():
+		state.challenge.until = float(state.challenge.until) + shift
 
 
 # ---------- Campagne : astroport, cargaisons ----------
@@ -1769,6 +2038,8 @@ func apply_offline_seconds(elapsed: float) -> Dictionary:
 	if sols < 0.01:
 		return report
 	var before := state.resources.duplicate()
+	var research_before := state.research_done.duplicate()
+	var objectives_before := state.objectives_done.duplicate()
 	var start := state.sol
 	_autopilot = true
 	var simulated := 0.0
@@ -1786,6 +2057,15 @@ func apply_offline_seconds(elapsed: float) -> Dictionary:
 	report.sols = shift
 	for r in ColonyContent.RESOURCES:
 		report.gains[r] = state.amount(r) - before.get(r, 0.0)
+	# Ce qui s'est passé pendant l'absence : recherches et objectifs terminés, réserves pleines
+	# (la production en trop a été perdue).
+	report.research = state.research_done.filter(func(id: String) -> bool: return not research_before.has(id))
+	report.objectives = state.objectives_done.filter(func(id: String) -> bool: return not objectives_before.has(id))
+	report.full = []
+	for r in ColonyContent.RESOURCES:
+		var cap := capacity(r)
+		if r != ColonyContent.DATA and cap > 0.0 and not is_inf(cap) and state.amount(r) >= cap * 0.99 and report.gains[r] >= 0.0:
+			report.full.append(r)
 	changed.emit()
 	return report
 

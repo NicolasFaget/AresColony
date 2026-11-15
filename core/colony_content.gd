@@ -1091,3 +1091,142 @@ const CHATTER := [
 	"Malik parle aux tomates. Elles poussent mieux. La science n'explique pas tout.",
 	"Concours de lancer de pierres : record battu grâce à la gravité réduite.",
 ]
+
+
+# ---------- Décisions (dilemmes) ----------
+
+## Situations à deux issues. « cost » doit être payable ; « gain » est appliqué tel quel (négatif :
+## une perte, bornée à la réserve) ; « health » touche tous les colons (sans jamais évacuer) ;
+## « risk » : probabilité, perte et texte si le sort tourne mal, texte si tout va bien ;
+## « shelter » : panneaux repliés pendant la tempête qui arrive. Sans réponse à temps, le choix
+## « default » (le plus prudent) s'applique, ou l'autre s'il n'est pas payable. {name} : un colon tiré au sort.
+const DILEMMAS := {
+	"storm_shelter": { "default": 1, "special": true, "title": "Tempête en approche",
+		"text": "Les satellites voient arriver une tempête de poussière. Faut-il replier les panneaux solaires ?",
+		"choices": [
+			{ "label": "Replier les panneaux", "shelter": true,
+				"outcome": "Ni poussière ni panne pendant la tempête, mais les panneaux ne produisent plus rien." },
+			{ "label": "Tenir",
+				"outcome": "Les panneaux gardent 20 % de la lumière, mais la poussière s'y dépose 4 fois plus vite." },
+		] },
+	"overtime": { "default": 1, "title": "Heures supplémentaires",
+		"text": "{name} propose que l'équipage travaille plus longtemps pour avancer le chantier.",
+		"choices": [
+			{ "label": "Accepter", "gain": { MATERIALS: 30.0 }, "health": -0.25,
+				"outcome": "+30 matériaux, mais les colons s'épuisent (santé −25 %)." },
+			{ "label": "Repos pour tous", "health": 1.0,
+				"outcome": "Les colons récupèrent : santé au maximum." },
+		] },
+	"strange_rock": { "default": 1, "title": "Une roche étrange",
+		"text": "{name} a trouvé une roche aux reflets verts : peut-être de l'olivine, un minéral fréquent dans les roches volcaniques.",
+		"choices": [
+			{ "label": "L'analyser", "cost": { ENERGY: 15.0 }, "gain": { DATA: 30.0 },
+				"outcome": "−15 énergie pour le spectromètre, +30 données." },
+			{ "label": "La broyer pour le four", "gain": { MATERIALS: 12.0 },
+				"outcome": "+12 matériaux." },
+		] },
+	"greenhouse_mold": { "default": 0, "need": "greenhouse", "title": "Moisissure dans la serre",
+		"text": "Des taches blanches sont apparues sur les feuilles. Dans une serre fermée, chaude et humide, les moisissures adorent s'installer.",
+		"choices": [
+			{ "label": "Arracher les plants malades", "gain": { FOOD: -15.0 },
+				"outcome": "−15 nourriture, mais la serre est saine." },
+			{ "label": "Traiter et espérer", "cost": { WATER: 8.0 },
+				"risk": { "chance": 0.5, "gain": { FOOD: -40.0 }, "text": "Raté : la moisissure a gagné toute la serre (−40 nourriture).",
+					"safe": "Le traitement a marché : la récolte est sauvée." },
+				"outcome": "−8 eau. Une chance sur deux de perdre 40 nourriture." },
+		] },
+	"earth_interview": { "default": 1, "title": "Interview en direct",
+		"text": "Une télé terrestre veut visiter la colonie « en direct ». Avec plusieurs minutes de trajet pour chaque message radio, ce sera un drôle de dialogue.",
+		"choices": [
+			{ "label": "Accepter", "cost": { ENERGY: 20.0 }, "gain": { MATERIALS: 25.0 },
+				"outcome": "−20 énergie pour l'antenne ; des sponsors financent +25 matériaux." },
+			{ "label": "Refuser poliment", "gain": { DATA: 12.0 },
+				"outcome": "L'équipe garde son temps pour la science : +12 données." },
+		] },
+	"leak": { "default": 0, "title": "Micro-fuite",
+		"text": "Un capteur signale une micro-fuite d'air dans un module. {name} pense pouvoir la colmater.",
+		"choices": [
+			{ "label": "Réparer tout de suite", "cost": { MATERIALS: 10.0 },
+				"outcome": "−10 matériaux, plus de fuite." },
+			{ "label": "Attendre", "gain": { OXYGEN: -6.0 },
+				"risk": { "chance": 0.4, "gain": { OXYGEN: -25.0 }, "text": "La fuite s'est agrandie avant d'être colmatée : −25 oxygène.",
+					"safe": "La fuite a été colmatée à la sortie suivante." },
+				"outcome": "−6 oxygène, et 4 risques sur 10 d'en perdre 25." },
+		] },
+	"ice_vein": { "default": 1, "title": "Filon de glace",
+		"text": "Le radar de {name} a repéré de la glace juste sous la surface, à deux pas de la colonie.",
+		"choices": [
+			{ "label": "Creuser maintenant", "cost": { MATERIALS: 15.0 }, "gain": { WATER: 40.0 },
+				"outcome": "−15 matériaux pour la foreuse, +40 eau." },
+			{ "label": "Le cartographier", "gain": { DATA: 12.0 },
+				"outcome": "+12 données." },
+		] },
+}
+
+# ---------- Défis ----------
+
+## Petits défis facultatifs, l'un après l'autre, avec une récompense et un délai. Types :
+## « full » (réserve remplie à `target` de sa capacité), « no_breakdown » (sols sans aucune panne),
+## « clean » (poussière moyenne sous `target`), « read » (fiches lues en plus), « build » (modules
+## posés en plus, hors conduites), « synergy » (une synergie de plus), « upgrade » (une amélioration),
+## « research » (une recherche terminée).
+const CHALLENGES := {
+	"full_water": { "kind": "full", "resource": WATER, "target": 0.9, "sols": 6.0, "reward": { DATA: 15.0 },
+		"title": "Citerne pleine", "text": "Remplir la réserve d'eau à 90 %." },
+	"full_energy": { "kind": "full", "resource": ENERGY, "target": 0.9, "sols": 4.0, "reward": { MATERIALS: 15.0 },
+		"title": "Batteries chargées", "text": "Remplir les batteries à 90 %." },
+	"full_food": { "kind": "full", "resource": FOOD, "target": 0.8, "sols": 8.0, "reward": { DATA: 15.0 },
+		"title": "Garde-manger", "text": "Remplir la réserve de nourriture à 80 %." },
+	"no_breakdown": { "kind": "no_breakdown", "target": 5.0, "sols": 8.0, "reward": { MATERIALS: 20.0 },
+		"title": "Mécanique de précision", "text": "Tenir 5 sols sans aucune machine en panne." },
+	"clean": { "kind": "clean", "target": 0.05, "sols": 4.0, "reward": { DATA: 12.0 },
+		"title": "Panneaux étincelants", "text": "Avoir des panneaux presque sans poussière." },
+	"read": { "kind": "read", "target": 2.0, "sols": 6.0, "reward": { DATA: 15.0 },
+		"title": "Soif d'apprendre", "text": "Lire 2 fiches de découverte." },
+	"build": { "kind": "build", "target": 3.0, "sols": 6.0, "reward": { MATERIALS: 20.0 },
+		"title": "Chantier", "text": "Construire 3 modules (hors conduites)." },
+	"synergy": { "kind": "synergy", "target": 1.0, "sols": 6.0, "reward": { DATA: 15.0 },
+		"title": "Bons voisins", "text": "Activer une synergie de plus." },
+	"upgrade": { "kind": "upgrade", "target": 1.0, "sols": 8.0, "reward": { MATERIALS: 20.0 },
+		"title": "Mise à niveau", "text": "Améliorer un module." },
+	"research": { "kind": "research", "target": 1.0, "sols": 6.0, "reward": { MATERIALS: 15.0 },
+		"title": "Labo en ébullition", "text": "Terminer une recherche." },
+}
+
+# ---------- Répliques des colons ----------
+
+## Selon la spécialité (repérée par le début du métier) ; %s : le prénom.
+const ROLE_LINES := {
+	"ingén": ["%s (ingénierie) : « Si ça tient avec du ruban adhésif, c'est que c'est réparé. »",
+		"%s (ingénierie) : « J'ai encore gagné 2 %% de rendement sur une pompe. Personne n'applaudit ? »"],
+	"botan": ["%s (botanique) : « Les plantes aiment la lumière rouge et bleue : la serre brille en violet. »",
+		"%s (botanique) : « Premier fraisier en fleur. Pollinisation au pinceau, faute d'abeilles. »"],
+	"agronom": ["%s (agronomie) : « Le sol martien contient des perchlorates : on le lave avant de semer. »"],
+	"géolog": ["%s (géologie) : « Ce caillou a peut-être 4 milliards d'années. Je l'appelle Gérard. »",
+		"%s (géologie) : « Des couches de sédiments partout : il y a eu de l'eau ici, longtemps. »"],
+	"médec": ["%s (médecine) : « En gravité réduite, les os s'affinent. Tout le monde au vélo ! »",
+		"%s (médecine) : « Dosimètres relevés. Restez bien à l'abri pendant les éruptions. »"],
+	"chimi": ["%s (chimie) : « Sabatier, électrolyse, frittage… Ici, on fait tout avec de l'air et des cailloux. »"],
+	"pilot": ["%s (pilotage) : « Le rover a encore de l'autonomie. Quelqu'un veut voir le coucher de soleil bleu ? »"],
+	"biolog": ["%s (biologie) : « Aucun microbe extraterrestre trouvé. Le mien est terrien, il s'appelle Kevin. »"],
+	"électri": ["%s (électricité) : « Une batterie pleine avant la nuit, c'est une nuit sans stress. »"],
+	"astrophys": ["%s (astrophysique) : « Ce point bleu, à l'aube, c'est la Terre. On le voit à l'œil nu. »"],
+	"mécan": ["%s (mécanique) : « Les roues du rover s'usent sur les cailloux pointus. J'en ai imprimé deux. »"],
+	"cuisin": ["%s (cuisine) : « Menu du sol : pommes de terre, pommes de terre, et surprise… pommes de terre. »"],
+}
+
+## Selon la situation de la colonie ; %s : le prénom.
+const MOOD_LINES := {
+	"storm": ["%s : « On ne voit plus le bout de la galerie. Heureusement qu'on a des batteries. »",
+		"%s : « La poussière siffle sur la coque. Partie de cartes au module habitat ? »"],
+	"night": ["%s : « Les fenêtres allumées dans la nuit, on dirait presque un village. »",
+		"%s : « Il fait −80 °C dehors. Le chauffage, c'est la vraie star de la colonie. »"],
+	"broken": ["%s : « Une machine est en panne. Qui a vu la clé de 12 ? »"],
+	"crowded": ["%s : « On commence à être serrés. Un habitat de plus ne serait pas du luxe. »"],
+	"aurora": ["%s : « Tout le monde à la verrière ! Une aurore verte ! »"],
+	"happy": ["%s : « Tout tourne. C'est presque inquiétant. »",
+		"%s : « Je crois que je commence à m'habituer à ce ciel. »"],
+}
+
+## Réparation : un colon s'en charge (de préférence un ingénieur ou un mécanicien).
+const REPAIR_LINE := "%s a réparé : %s."

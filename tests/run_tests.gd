@@ -47,6 +47,8 @@ func _init() -> void:
 	_test_europa()
 	_test_enceladus()
 	_test_number_formatter()
+	_test_dilemmas()
+	_test_challenges()
 	_simulate_campaign()
 	_simulate_realtime()
 	_simulate_outposts()
@@ -1658,3 +1660,123 @@ func _simulate_outposts() -> void:
 		_check(done.has(region + "_breath"), "%s : premier oxygène" % region)
 		_check(done.has({ "ceres": "ceres_brine", "titan": "titan_pump", "europa": "europa_ocean", "enceladus": "enceladus_plume" }[region]), "%s : premier module du monde" % region)
 		_check(region != "titan" or done.get("titan_pump", INF) <= 25.0, "Titan : la pompe à méthane arrive tôt")
+
+
+# ---------- Décisions et défis ----------
+
+func _test_dilemmas() -> void:
+	# Chaque décision a deux choix complets et un choix par défaut valide.
+	for id: String in R.DILEMMAS:
+		var def: Dictionary = R.DILEMMAS[id]
+		_check(def.choices.size() == 2 and def.get("default", -1) in [0, 1], "décision %s : deux choix et un défaut" % id)
+		for option: Dictionary in def.choices:
+			_check(not str(option.get("label", "")).is_empty() and not str(option.get("outcome", "")).is_empty(), "décision %s : textes" % id)
+
+	# Une décision arrive d'elle-même (les tests d'équilibrage la coupent avec breakdown_rate = 0).
+	var engine := _calm_engine()
+	engine.breakdown_rate = 1e-9
+	engine.state.sol = ColonyEngine.DILEMMA_START + 1.0
+	engine.advance(7.0)
+	_check(not engine.state.dilemma.is_empty() or not engine.state.last_dilemma.is_empty(), "une décision a été proposée")
+
+	# Choix payant : le coût est retiré, le gain ajouté.
+	engine = _calm_engine()
+	engine.state.resources[R.ENERGY] = 50.0
+	engine.state.resources[R.DATA] = 0.0
+	engine._raise_dilemma("strange_rock", engine.state.sol + 2.0)
+	_check(engine.dilemma_text().contains(engine.state.dilemma.name), "le texte cite le colon")
+	var report := engine.resolve_dilemma(0)
+	_check(not report.is_empty() and engine.state.dilemma.is_empty(), "décision tranchée")
+	_check(_near(engine.state.amount(R.ENERGY), 35.0) and _near(engine.state.amount(R.DATA), 30.0), "roche analysée : −15 énergie, +30 données")
+
+	# Choix impossible sans les moyens ; sans réponse, le défaut payable s'applique.
+	engine = _calm_engine()
+	engine.state.resources[R.MATERIALS] = 0.0
+	engine._raise_dilemma("leak", engine.state.sol + 0.5)
+	_check(not engine.dilemma_problem(0).is_empty(), "réparer sans matériaux : impossible")
+	_check(engine.default_choice() == 1, "défaut impayable : l'autre choix")
+	engine.breakdown_rate = 1e-9
+	engine.advance(0.6)
+	_check(engine.state.dilemma.is_empty() and engine.state.last_dilemma == "leak", "sans réponse : décision appliquée à l'échéance")
+
+	# Repos : santé au maximum ; heures supplémentaires : fatigue sans évacuation.
+	engine = _calm_engine()
+	engine.state.colonists[0].health = 0.4
+	engine._raise_dilemma("overtime", engine.state.sol + 2.0)
+	engine.resolve_dilemma(1)
+	_check(_near(engine.state.colonists[0].health, 1.0), "repos : santé au maximum")
+	engine.state.colonists[0].health = 0.2
+	engine._raise_dilemma("overtime", engine.state.sol + 2.0)
+	engine.resolve_dilemma(0)
+	_check(engine.state.colonists.size() == 4 and engine.state.colonists[0].health >= 0.2, "heures sup : personne n'est évacué")
+
+	# Tempête : panneaux repliés = aucune lumière, aucune poussière.
+	engine = _rich_engine()
+	_place_solar_row(engine, 3)
+	engine._raise_dilemma("storm_shelter", engine.state.sol + 1.0)
+	engine.resolve_dilemma(0)
+	engine.dust_rate = ColonyEngine.DUST_RATE
+	engine.state.sol = floorf(engine.state.sol) + 0.5
+	engine.state.storm_until = engine.state.sol + 2.0
+	_check(engine.state.shelter and engine.sunlight() == 0.0, "panneaux repliés : plus de lumière")
+	var dust_before := engine.average_dust()
+	engine.advance(0.5)
+	_check(_near(engine.average_dust(), dust_before), "panneaux repliés : pas de poussière")
+	engine.state.storm_until = engine.state.sol + 0.01
+	engine.advance(0.05)
+	_check(not engine.state.shelter, "fin de tempête : panneaux redéployés")
+
+	# Sauvegarde : la décision en attente est gardée.
+	engine = _calm_engine()
+	engine._raise_dilemma("ice_vein", 42.0)
+	var copy := ColonyState.from_dict(JSON.parse_string(JSON.stringify(engine.state.to_dict())))
+	_check(copy.dilemma.get("id") == "ice_vein" and _near(float(copy.dilemma.until), 42.0), "décision sauvegardée")
+
+
+## Panneaux solaires collés à l'atterrisseur, vers la droite.
+func _place_solar_row(engine: ColonyEngine, count: int) -> void:
+	var lander := engine.map.lander_cell
+	for k in count:
+		engine.place("solar", lander + Vector2i(2 + k, 0))
+
+
+func _test_challenges() -> void:
+	for id: String in R.CHALLENGES:
+		var def: Dictionary = R.CHALLENGES[id]
+		_check(def.target > 0.0 and def.sols > 0.0 and not def.reward.is_empty(), "défi %s : complet" % id)
+
+	# Pas de défi pendant le guide ; ensuite, un défi arrive.
+	var engine := _rich_engine()
+	engine.breakdown_rate = 1e-9
+	engine.advance(1.5)
+	_check(engine.state.challenge.is_empty(), "pas de défi pendant le guide")
+	engine.state.tutorial_done = true
+	engine.advance(1.5)
+	_check(not engine.state.challenge.is_empty(), "un défi est proposé après le guide")
+
+	# Défi « Chantier » : trois modules posés, récompense versée.
+	engine = _rich_engine()
+	engine.breakdown_rate = 1e-9
+	engine.state.tutorial_done = true
+	var def: Dictionary = R.CHALLENGES.build
+	engine.state.challenge = { "id": "build", "start": engine._challenge_value(def), "progress": 0.0, "until": engine.state.sol + 6.0 }
+	var materials := engine.state.amount(R.MATERIALS)
+	_place_solar_row(engine, 3)
+	var spent := materials - engine.state.amount(R.MATERIALS)
+	_check(_near(engine.challenge_progress(), 1.0), "chantier : 3 modules = défi rempli")
+	engine.advance(0.05)
+	_check(engine.state.challenge.is_empty() and engine.state.challenges_done == 1, "défi réussi")
+	_check(_near(engine.state.amount(R.MATERIALS), materials - spent + 20.0, 1e-3), "récompense : +20 matériaux")
+
+	# Délai dépassé : le défi disparaît sans pénalité.
+	engine = _rich_engine()
+	engine.breakdown_rate = 1e-9
+	engine.state.tutorial_done = true
+	engine.state.challenge = { "id": "read", "start": 99.0, "progress": 0.0, "until": engine.state.sol + 0.1 }
+	engine.advance(0.2)
+	_check(engine.state.challenges_done == 0 and engine.state.challenge.get("id", "") != "read" or engine.state.challenge.is_empty(), "défi expiré")
+
+	# Sauvegarde du défi en cours.
+	engine.state.challenge = { "id": "upgrade", "start": 3.0, "progress": 0.0, "until": 50.0 }
+	var copy := ColonyState.from_dict(JSON.parse_string(JSON.stringify(engine.state.to_dict())))
+	_check(copy.challenge.get("id") == "upgrade" and _near(float(copy.challenge.start), 3.0), "défi sauvegardé")

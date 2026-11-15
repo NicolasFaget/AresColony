@@ -48,7 +48,16 @@ static func material(color: Color, emission := 0.0, metallic := 0.0) -> Material
 	if _materials.has(key):
 		return _materials[key]
 	var mat: Material
-	if color.a < 1.0 or emission > 0.0:
+	if emission > 0.0 and color.a >= 1.0:
+		# Lampe : sa lueur suit l'activité du module (paramètre d'instance « lit », voir lamp.gdshader).
+		var lamp := ShaderMaterial.new()
+		lamp.shader = preload("res://world/lamp.gdshader")
+		lamp.set_shader_parameter("color", color)
+		lamp.set_shader_parameter("energy", emission)
+		# Balises rouges des mâts : elles clignotent.
+		lamp.set_shader_parameter("blink", color == Color("#ff6f61"))
+		mat = lamp
+	elif color.a < 1.0 or emission > 0.0:
 		var standard := StandardMaterial3D.new()
 		standard.albedo_color = color
 		standard.roughness = 0.08 if color.a < 1.0 else 0.5
@@ -224,10 +233,15 @@ static func _lander(r: Node3D) -> void:
 		var wing := box(r, Vector3(side * 1.02, 1.32, 0), Vector3(0.62, 0.035, 0.5), BLUE, Vector3(0, 0, side * 12.0))
 		wing.material_override = solar_material()
 		box(r, Vector3(side * 1.02, 1.3, 0), Vector3(0.66, 0.02, 0.54), GREY, Vector3(0, 0, side * 12.0))
-	# Antenne parabolique.
+	# Antenne parabolique, qui balaie lentement le ciel.
 	cylinder(r, Vector3(0.12, 1.66, 0.1), 0.02, 0.24, GREY, Vector3.ZERO, -1.0, 8)
-	sphere(r, Vector3(0.12, 1.8, 0.1), 0.17, WHITE, Vector3(1, 0.32, 1), 0.0, true)
-	strut(r, Vector3(0.12, 1.8, 0.1), Vector3(0.12, 1.95, 0.1), 0.008, DARK)
+	var dish := Node3D.new()
+	dish.name = "RotorSpin"
+	dish.position = Vector3(0.12, 1.8, 0.1)
+	r.add_child(dish)
+	var bowl := sphere(dish, Vector3(0.03, 0, 0), 0.17, WHITE, Vector3(1, 0.32, 1), 0.0, true)
+	bowl.rotation_degrees = Vector3(0, 0, 28)
+	strut(dish, Vector3(0.03, 0, 0), Vector3(-0.04, 0.14, 0), 0.008, DARK)
 	light(r, Vector3(-0.2, 1.58, -0.15), Color("#ff6f61"), 0.025)
 	# Échelle et écoutille.
 	for side in [-0.07, 0.07]:
@@ -250,7 +264,9 @@ static func _solar(r: Node3D) -> void:
 	cylinder(r, Vector3(0, 0.03, 0), 0.12, 0.06, CONCRETE)
 	cylinder(r, Vector3(0, 0.27, 0), 0.035, 0.48, GREY, Vector3.ZERO, -1.0, 10)
 	box(r, Vector3(0, 0.5, 0), Vector3(0.12, 0.06, 0.1), DARK)
+	# Cadre orientable : il suit le soleil (voir ColonyWorld), à plat la nuit, replié en tempête.
 	var frame := Node3D.new()
+	frame.name = "RotorSun"
 	frame.position = Vector3(0, 0.56, 0)
 	frame.rotation_degrees = Vector3(-24, 0, 0)
 	r.add_child(frame)
@@ -759,22 +775,38 @@ static var _baked := {}
 static func baked_building(building_id: String) -> Node3D:
 	if not _baked.has(building_id):
 		var model := bake(building(building_id))
-		var parts := []
-		for child in model.get_children():
+		_baked[building_id] = _spec(model)
+		model.free()
+	return _from_spec(_baked[building_id])
+
+
+## Description d'un modèle fusionné (maillages, ombres, pièces mobiles) : le cache garde des
+## ressources, pas des nœuds hors de l'arbre.
+static func _spec(node: Node3D) -> Dictionary:
+	var spec := { "name": str(node.name), "transform": node.transform, "parts": [], "rotors": [] }
+	for child in node.get_children():
+		if child is MeshInstance3D:
 			var part := child as MeshInstance3D
 			var mesh: Mesh = part.mesh
 			if part.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
 				mesh = with_lods(mesh)
-			parts.append([mesh, part.cast_shadow])
-		model.free()
-		_baked[building_id] = parts
+			spec.parts.append([mesh, part.cast_shadow])
+		elif child is Node3D:
+			spec.rotors.append(_spec(child))
+	return spec
+
+
+static func _from_spec(spec: Dictionary) -> Node3D:
 	var root := Node3D.new()
-	root.name = building_id
-	for part: Array in _baked[building_id]:
+	root.name = spec.name
+	root.transform = spec.transform
+	for part: Array in spec.parts:
 		var instance := MeshInstance3D.new()
 		instance.mesh = part[0]
 		instance.cast_shadow = part[1]
 		root.add_child(instance)
+	for rotor: Dictionary in spec.rotors:
+		root.add_child(_from_spec(rotor))
 	return root
 
 
@@ -817,9 +849,14 @@ static func pebble_mesh() -> Mesh:
 static func bake(root: Node3D) -> Node3D:
 	var tools := {}
 	var order: Array[Material] = []
+	# Pièces mobiles (nœuds « Rotor… ») : fusionnées à part, elles restent orientables.
+	var rotors: Array[Node3D] = []
+	for node in root.find_children("Rotor*", "Node3D", true, false):
+		if not _under_rotor(node, root):
+			rotors.append(node)
 	for node in root.find_children("*", "MeshInstance3D", true, false):
 		var part: MeshInstance3D = node
-		if part.name == "Flame" or part.mesh == null:
+		if part.name == "Flame" or part.mesh == null or _under_rotor(part, root):
 			continue
 		var mat: Material = part.material_override
 		if not tools.has(mat):
@@ -848,8 +885,25 @@ static func bake(root: Node3D) -> Node3D:
 		if mesh == clear:
 			instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		baked.add_child(instance)
+	for rotor in rotors:
+		var placed := _relative_transform(root, rotor)
+		var rotor_name := rotor.name
+		rotor.get_parent().remove_child(rotor)
+		var moving := bake(rotor)
+		moving.name = rotor_name
+		moving.transform = placed
+		baked.add_child(moving)
 	root.free()
 	return baked
+
+
+static func _under_rotor(node: Node, root: Node) -> bool:
+	var parent := node.get_parent()
+	while parent != null and parent != root:
+		if str(parent.name).begins_with("Rotor"):
+			return true
+		parent = parent.get_parent()
+	return false
 
 
 static func _relative_transform(root: Node3D, node: Node3D) -> Transform3D:

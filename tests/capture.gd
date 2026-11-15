@@ -691,6 +691,80 @@ func _run() -> void:
 			campaign.switch_to(0)
 			main._show_founding()
 			await _shot("C2_fondation_titan")
+		"vivant":
+			# Colonie vivante : panneaux orientés, nuit éclairée, tempête (panneaux repliés), décisions,
+			# défis, fiche d'un colon, mode photo ; décor propre à chaque monde.
+			var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://game/test_saves/europa.json"))
+			for world: Array in [[0, "mars"], [1, "ceres"], [2, "titan"], [3, "europa"]]:
+				var campaign := Campaign.from_dict(saved.duplicate(true))
+				campaign.switch_to(world[0])
+				manager.campaign = campaign
+				manager.engine = campaign.engine()
+				engine = manager.engine
+				engine.state.speed = 1
+				engine.state.tutorial_done = true
+				engine.state.sol = floorf(engine.state.sol) + 0.62
+				main = await _open_main()
+				_close_modals(main)
+				if not main._window.collapsed:
+					main._window.toggle_collapsed()
+				await _frames(60)
+				await _shot("V_%s_1_jour" % world[1])
+				if world[1] == "mars":
+					engine.state.sol = floorf(engine.state.sol) + 0.9
+					await _frames(150)
+					await _shot("V_mars_2_nuit")
+					engine.state.sol = floorf(engine.state.sol) + 1.45
+					engine.state.storm_until = engine.state.sol + 2.0
+					engine.state.shelter = true
+					await _frames(200)
+					await _shot("V_mars_3_tempete_repliee")
+					engine.state.storm_until = -1.0
+					engine.state.shelter = false
+					engine._raise_dilemma("greenhouse_mold", engine.state.sol + 2.0)
+					await _frames(20)
+					await _shot("V_mars_4_decision")
+					_close_modals(main)
+					engine._raise_dilemma("storm_shelter", engine.state.sol + 1.0)
+					await _frames(20)
+					await _shot("V_mars_5_decision_tempete")
+					_close_modals(main)
+					engine.state.challenge = { "id": "full_water", "start": 0.0, "progress": 0.0, "until": engine.state.sol + 4.0 }
+					main._window.toggle_collapsed()
+					main._select_tab(1)
+					await _frames(20)
+					await _shot("V_mars_6_defi")
+					main._window.toggle_collapsed()
+					main._show_colonist(0)
+					await _frames(20)
+					await _shot("V_mars_7_colon")
+					_close_modals(main)
+				main._show_photo_mode()
+				await _frames(60)
+				await _shot("V_%s_8_photo" % world[1])
+				main._world.rig.photo_orbit(Vector2(0, -50))
+				await _frames(30)
+				await _shot("V_%s_9_photo_ciel" % world[1])
+				main._close_photo_mode()
+				main.queue_free()
+				await _frames(5)
+			var moon := Campaign.from_dict(JSON.parse_string(FileAccess.get_file_as_string("res://game/test_saves/enceladus.json")))
+			manager.campaign = moon
+			manager.engine = moon.engine()
+			engine = manager.engine
+			engine.state.speed = 1
+			engine.state.sol = floorf(engine.state.sol) + 0.55
+			main = await _open_main()
+			_close_modals(main)
+			if not main._window.collapsed:
+				main._window.toggle_collapsed()
+			main._world.rig.zoom(1.8)
+			await _frames(150)
+			await _shot("V_encelade_1_geysers")
+			main._show_photo_mode()
+			main._world.rig.photo_orbit(Vector2(0, -50))
+			await _frames(60)
+			await _shot("V_encelade_9_photo_saturne")
 		"interaction":
 			main = await _open_main()
 			_close_modals(main)

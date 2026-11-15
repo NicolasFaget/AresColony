@@ -100,3 +100,12 @@ Chloé
 Noé
 Imperial College London (2022)
 Live Science (2025)
+ingén
+géolog
+médec
+électri
+mécan
+{name}
+%s. %s
+Ares Colony
+Rotor*

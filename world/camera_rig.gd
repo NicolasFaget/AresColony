@@ -18,6 +18,9 @@ var covered_fraction := 0.5:
 		_update_offset()
 
 var _focus_tween: Tween
+## Mode photo : caméra en perspective, qu'on fait tourner autour du point visé.
+var photo := false
+var _saved := {}
 
 
 func _ready() -> void:
@@ -33,6 +36,9 @@ func _ready() -> void:
 
 
 func pan_pixels(delta: Vector2) -> void:
+	if photo:
+		photo_orbit(delta)
+		return
 	if _focus_tween != null:
 		_focus_tween.kill()
 	var units_per_pixel := camera.size / get_viewport().get_visible_rect().size.y
@@ -47,6 +53,9 @@ func pan_pixels(delta: Vector2) -> void:
 
 
 func zoom(factor: float) -> void:
+	if photo:
+		photo_zoom(factor)
+		return
 	camera.size = clampf(camera.size * factor, MIN_SIZE, MAX_SIZE)
 	_update_offset()
 
@@ -73,6 +82,45 @@ func _clamp() -> void:
 	position.y = 0.0
 
 
+# ---------- Mode photo ----------
+
+func enter_photo() -> void:
+	if photo:
+		return
+	photo = true
+	_saved = { "rotation": rotation_degrees, "size": camera.size }
+	camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+	camera.fov = 50.0
+	camera.near = 0.1
+	camera.v_offset = 0.0
+	camera.position = Vector3(0, 0, 14.0)
+	rotation_degrees = Vector3(-16.0, rotation_degrees.y, 0.0)
+
+
+func exit_photo() -> void:
+	if not photo:
+		return
+	photo = false
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camera.near = 1.0
+	camera.position = Vector3(0, 0, DISTANCE)
+	rotation_degrees = _saved.rotation
+	camera.size = _saved.size
+	_update_offset()
+
+
+## Glisser : tourner autour du point visé (horizontalement) et lever ou baisser le regard.
+func photo_orbit(delta: Vector2) -> void:
+	rotation_degrees.y -= delta.x * 0.25
+	rotation_degrees.x = clampf(rotation_degrees.x - delta.y * 0.2, -75.0, -5.0)
+
+
+func photo_zoom(factor: float) -> void:
+	camera.position.z = clampf(camera.position.z * factor, 5.0, 32.0)
+
+
 func _update_offset() -> void:
+	if photo:
+		return
 	if camera != null:
 		camera.v_offset = -camera.size * covered_fraction / 2.0
