@@ -128,6 +128,9 @@ func focus_on(id: String) -> void:
 		return
 	# Assez près pour voir la planète et ses lunes.
 	var reach: float = body_size(id) * 7.0
+	# Une lune : sa planète reste dans le champ, pour qu'on sache où l'on est.
+	if BODIES[id].has("parent"):
+		reach = maxf(reach, float(BODIES[id].orbit) * 2.0)
 	for other: String in BODIES:
 		if BODIES[other].get("parent", "") == id:
 			reach = maxf(reach, BODIES[other].orbit * 2.4)

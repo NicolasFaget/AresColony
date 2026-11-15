@@ -742,6 +742,7 @@ func _show_network() -> void:
 	_solar.cargo_requested.connect(_show_cargo)
 	_solar.founding_requested.connect(_show_founding)
 	_solar.list_requested.connect(_show_network_list)
+	_solar.found_at.connect(func(region: String) -> void: _found_colony(GameManager.campaign.active, region))
 	add_child(_solar)
 	move_child(_solar, _modal_layer.get_index())
 	# La colonie n'est plus dessinée tant que la vue est ouverte (une seule scène 3D à la fois).
@@ -875,11 +876,7 @@ func _show_founding() -> void:
 		go.focus_mode = Control.FOCUS_NONE
 		go.disabled = not problem.is_empty()
 		go.pressed.connect(func() -> void:
-			if campaign.found_colony(origin, id):
-				AudioManager.play("whoosh")
-				GameManager.vibrate(40)
-				_world.launch_from_spaceport()
-				_news.post(Tr.t("Le vaisseau de fondation décolle vers %s !") % Tr.t(region.name))
+			if _found_colony(origin, id):
 				holder[0].close())
 		var rows: Array = [title, UiFx.paragraph(Tr.t(region.tagline), "SmallLabel"), trip, go]
 		if not problem.is_empty():
@@ -891,6 +888,17 @@ func _show_founding() -> void:
 	holder.append(Modal.open(_modal_layer, {
 		"icon": "planet", "title": Tr.t("Fonder une colonie"), "extra": scroll, "confirm_text": Tr.t("Fermer"),
 	}))
+
+
+## Lance un vaisseau de fondation (bruit, vibration, décollage, nouvelle). Vrai s'il est parti.
+func _found_colony(origin: int, region: String) -> bool:
+	if not GameManager.campaign.found_colony(origin, region):
+		return false
+	AudioManager.play("whoosh")
+	GameManager.vibrate(40)
+	_world.launch_from_spaceport()
+	_news.post(Tr.t("Le vaisseau de fondation décolle vers %s !") % Tr.t(ColonyContent.REGIONS[region].name))
+	return true
 
 
 ## Fenêtres de tir entre les mondes du réseau (et vers les mondes à coloniser).

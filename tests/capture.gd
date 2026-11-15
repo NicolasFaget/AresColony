@@ -475,6 +475,22 @@ func _run() -> void:
 			main._show_card("enceladus_phosphorus")
 			await _frames(10)
 			await _shot("D4_fiche_phosphore")
+		"systeme":
+			# Système solaire depuis une partie à quatre colonies : Encelade reste à fonder.
+			var campaign := Campaign.from_dict(JSON.parse_string(FileAccess.get_file_as_string("res://game/test_saves/europa.json")))
+			campaign.switch_to(0)
+			manager.campaign = campaign
+			manager.engine = campaign.engine()
+			engine = manager.engine
+			engine.state.speed = 0
+			main = await _open_main()
+			_close_modals(main)
+			main._show_network()
+			await _frames(30)
+			await _shot("F1_systeme")
+			main._solar._on_body_tapped("enceladus")
+			await _frames(90)
+			await _shot("F2_encelade_a_fonder")
 		"reseau":
 			# Réseau à cinq colonies, vu depuis Mars : fenêtres du réseau, de la cargaison, de la fondation.
 			var campaign := Campaign.from_dict(JSON.parse_string(FileAccess.get_file_as_string("res://game/test_saves/enceladus.json")))

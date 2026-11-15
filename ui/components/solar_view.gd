@@ -9,6 +9,8 @@ signal colony_chosen(index: int)
 signal cargo_requested
 signal founding_requested
 signal list_requested
+## Fonder une colonie dans cette région, depuis la colonie affichée.
+signal found_at(region: String)
 
 ## Marges des bords de l'écran (encoche, barre de navigation), en pixels.
 var inset_top := 12
@@ -21,6 +23,8 @@ var _overlay: Control
 var _colony_tags: Array[Button] = []
 var _body_tags := {}
 var _flight_tags: Array[Label] = []
+## Colonies des lunes regroupées sous leur planète, en vue d'ensemble (planète -> bouton).
+var _group_tags := {}
 var _selected := -1
 var _selected_body := ""
 var _sheet_box: VBoxContainer
@@ -135,12 +139,48 @@ func _update_scene(delta: float) -> void:
 func _place_tags(flights: Array) -> void:
 	var taken: Array[Rect2] = []
 	var stacks := {}
+	# Lunes trop près de leur planète à l'écran (vue d'ensemble) : leurs colonies sont regroupées
+	# sous une seule étiquette, qui zoome sur la planète.
+	var crowded := {}
+	for id: String in SolarSystem.BODIES:
+		var parent: String = SolarSystem.BODIES[id].get("parent", "")
+		if parent.is_empty():
+			continue
+		var spot: Variant = _system.screen_position(_system.body_position(id))
+		var center: Variant = _system.screen_position(_system.body_position(parent))
+		if spot != null and center != null and (spot as Vector2).distance_to(center) < _system.screen_radius(parent) + 40.0:
+			crowded[id] = parent
+	var groups := {}
+	for i in _colony_tags.size():
+		var world := _campaign.planet_of(i)
+		if crowded.has(world):
+			groups[crowded[world]] = groups.get(crowded[world], 0) + 1
+	# Une seule colonie autour d'une planète : son étiquette suffit.
+	for world: String in crowded.keys():
+		if groups.get(crowded[world], 0) < 2:
+			crowded.erase(world)
+	for parent: String in _group_tags:
+		_group_tags[parent].visible = false
+	for parent: String in groups:
+		if groups[parent] < 2:
+			continue
+		var group := _group_tag(parent)
+		var spot: Variant = _system.screen_position(_system.body_position(parent))
+		if spot == null:
+			continue
+		group.visible = true
+		group.text = Tr.t("%s · %d colonies") % [Tr.t(SolarSystem.BODIES[parent].name), groups[parent]]
+		group.size = group.get_combined_minimum_size()
+		var lift := maxf(_system.screen_radius(parent), 6.0) + 14.0
+		var rect := _free_spot(Rect2((spot as Vector2) - Vector2(group.size.x * 0.5, lift + group.size.y), group.size), taken, -1.0)
+		taken.append(rect)
+		group.position = rect.position
 	for i in _colony_tags.size():
 		var tag := _colony_tags[i]
 		var world := _campaign.planet_of(i)
 		var spot: Variant = _system.screen_position(_system.body_position(world))
-		tag.visible = spot != null
-		if spot == null:
+		tag.visible = spot != null and not crowded.has(world)
+		if not tag.visible:
 			continue
 		tag.size = tag.get_combined_minimum_size()
 		var level: int = stacks.get(world, 0)
@@ -167,11 +207,11 @@ func _place_tags(flights: Array) -> void:
 		var spot: Variant = _system.screen_position(_system.body_position(id))
 		var parent: String = SolarSystem.BODIES[id].get("parent", "")
 		# Une lune trop près de sa planète à l'écran : son nom attendra qu'on s'approche.
-		var crowded := false
+		var near_parent := false
 		if spot != null and not parent.is_empty():
 			var center: Variant = _system.screen_position(_system.body_position(parent))
-			crowded = center != null and (spot as Vector2).distance_to(center) < _system.screen_radius(parent) + 40.0
-		tag.visible = spot != null and not crowded
+			near_parent = center != null and (spot as Vector2).distance_to(center) < _system.screen_radius(parent) + 40.0
+		tag.visible = spot != null and not near_parent
 		if not tag.visible:
 			continue
 		tag.size = tag.get_combined_minimum_size()
@@ -216,6 +256,20 @@ func _place_tags(flights: Array) -> void:
 			label.visible = true
 			label.position = rect.position
 			taken.append(rect)
+
+
+func _group_tag(parent: String) -> Button:
+	if not _group_tags.has(parent):
+		var tag := Button.new()
+		tag.focus_mode = Control.FOCUS_NONE
+		tag.custom_minimum_size = Vector2(0, 52)
+		tag.add_theme_font_size_override("font_size", 22)
+		for state in ["normal", "hover", "pressed"]:
+			tag.add_theme_stylebox_override(state, _tag_style)
+		tag.pressed.connect(_on_body_tapped.bind(parent))
+		_overlay.add_child(tag)
+		_group_tags[parent] = tag
+	return _group_tags[parent]
 
 
 ## Décale un rectangle (vers le haut si `direction` vaut −1) jusqu'à une place libre.
@@ -308,7 +362,12 @@ func _fill_sheet() -> void:
 			text = Tr.t("La Terre : d'où partent les volontaires et les ravitaillements.")
 		elif _selected_body in ["jupiter", "saturn"]:
 			text = Tr.t("Une planète géante, sans sol où se poser : les colonies vivent sur ses lunes.")
+		var regions := _founding_regions(_selected_body)
+		if not regions.is_empty():
+			text = Tr.t("Aucune colonie ici pour l'instant : un vaisseau de fondation peut s'y poser.")
 		_sheet_box.add_child(UiFx.vbox(2, [name, UiFx.paragraph(text, "SmallLabel")]))
+		for region in regions:
+			_founding_row(region)
 	var cargo := _action(Tr.t("Cargaison"), "rocket", "")
 	cargo.disabled = _campaign.colonies.size() < 2
 	cargo.pressed.connect(func() -> void: cargo_requested.emit())
@@ -317,6 +376,44 @@ func _fill_sheet() -> void:
 	var list := _action(Tr.t("Liste"), "news", "")
 	list.pressed.connect(func() -> void: list_requested.emit())
 	_sheet_box.add_child(UiFx.hbox(8, [cargo, found, list]))
+
+
+## Sites d'atterrissage d'un monde (fondation possible un jour depuis la colonie affichée).
+func _founding_regions(world: String) -> Array[String]:
+	var list: Array[String] = []
+	for id: String in ColonyContent.FOUNDING_REGIONS:
+		if Campaign.planet_of_region(id) == world:
+			list.append(id)
+	return list
+
+
+## Un site où se poser : coût et durée du vol depuis la colonie affichée, ou ce qui manque.
+func _founding_row(region: String) -> void:
+	var origin := _campaign.active
+	var cost := _campaign.founding_cost(origin, region)
+	var transit := _campaign.transit_sols(origin, region)
+	var title := UiFx.label(Tr.t(ColonyContent.REGIONS[region].name), "BodyLabel")
+	var trip := UiFx.paragraph(Tr.t("%s matériaux · %s kg de méthane · %s sol%s de voyage") % [
+			NumberFormatter.format(cost[ColonyContent.MATERIALS]), NumberFormatter.format(cost[ColonyContent.METHANE]),
+			NumberFormatter.format(transit), "s" if transit >= 2.0 else ""], "SmallLabel")
+	trip.add_theme_color_override("font_color", Palette.ACCENT)
+	var text := UiFx.vbox(2, [title, trip])
+	var problem := _campaign.founding_problem(origin, region)
+	if not problem.is_empty():
+		var reason := UiFx.paragraph(problem, "SmallLabel")
+		reason.add_theme_color_override("font_color", Palette.WARNING)
+		text.add_child(reason)
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var go := Button.new()
+	go.text = Tr.t("Se poser ici")
+	go.theme_type_variation = "GoldButton"
+	go.custom_minimum_size = Vector2(150, 60)
+	go.focus_mode = Control.FOCUS_NONE
+	go.disabled = not problem.is_empty()
+	go.pressed.connect(func() -> void:
+		found_at.emit(region)
+		_fill_sheet.call_deferred())
+	_sheet_box.add_child(UiFx.panel("Row", UiFx.hbox(8, [text, go])))
 
 
 func _colony_card(i: int) -> void:
