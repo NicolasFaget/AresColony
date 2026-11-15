@@ -103,6 +103,7 @@ func _add_colony_tags() -> void:
 		var style := _tag_style
 		for state in ["normal", "hover", "pressed"]:
 			tag.add_theme_stylebox_override(state, style)
+		tag.add_theme_constant_override("icon_max_width", 22)
 		tag.pressed.connect(_select.bind(i))
 		_overlay.add_child(tag)
 		_colony_tags.append(tag)
@@ -199,9 +200,10 @@ func _place_tags(flights: Array) -> void:
 					tag.remove_theme_stylebox_override(state)
 				else:
 					tag.add_theme_stylebox_override(state, _tag_style)
-		tag.icon = UiFx.icon("target") if here else null
-		tag.expand_icon = false
-		tag.add_theme_constant_override("icon_max_width", 22)
+		# Rien n'est réécrit s'il n'a pas changé : chaque changement de style relance la mise en page.
+		var icon: Texture2D = UiFx.icon("target") if here else null
+		if tag.icon != icon:
+			tag.icon = icon
 	for id: String in _body_tags:
 		var tag: Button = _body_tags[id]
 		var spot: Variant = _system.screen_position(_system.body_position(id))
@@ -225,7 +227,9 @@ func _place_tags(flights: Array) -> void:
 		if tag.visible:
 			taken.append(rect)
 			tag.position = rect.position
-		tag.add_theme_color_override("font_color", Palette.TEXT if id == _selected_body else Palette.TEXT_MUTED)
+		var color := Palette.TEXT if id == _selected_body else Palette.TEXT_MUTED
+		if tag.get_theme_color("font_color") != color:
+			tag.add_theme_color_override("font_color", color)
 	while _flight_tags.size() < flights.size():
 		var label := UiFx.label("", "CaptionLabel")
 		label.add_theme_font_size_override("font_size", 20)
@@ -244,8 +248,12 @@ func _place_tags(flights: Array) -> void:
 			continue
 		var shipment: Dictionary = _campaign.shipments[k]
 		var left := maxf(0.0, shipment.arrive - _campaign.time)
-		label.text = Tr.t("%s sol%s") % [NumberFormatter.format(ceilf(left)), "s" if left > 1.0 else ""]
-		label.add_theme_color_override("font_color", Palette.MONEY if flight.kind == "colony" else Palette.ACCENT)
+		var text := Tr.t("%s sol%s") % [NumberFormatter.format(ceilf(left)), "s" if left > 1.0 else ""]
+		if label.text != text:
+			label.text = text
+		var color := Palette.MONEY if flight.kind == "colony" else Palette.ACCENT
+		if label.get_theme_color("font_color") != color:
+			label.add_theme_color_override("font_color", color)
 		label.size = label.get_combined_minimum_size()
 		var rect := Rect2((spot as Vector2) + Vector2(10.0, -label.size.y * 0.5), label.size)
 		var overlaps := false

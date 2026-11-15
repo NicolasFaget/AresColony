@@ -745,8 +745,11 @@ func _show_network() -> void:
 	_solar.found_at.connect(func(region: String) -> void: _found_colony(GameManager.campaign.active, region))
 	add_child(_solar)
 	move_child(_solar, _modal_layer.get_index())
-	# La colonie n'est plus dessinée tant que la vue est ouverte (une seule scène 3D à la fois).
+	# La colonie n'est plus ni dessinée ni animée tant que la vue est ouverte (une seule scène 3D
+	# à la fois : sans cela, son ciel et ses animations coûtent autant que la vue elle-même).
 	_world.visible = false
+	_world.process_mode = Node.PROCESS_MODE_DISABLED
+	get_viewport().disable_3d = true
 
 
 func _close_network() -> void:
@@ -754,6 +757,8 @@ func _close_network() -> void:
 		_solar.queue_free()
 	_solar = null
 	_world.visible = true
+	_world.process_mode = Node.PROCESS_MODE_INHERIT
+	get_viewport().disable_3d = false
 
 
 ## Réseau de colonies en liste : chaque colonie, les fusées en vol, et les actions de l'astroport.

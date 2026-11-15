@@ -316,8 +316,9 @@ func _debug_fps(delta: float) -> void:
 		_fps_timer = 0.0
 		var rid := get_viewport().get_viewport_rid()
 		RenderingServer.viewport_set_measure_render_time(rid, true)
-		print("FPS %d · GPU %.1f ms · objets %d · primitives %d" % [
-			Engine.get_frames_per_second(), RenderingServer.viewport_get_measured_render_time_gpu(rid),
+		print("FPS %d · CPU %.1f ms · GPU %.1f ms · objets %d · primitives %d" % [
+			Engine.get_frames_per_second(), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
+			RenderingServer.viewport_get_measured_render_time_gpu(rid),
 			Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
 			Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)])
 
