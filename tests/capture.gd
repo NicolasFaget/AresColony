@@ -475,6 +475,31 @@ func _run() -> void:
 			main._show_card("enceladus_phosphorus")
 			await _frames(10)
 			await _shot("D4_fiche_phosphore")
+		"reseau":
+			# Réseau à cinq colonies, vu depuis Mars : fenêtres du réseau, de la cargaison, de la fondation.
+			var campaign := Campaign.from_dict(JSON.parse_string(FileAccess.get_file_as_string("res://game/test_saves/enceladus.json")))
+			campaign.switch_to(0)
+			manager.campaign = campaign
+			manager.engine = campaign.engine()
+			engine = manager.engine
+			engine.state.speed = 0
+			main = await _open_main()
+			_close_modals(main)
+			main._show_network()
+			await _frames(20)
+			await _shot("E1_reseau")
+			_close_modals(main)
+			main._show_cargo()
+			await _frames(20)
+			await _shot("E2_cargaison")
+			_close_modals(main)
+			main._show_founding()
+			await _frames(20)
+			await _shot("E3_fondation")
+			_close_modals(main)
+			main._show_finale()
+			await _frames(20)
+			await _shot("E4_fin_campagne")
 		"arcadia":
 			manager.stop_game()
 			var menu: Control = load("res://ui/menu.tscn").instantiate()

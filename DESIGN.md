@@ -125,6 +125,10 @@ de vie de l'application.
 - Hors-ligne (pilote automatique) : un sol toutes les 20 minutes d'absence, 8 h au plus, sans
   événement ni perte de santé ; veille sécurisée dès qu'une ressource vitale descend sous un quart
   de sol de consommation. Les échéances (tempêtes, ravitaillements) sont décalées d'autant.
+  Sans événement à suivre, le pilote automatique avance par pas de 0,1 sol (`AUTOPILOT_STEP`, cinq
+  fois `STEP`) : 8 h d'absence avec cinq colonies se rattrapent en ~0,7 s sur PC (7,7 s avant).
+- Air des grands dômes : le rendement moyen d'un dôme est gardé dans la sauvegarde (`air`) ; un
+  dôme vide le reste après un rechargement. À la démolition, le rendement moyen suit son module.
 
 ## Équilibrage mesuré (joueur simulé, tests/run_tests.gd)
 
@@ -262,13 +266,21 @@ fourchettes ; mettre ce tableau à jour après chaque rééquilibrage.
   moindre contrôle raté.
 - Absence : l'horloge de la campagne avance du temps écoulé, même si la colonie affichée se met en
   veille (les fusées continuent leur route).
+- Fin de campagne : quand une colonie de chacun des cinq mondes a rempli tous ses objectifs
+  (`is_complete`), le signal `completed` ouvre un bilan (sols, colonies, colons, cargaisons, fiches,
+  quiz), montré une seule fois (`finale_shown`, sauvegardé). La partie continue ensuite.
 
 ## Performances
 
 - Le jeu avance d'un tout petit pas à chaque image : tout ce qui est appelé dans `_step` doit être
-  léger. Caches : multiplicateurs par module (`rate_factor`), effets des recherches (`effect`),
-  capacités de stockage (`capacity`), bilan d'autonomie (rafraîchi tous les STEP sols). Ils sont vidés
-  dans `_rebuild()` et `upgrade()`. Mesure : ~370 µs par image sur PC pour 33 modules (1 200 avant).
+  léger. Caches : débits nominaux de chaque module, hors soleil et poussière (`_ensure_rates`,
+  recalculés quand un module est posé, démoli, amélioré, ou qu'une recherche aboutit),
+  multiplicateurs (`rate_factor`), effets des recherches (`effect`), capacités de stockage
+  (`capacity`), listes des panneaux et des modules qui peuvent tomber en panne (`_rebuild`).
+  Le bilan d'autonomie est recalculé à chaque pas (le rafraîchir moins souvent retarde l'objectif).
+  Mesure : ~1,2 ms par pas sur PC pour 80 modules (3,3 avant les débits en cache).
+- Menu : les résumés des emplacements sont gardés en mémoire (`slot_summary`) tant que le fichier
+  ne change pas.
 - `_simulate_realtime()` (tests) rejoue l'ère 1 image par image à ×4 : mêmes résultats qu'en gros pas.
 - Téléphone (Mali-G57) : ~43 images/s en début de partie, ~39 avec 64 modules (limite : le GPU).
 

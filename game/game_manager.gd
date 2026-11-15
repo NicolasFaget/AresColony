@@ -45,6 +45,8 @@ var _since_last_refresh := 0.0
 var _startup_report := {}
 var _skip_next_delta := false
 var _fps_timer := 0.0
+## Résumés des emplacements déjà lus (le menu en a besoin plusieurs fois) : { slot: [date du fichier, résumé] }.
+var _summaries := {}
 
 
 func _ready() -> void:
@@ -161,15 +163,22 @@ func open_game(slot: String, new_game := false, region := "jezero") -> void:
 func save() -> void:
 	if campaign != null and _save_service != null:
 		_save_service.save_campaign(campaign, SaveService.now_unix())
+		_summaries.erase(current_slot)
 	_since_last_save = 0.0
 
 
 ## Résumé d'un emplacement (voir ColonyState.summary), ou {} s'il est vide.
 func slot_summary(slot: String) -> Dictionary:
 	var storage := FileSaveStorage.new(save_dir, slot)
-	if storage.read().strip_edges().is_empty() and storage.read_backup().strip_edges().is_empty():
-		return {}
-	return SaveService.new(storage).load_campaign().summary()
+	var stamp := "%s:%d:%d" % [save_dir, FileAccess.get_modified_time(storage.save_path), FileAccess.get_modified_time(storage.backup_path)]
+	var known: Array = _summaries.get(slot, [])
+	if not known.is_empty() and known[0] == stamp:
+		return known[1]
+	var summary := {}
+	if not (storage.read().strip_edges().is_empty() and storage.read_backup().strip_edges().is_empty()):
+		summary = SaveService.new(storage).load_campaign().summary()
+	_summaries[slot] = [stamp, summary]
+	return summary
 
 
 ## Emplacement joué le plus récemment, ou "" s'il n'y a aucune sauvegarde.
@@ -202,6 +211,7 @@ func install_test_save(slot: String, test_name: String) -> bool:
 	if not data is Dictionary:
 		return false
 	SaveService.new(FileSaveStorage.new(save_dir, slot)).save_campaign(Campaign.from_dict(data), SaveService.now_unix())
+	_summaries.erase(slot)
 	return true
 
 
@@ -210,6 +220,7 @@ func delete_slot(slot: String) -> void:
 	for path in [storage.save_path, storage.backup_path, storage.temp_path]:
 		if FileAccess.file_exists(path):
 			DirAccess.remove_absolute(path)
+	_summaries.erase(slot)
 
 
 ## Rapport hors-ligne du démarrage, à afficher une seule fois. Vide s'il n'y a rien à montrer.

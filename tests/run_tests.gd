@@ -1322,6 +1322,7 @@ func _test_nitrogen() -> void:
 	for id in ["spaceport", "buffer_gas"]:
 		mars.state.research_done.append(id)
 	mars.state.resources[R.MATERIALS] = 400.0
+	var panel_ok := mars.place("solar", ColonyBot.connected_spot(mars, "solar"))
 	var before := mars.housing()
 	_check(mars.place("dome", ColonyBot.connected_spot(mars, "dome")), "grand dôme posé")
 	var dome := mars.state.buildings.size() - 1
@@ -1336,6 +1337,15 @@ func _test_nitrogen() -> void:
 	mars.state.resources[R.NITROGEN] = 0.0
 	mars.advance(3.0)
 	_check(not mars.is_pressurized(dome), "sans azote, le dôme se vide")
+	# Un dôme vide le reste après un rechargement de la sauvegarde.
+	var reloaded := ColonyEngine.new(ColonyState.from_dict(mars.state.to_dict()))
+	_check(not reloaded.is_pressurized(dome) and reloaded.housing() == mars.housing(), "dôme vide : toujours vide après rechargement")
+	# Démolir un module posé avant lui ne le remplit pas d'air (le rendement suit son module).
+	var housing_before := mars.housing()
+	_check(panel_ok and mars.demolish(dome - 1), "démolition d'un module posé avant le dôme")
+	dome -= 1
+	_check(not mars.is_pressurized(dome) and mars.housing() == housing_before, "après démolition : le dôme vide reste vide")
+	mars.state.resources[R.MATERIALS] = 400.0
 	_check(mars.place("n2_compressor", ColonyBot.connected_spot(mars, "n2_compressor")), "compresseur posé sur Mars")
 	var compressor := mars.state.buildings.size() - 1
 	var on_mars: float = mars.building_flows(compressor).get(R.NITROGEN, 0.0)
@@ -1504,6 +1514,9 @@ func _simulate_campaign() -> void:
 	campaign.shipment_arrived.connect(func(shipment: Dictionary) -> void:
 		if shipment.kind == "cargo" and shipment.to == 0:
 			nitrogen_in[0] += float(shipment.cargo.get(R.NITROGEN, 0.0)))
+	var finished := [0]
+	campaign.completed.connect(func() -> void: finished[0] += 1)
+	_check(not campaign.is_complete(), "campagne pas encore accomplie au début de l'ère 4")
 	while campaign.time < 1500.0 and reached.size() < network_goals.size():
 		ColonyBot.network(campaign)
 		campaign.advance(0.25)
@@ -1528,6 +1541,8 @@ func _simulate_campaign() -> void:
 	_check(reached.get("titan_fuel", INF) < 600.0, "Cérès et Titan complètes avant le sol 600")
 	_check(reached.get("europa_thera", INF) < 800.0, "Europe complète avant le sol 800")
 	_check(reached.get("enceladus_life", INF) < 1000.0, "Encelade complète avant le sol 1000")
+	_check(campaign.is_complete() and finished[0] >= 1 and campaign.worlds_done().size() == 5, "campagne accomplie : les cinq mondes")
+	_check(campaign.totals().colonies == campaign.colonies.size() and campaign.totals().cards_total > 0 and campaign.totals().colonists > 0, "bilan de fin de campagne")
 
 	print("\n--- Campagne « Survie » (joueur simulé) ---")
 	for objective in engine.objectives:

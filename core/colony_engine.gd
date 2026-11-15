@@ -38,6 +38,9 @@ const SECONDS_PER_SOL := 60.0
 const SPEEDS: Array[int] = [0, 1, 2, 4]
 ## Pas de simulation (sols).
 const STEP := 0.02
+## Pilote automatique (absence, colonies en arrière-plan) : sans événement à suivre, des pas plus
+## longs suffisent (dix par sol, le jour et la nuit restent bien marqués).
+const AUTOPILOT_STEP := 0.1
 ## Les panneaux ne reçoivent plus que 20 % de la lumière pendant une tempête.
 const STORM_SOLAR := 0.2
 const STORM_WARNING_SOLS := 1.0
@@ -156,6 +159,14 @@ var _capacity_research := -1
 var breakdown_rate := BREAKDOWN_RATE
 ## Rendement moyen récent de chaque module (lissé sur environ un demi-sol, pour la note).
 var _efficiency_avg: Array[float] = []
+## Débits nominaux par module (voir _ensure_rates) et définitions correspondantes.
+var _rates_in: Array[Dictionary] = []
+var _rates_out: Array[Dictionary] = []
+var _defs: Array[Defs.Building] = []
+var _rates_research := -1
+## Panneaux solaires et modules qui peuvent tomber en panne, raccordés ou non (voir _rebuild).
+var _solar: Array[int] = []
+var _breakable: Array[int] = []
 ## Modules en veille : toutes leurs sorties sont pleines, ils ne consomment plus rien.
 var _idle: Array[bool] = []
 ## Fin de la remise en route après la dernière tempête (compteur d'autonomie en pause).
@@ -449,10 +460,17 @@ func average_flows(real := false) -> Dictionary:
 	var flows := {}
 	for r in ColonyContent.RESOURCES:
 		flows[r] = 0.0
+	_ensure_rates()
+	var sun := _storm_factor() * effect("solar")
 	for i in state.buildings.size():
-		var own := building_flows(i, real)
-		for r: String in own:
-			flows[r] += own[r]
+		if not _connected[i] or is_broken(i):
+			continue
+		var ins: Dictionary = _rates_in[i]
+		var e := _efficiency_avg[i] if real and not ins.is_empty() else 1.0
+		for r: String in ins:
+			flows[r] -= ins[r] * e
+		for r: String in _rates_out[i]:
+			flows[r] += _output_rate(i, r, sun) * e
 	var count := state.colonists.size()
 	var needs := colonist_needs()
 	for r: String in needs:
@@ -537,6 +555,7 @@ func upgrade(index: int) -> bool:
 		_add(r, -cost[r])
 	state.buildings[index].level = level_of(index) + 1
 	_capacity_cache.clear()
+	_invalidate_rates()
 	_autonomy_flows = {}
 	_check_objectives()
 	changed.emit()
@@ -732,6 +751,8 @@ func demolish(index: int) -> bool:
 		return false
 	_add(ColonyContent.MATERIALS, def_of(index).cost * DEMOLISH_REFUND)
 	state.buildings.remove_at(index)
+	# Le rendement moyen suit son module (sinon celui du suivant glisserait d'un cran).
+	_efficiency_avg.remove_at(index)
 	_rebuild()
 	_clamp_to_capacity()
 	changed.emit()
@@ -836,24 +857,27 @@ func advance(sols: float) -> void:
 
 
 func _step(ds: float) -> void:
+	_ensure_rates()
 	var sun := sunlight()
 	var n := state.buildings.size()
 	var demand := {}
 	var passive := {}
+	var full := {}
 	for i in n:
 		_idle[i] = false
 		if not _connected[i] or is_broken(i):
 			continue
-		var def := def_of(i)
-		if OS.get_environment("NOIDLE") == "" and not def.inputs.is_empty() and _outputs_full(def):
+		var def := _defs[i]
+		if not def.inputs.is_empty() and _outputs_full(def, full):
 			_idle[i] = true
 			continue
 		if def.inputs.is_empty():
 			for r: String in def.outputs:
 				passive[r] = passive.get(r, 0.0) + _output_rate(i, r, sun) * ds
 		else:
-			for r: String in def.inputs:
-				demand[r] = demand.get(r, 0.0) + _input_rate(i, r) * ds
+			var ins: Dictionary = _rates_in[i]
+			for r: String in ins:
+				demand[r] = demand.get(r, 0.0) + ins[r] * ds
 	var count := state.colonists.size()
 	var needs := colonist_needs()
 	for r: String in needs:
@@ -869,21 +893,24 @@ func _step(ds: float) -> void:
 	for i in n:
 		var e := 0.0
 		if _connected[i] and not is_broken(i):
-			var def := def_of(i)
+			var def := _defs[i]
+			var ins: Dictionary = _rates_in[i]
 			e = 1.0
-			for r: String in def.inputs:
-				e = minf(e, satisfied[r] if satisfied.has(r) else minf(1.0, state.amount(r) / maxf(_input_rate(i, r) * ds, 1e-6)))
+			for r: String in ins:
+				e = minf(e, satisfied[r] if satisfied.has(r) else minf(1.0, state.amount(r) / maxf(ins[r] * ds, 1e-6)))
+			# Moyenne des entrées disponibles : une panne ou un débranchement ne la fait pas baisser.
+			_efficiency_avg[i] = lerpf(_efficiency_avg[i], e, minf(1.0, ds * 2.0))
+			if def.inputs.has(ColonyContent.NITROGEN):
+				# Air d'un dôme : gardé dans la sauvegarde (un dôme vide le reste après un rechargement).
+				state.buildings[i].air = _efficiency_avg[i]
 			if _idle[i]:
 				# En veille : le rendement suit ce qu'il pourrait faire, sans rien consommer.
 				_efficiency[i] = e
-				_efficiency_avg[i] = lerpf(_efficiency_avg[i], e, minf(1.0, ds * 2.0))
 				continue
-			for r: String in def.inputs:
-				delta[r] = delta.get(r, 0.0) - _input_rate(i, r) * e * ds
+			for r: String in ins:
+				delta[r] = delta.get(r, 0.0) - ins[r] * e * ds
 			for r: String in def.outputs:
 				delta[r] = delta.get(r, 0.0) + _output_rate(i, r, sun) * e * ds
-			# Moyenne des entrées disponibles : une panne ou un débranchement ne la fait pas baisser.
-			_efficiency_avg[i] = lerpf(_efficiency_avg[i], e, minf(1.0, ds * 2.0))
 		_efficiency[i] = e
 	for r: String in needs:
 		delta[r] = delta.get(r, 0.0) - needs[r] * count * ds * satisfied.get(r, 1.0)
@@ -924,10 +951,48 @@ func rate_factor(index: int, resource: String, output: bool) -> float:
 
 
 func _input_rate(index: int, resource: String) -> float:
-	var rate: float = def_of(index).inputs[resource] * rate_factor(index, resource, false)
-	if resource == ColonyContent.ENERGY and state.buildings[index].id in ColonyContent.HEATED:
-		rate *= effect("heating")
-	return rate
+	_ensure_rates()
+	return _rates_in[index][resource]
+
+
+## Débits nominaux de chaque module (synergies, améliorations, recherches, région), hors soleil et
+## poussière : recalculés seulement quand un module est posé, démoli, amélioré, ou qu'une recherche aboutit.
+func _ensure_rates() -> void:
+	var n := state.buildings.size()
+	if _rates_research == state.research_done.size() and _rates_in.size() == n:
+		return
+	_rates_research = state.research_done.size()
+	_rates_in.resize(n)
+	_rates_out.resize(n)
+	_defs.resize(n)
+	for i in n:
+		var def := def_of(i)
+		_defs[i] = def
+		var ins := {}
+		for r: String in def.inputs:
+			var rate: float = def.inputs[r] * rate_factor(i, r, false)
+			if r == ColonyContent.ENERGY and def.id in ColonyContent.HEATED:
+				rate *= effect("heating")
+			ins[r] = rate
+		var outs := {}
+		for r: String in def.outputs:
+			var rate: float = def.outputs[r] * rate_factor(i, r, true)
+			# Compresseur d'azote : selon la part d'azote de l'air (Titan 1, Mars 0,05).
+			if r == ColonyContent.NITROGEN and def.id == "n2_compressor":
+				rate *= planet().get("air_nitrogen", 0.0)
+			if r == ColonyContent.FOOD:
+				rate *= effect("food")
+			elif r == ColonyContent.WATER and def.id == "extractor":
+				rate *= effect("ice_water")
+			elif r == ColonyContent.MATERIALS and def.id == "kiln":
+				rate *= effect("materials")
+			outs[r] = rate
+		_rates_in[i] = ins
+		_rates_out[i] = outs
+
+
+func _invalidate_rates() -> void:
+	_rates_research = -1
 
 
 func region() -> Dictionary:
@@ -964,22 +1029,14 @@ func region_sites() -> Array[Dictionary]:
 
 
 func _output_rate(index: int, resource: String, sun: float) -> float:
-	var def := def_of(index)
-	var rate: float = def.outputs[resource] * rate_factor(index, resource, true)
+	_ensure_rates()
+	var rate: float = _rates_out[index][resource]
+	var def: Defs.Building = _defs[index]
 	if def.solar and resource == ColonyContent.ENERGY:
 		rate *= sun * (1.0 - DUST_LOSS * dust_of(index))
 		# Générateur à radio-isotopes de l'atterrisseur (Titan, comme Dragonfly) : jour et nuit.
 		if def.id == "lander":
 			rate += planet().get("lander_rtg", 0.0)
-	# Compresseur d'azote : selon la part d'azote de l'air (Titan 1, Mars 0,05).
-	if resource == ColonyContent.NITROGEN and def.id == "n2_compressor":
-		rate *= planet().get("air_nitrogen", 0.0)
-	if resource == ColonyContent.FOOD:
-		rate *= effect("food")
-	elif resource == ColonyContent.WATER and def.id == "extractor":
-		rate *= effect("ice_water")
-	elif resource == ColonyContent.MATERIALS and def.id == "kiln":
-		rate *= effect("materials")
 	return rate
 
 
@@ -1006,7 +1063,7 @@ func _update_health(satisfied: Dictionary, ds: float) -> void:
 	if planet().get("radiation", false) and dose < JUPITER_DAMAGE:
 		dose = JUPITER_DAMAGE
 		dose_cause = "jupiter"
-	var shelter := shelter_capacity()
+	var shelter := shelter_capacity() if dose > 0.0 else 0
 	for i in range(state.colonists.size() - 1, -1, -1):
 		var colonist: Dictionary = state.colonists[i]
 		var mine := loss
@@ -1093,8 +1150,8 @@ func dust_of(index: int) -> float:
 ## Panneaux (et atterrisseur) raccordés.
 func _solar_indices() -> Array[int]:
 	var list: Array[int] = []
-	for i in state.buildings.size():
-		if _connected[i] and def_of(i).solar:
+	for i in _solar:
+		if _connected[i]:
 			list.append(i)
 	return list
 
@@ -1203,8 +1260,8 @@ func _breakdowns(ds: float) -> void:
 	if breakdown_rate <= 0.0 or state.sol < BREAKDOWN_START:
 		return
 	var drew := false
-	for i in state.buildings.size():
-		if not _connected[i] or is_broken(i) or not state.buildings[i].id in ColonyContent.BREAKABLE:
+	for i in _breakable:
+		if not _connected[i] or is_broken(i):
 			continue
 		drew = true
 		if _rng.randf() < breakdown_rate * effect("breakdowns") * ds:
@@ -1581,7 +1638,7 @@ func run_autopilot(sols: float) -> String:
 	_autopilot = true
 	var simulated := 0.0
 	while simulated < sols - 1e-9:
-		var ds := minf(STEP, sols - simulated)
+		var ds := minf(AUTOPILOT_STEP, sols - simulated)
 		_step(ds)
 		simulated += ds
 		low = _vital_low()
@@ -1716,7 +1773,7 @@ func apply_offline_seconds(elapsed: float) -> Dictionary:
 	_autopilot = true
 	var simulated := 0.0
 	while simulated < sols:
-		var ds := minf(STEP, sols - simulated)
+		var ds := minf(AUTOPILOT_STEP, sols - simulated)
 		_step(ds)
 		simulated += ds
 		report.standby = _vital_low()
@@ -1752,11 +1809,14 @@ func _has_connected(def_id: String) -> bool:
 
 
 ## Toutes les sorties d'un module sont à pleine capacité (inutile de le faire tourner).
-func _outputs_full(def: Defs.Building) -> bool:
+## `memo` : réponses déjà calculées pendant ce pas, par ressource.
+func _outputs_full(def: Defs.Building, memo := {}) -> bool:
 	if def.outputs.is_empty():
 		return false
 	for r: String in def.outputs:
-		if state.amount(r) < capacity(r) - incoming.get(r, 0.0) - 0.01:
+		if not memo.has(r):
+			memo[r] = state.amount(r) >= capacity(r) - incoming.get(r, 0.0) - 0.01
+		if not memo[r]:
 			return false
 	return true
 
@@ -1795,8 +1855,10 @@ func _rebuild() -> void:
 	var old := _efficiency_avg.size()
 	_efficiency_avg.resize(n)
 	for i in range(old, n):
-		# Un dôme qu'on vient de poser est vide d'air ; au chargement, on garde l'état sauvegardé (plein).
-		_efficiency_avg[i] = 0.0 if old > 0 and def_of(i).inputs.has(ColonyContent.NITROGEN) else 1.0
+		# Un dôme qu'on vient de poser est vide d'air ; au chargement, il retrouve son air sauvegardé.
+		var dome := def_of(i).inputs.has(ColonyContent.NITROGEN)
+		_efficiency_avg[i] = float(state.buildings[i].get("air", 0.0 if old > 0 else 1.0)) if dome else 1.0
+	_invalidate_rates()
 	# Synergies : chaque module, une fois par type de synergie, si un voisin direct convient.
 	_synergies.resize(n)
 	for i in n:
@@ -1813,6 +1875,8 @@ func _rebuild() -> void:
 	_factor_cache.clear()
 	_capacity_cache.clear()
 	_autonomy_flows = {}
+	_solar.clear()
+	_breakable.clear()
 	if n == 0:
 		return
 	var queue: Array[int] = [0]
@@ -1825,3 +1889,8 @@ func _rebuild() -> void:
 				if other >= 0 and not _connected[other]:
 					_connected[other] = true
 					queue.append(other)
+	for i in n:
+		if def_of(i).solar:
+			_solar.append(i)
+		if state.buildings[i].id in ColonyContent.BREAKABLE:
+			_breakable.append(i)

@@ -149,6 +149,8 @@ static func from_dict(data: Dictionary) -> ColonyState:
 						"level": clampi(int(_num(item.get("level"), 1)), 1, 3) }
 				if item.has("dust"):
 					building.dust = clampf(_num(item.dust, 0.0), 0.0, 1.0)
+				if item.has("air"):
+					building.air = clampf(_num(item.air, 1.0), 0.0, 1.0)
 				if item.get("broken") == true:
 					building.broken = true
 				state.buildings.append(building)

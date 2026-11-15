@@ -82,12 +82,14 @@ func refresh() -> void:
 	var objective := engine.current_objective()
 	if objective == null:
 		_objective_title.text = Tr.t("Mission accomplie !")
-		_objective_text.text = Tr.t("La colonie est autonome et son retour est assuré. La suite arrive dans une prochaine version.") \
-				if engine.planet_id() == "mars" \
-				else Tr.t("Tous les objectifs de ce monde sont remplis : votre réseau de colonies tient debout. La suite arrive dans une prochaine version.")
+		var campaign := GameManager.campaign
+		if campaign != null and campaign.is_complete():
+			_objective_text.text = Tr.t("Les cinq mondes sont accomplis, de Mars à Encelade. Vos colonies continuent de tourner : à vous de les faire grandir.")
+		else:
+			_objective_text.text = Tr.t("Tous les objectifs de ce monde sont remplis. D'autres colonies ont encore du travail : passez de l'une à l'autre avec le bouton planète, en haut.")
 		_objective_bar.value = 100.0
 	else:
-		_objective_title.text = objective.title
+		_objective_title.text = Tr.t(objective.title)
 		_objective_text.text = Tr.t(objective.description) + Tr.t("\nRécompense : ") + _reward_text(objective.reward)
 		_objective_bar.value = engine.objective_progress(objective.id) * 100.0
 	var done: Array[String] = []

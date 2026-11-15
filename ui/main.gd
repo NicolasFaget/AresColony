@@ -68,6 +68,7 @@ func _ready() -> void:
 
 	GameManager.state_changed.connect(_refresh)
 	GameManager.offline_report.connect(_show_offline_report)
+	GameManager.campaign.completed.connect(_show_finale)
 	get_viewport().size_changed.connect(_layout_changed)
 	_layout_changed()
 	_refresh()
@@ -80,6 +81,8 @@ func _ready() -> void:
 		_show_offline_report(report)
 	elif _engine.state.sol < 0.35:
 		_show_welcome()
+	if GameManager.campaign.is_complete() and not GameManager.campaign.finale_shown:
+		_show_finale()
 
 
 func _build_layout() -> void:
@@ -503,7 +506,7 @@ func _on_objective_completed(objective_id: String) -> void:
 					"icon": "check", "title": Tr.t("Colonie enracinée !"),
 					"body": Tr.t("Vingt colons vivent à l'abri des radiations, nourris par une serre sur un sol vivant et ")
 							+ Tr.t("alimentés jour et nuit. Votre colonie est durable : c'est exactement ce que préparent ")
-							+ Tr.t("les agences spatiales pour les premières bases martiennes.\n\nMerci d'avoir joué, commandant !"),
+							+ Tr.t("les agences spatiales pour les premières bases martiennes.\n\nProchaine étape : le reste du Système solaire."),
 					"confirm_text": Tr.t("Continuer à jouer"),
 				})
 			if objective_id == "return":
@@ -511,7 +514,7 @@ func _on_objective_completed(objective_id: String) -> void:
 					"icon": "rocket", "title": Tr.t("Retour assuré !"),
 					"body": Tr.t("Les réservoirs du véhicule de retour sont pleins de méthane fabriqué sur Mars, comme dans le plan ")
 							+ Tr.t("Mars Direct. Votre colonie est autonome, explore les environs, et peut rentrer quand elle le veut.\n\n")
-							+ Tr.t("Bravo, commandant ! La suite arrivera dans une prochaine version."),
+							+ Tr.t("Bravo, commandant ! Prochaine étape : rendre la colonie durable."),
 					"confirm_text": Tr.t("Continuer à jouer"),
 				})
 
@@ -891,12 +894,18 @@ func _show_cargo() -> void:
 	box.add_child(UiFx.label(Tr.t("Destination"), "HeadingLabel"))
 	var group := ButtonGroup.new()
 	var refresh_ref: Array[Callable] = []
-	var targets := UiFx.hbox(6)
+	# Deux par ligne : la fenêtre garde sa largeur, quel que soit le nombre de colonies.
+	var targets := GridContainer.new()
+	targets.columns = mini(2, campaign.colonies.size() - 1)
+	targets.add_theme_constant_override("h_separation", 6)
+	targets.add_theme_constant_override("v_separation", 6)
 	for i in campaign.colonies.size():
 		if i == origin:
 			continue
 		var target := Button.new()
 		target.text = campaign.colony_name(i)
+		target.clip_text = true
+		target.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		target.toggle_mode = true
 		target.button_group = group
 		target.button_pressed = i == destination[0]
@@ -932,13 +941,21 @@ func _show_cargo() -> void:
 		var name := UiFx.label(Tr.t("Colons") if is_crew else Tr.t(ColonyContent.RESOURCE_NAMES[r]), "BodyLabel")
 		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var step := 1 if is_crew else 10
+		# `sign` : −1 ou +1 (un pas), 0 : le plus possible (réserves de la colonie, place dans la soute).
 		var change := func(sign: int) -> void:
+			var units: float = crew[0] * Campaign.COLONIST_UNITS
+			for k: String in amounts:
+				units += amounts[k]
 			if is_crew:
-				crew[0] = clampi(crew[0] + sign * step, 0, campaign.engines[origin].state.colonists.size())
+				var people: int = campaign.engines[origin].state.colonists.size()
+				var room: int = crew[0] + int((Campaign.PAYLOAD_UNITS - units) / Campaign.COLONIST_UNITS)
+				crew[0] = mini(people, maxi(room, crew[0])) if sign == 0 else clampi(crew[0] + sign * step, 0, people)
 				value.text = str(crew[0])
 			else:
 				var have := floorf(campaign.engines[origin].state.amount(r))
-				amounts[r] = clampf(amounts.get(r, 0.0) + sign * step, 0.0, have)
+				var mine: float = amounts.get(r, 0.0)
+				var top := minf(have, maxf(mine, Campaign.PAYLOAD_UNITS - units + mine))
+				amounts[r] = top if sign == 0 else clampf(mine + sign * step, 0.0, have)
 				if amounts[r] <= 0.0:
 					amounts.erase(r)
 				value.text = NumberFormatter.format(amounts.get(r, 0.0))
@@ -954,8 +971,13 @@ func _show_cargo() -> void:
 		plus.custom_minimum_size = Vector2(56, 48)
 		plus.focus_mode = Control.FOCUS_NONE
 		plus.pressed.connect(func() -> void: change.call(1))
+		var most := Button.new()
+		most.text = Tr.t("Max")
+		most.custom_minimum_size = Vector2(72, 48)
+		most.focus_mode = Control.FOCUS_NONE
+		most.pressed.connect(func() -> void: change.call(0))
 		var icon := UiFx.image(UiFx.icon("person" if is_crew else r), 24, Palette.TEXT if is_crew else Palette.resource_color(r))
-		box.add_child(UiFx.hbox(8, [icon, name, minus, value, plus]))
+		box.add_child(UiFx.hbox(8, [icon, name, minus, value, plus, most]))
 	launch.theme_type_variation = "GoldButton"
 	launch.text = Tr.t("Lancer la fusée")
 	launch.custom_minimum_size = Vector2(0, 64)
@@ -975,6 +997,29 @@ func _show_cargo() -> void:
 	}))
 
 
+## Fin de la campagne : les cinq mondes sont accomplis. Bilan, montré une seule fois.
+func _show_finale() -> void:
+	var campaign := GameManager.campaign
+	if campaign.finale_shown:
+		return
+	campaign.finale_shown = true
+	GameManager.save()
+	AudioManager.play("milestone")
+	GameManager.vibrate(60)
+	var totals := campaign.totals()
+	Modal.open(_modal_layer, {
+		"icon": "planet", "title": Tr.t("Campagne accomplie !"),
+		"body": Tr.t("De Jezero aux geysers d'Encelade, vos colonies vivent sur cinq mondes et se ravitaillent entre elles. ")
+				+ Tr.t("Chaque étape suivait les plans des agences spatiales et ce que les sondes nous ont appris.\n\n")
+				+ Tr.t("• %s sols depuis l'atterrissage\n") % NumberFormatter.format(roundf(totals.sols))
+				+ Tr.t("• %d colonies, %d colons\n") % [totals.colonies, totals.colonists]
+				+ Tr.t("• %d cargaisons livrées\n") % totals.deliveries
+				+ Tr.t("• %d fiches lues sur %d, %d bonnes réponses aux quiz\n\n") % [totals.cards, totals.cards_total, totals.quiz]
+				+ Tr.t("Merci d'avoir joué, commandant ! Vos colonies continuent de tourner."),
+		"confirm_text": Tr.t("Continuer à jouer"),
+	})
+
+
 ## Début d'une nouvelle ère : ce qui change et ce qu'il faut viser.
 func _on_era_started(era: int) -> void:
 	AudioManager.play("milestone")
@@ -986,7 +1031,7 @@ func _on_era_started(era: int) -> void:
 					+ Tr.t("• Recherchez puis construisez un astroport.\n")
 					+ Tr.t("• Fondez une deuxième colonie sur Mars (bouton planète, en haut).\n")
 					+ Tr.t("• Reliez vos colonies par des cargaisons.\n\n")
-					+ Tr.t("Ensuite : Cérès, puis Titan."),
+					+ Tr.t("Ensuite : Cérès, Titan, Europe, puis Encelade."),
 			"confirm_text": Tr.t("En route !"),
 		})
 		return
@@ -1042,7 +1087,7 @@ func _show_expeditions() -> void:
 	if not _engine.state.expedition.is_empty():
 		var left: float = _engine.state.expedition.until - _engine.state.sol
 		var away := UiFx.paragraph(Tr.t("Le rover est en route vers « %s ». Retour dans %s sol%s.") % [
-				_engine.site_by_id(_engine.state.expedition.site).name, NumberFormatter.format(maxf(0.0, left)),
+				Tr.t(_engine.site_by_id(_engine.state.expedition.site).name), NumberFormatter.format(maxf(0.0, left)),
 				"s" if left >= 2.0 else ""], "BodyLabel")
 		away.add_theme_color_override("font_color", Palette.FAME)
 		box.add_child(away)
@@ -1212,7 +1257,7 @@ func _show_synergies() -> void:
 	var list := UiFx.vbox(14)
 	for synergy: Dictionary in ColonyContent.SYNERGIES:
 		var pair := Tr.t("%s + %s") % [Tr.t(_engine.building_defs[synergy.building].name), Tr.t(_engine.building_defs[synergy.neighbor].name)]
-		var title := UiFx.label("✦ " + synergy.name, "HeadingLabel")
+		var title := UiFx.label("✦ " + Tr.t(synergy.name), "HeadingLabel")
 		title.add_theme_color_override("font_color", SYNERGY_COLOR)
 		var effect := UiFx.paragraph(Tr.t("%s → %s") % [pair, Tr.t(synergy.effect)], "BodyLabel")
 		list.add_child(UiFx.vbox(2, [title, effect, UiFx.paragraph(synergy.why, "SmallLabel")]))

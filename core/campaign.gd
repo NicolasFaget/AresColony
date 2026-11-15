@@ -8,6 +8,8 @@ extends RefCounted
 signal shipment_arrived(shipment: Dictionary)
 ## Une nouvelle colonie vient d'être fondée (index dans `colonies`).
 signal colony_founded(index: int)
+## Les cinq mondes sont accomplis (tous les objectifs d'une colonie sur chacun) : fin de la campagne.
+signal completed
 
 const FORMAT_VERSION := 2
 ## Les colonies en arrière-plan avancent par paquets (pas besoin de les calculer à chaque image).
@@ -40,6 +42,8 @@ var time := 0.0
 var shipments: Array[Dictionary] = []
 var next_shipment_id := 1
 var deliveries := 0
+## Le bilan de fin de campagne a été montré (une seule fois).
+var finale_shown := false
 
 ## Colonies en veille sécurisée (index -> ressource vitale trop basse).
 var standby := {}
@@ -427,9 +431,40 @@ func _add_colony(state: ColonyState, existing: ColonyEngine = null) -> int:
 	colony.research_completed.connect(_on_knowledge_gained)
 	colony.card_unlocked.connect(_on_knowledge_gained)
 	colony.card_read.connect(_on_card_read)
+	colony.objective_completed.connect(_on_objective_completed)
 	engines.append(colony)
 	_update_info()
 	return engines.size() - 1
+
+
+func _on_objective_completed(_id: String) -> void:
+	if not finale_shown and is_complete():
+		completed.emit()
+
+
+## Mondes accomplis : une colonie y a atteint tous ses objectifs (dans l'ordre de la campagne).
+func worlds_done() -> Array[String]:
+	var done: Array[String] = []
+	for planet: String in ColonyContent.PLANET_ORDER:
+		for colony in engines:
+			if colony.planet_id() == planet and not colony.objectives.is_empty() 					and colony.objectives.all(func(o: Defs.Objective) -> bool: return colony.state.objectives_done.has(o.id)):
+				done.append(planet)
+				break
+	return done
+
+
+func is_complete() -> bool:
+	return worlds_done().size() == ColonyContent.PLANET_ORDER.size()
+
+
+## Bilan de la campagne, pour l'écran de fin.
+func totals() -> Dictionary:
+	var colonists := 0
+	for state in colonies:
+		colonists += state.colonists.size()
+	var first := engines[0]
+	return { "sols": time, "colonies": colonies.size(), "colonists": colonists, "deliveries": deliveries,
+			"cards": first.state.cards_read.size(), "cards_total": first.cards.size(), "quiz": first.quiz_score() }
 
 
 func _on_knowledge_gained(_id: String) -> void:
@@ -476,6 +511,7 @@ func to_dict() -> Dictionary:
 	return {
 		"version": FORMAT_VERSION, "colonies": list, "active": active, "time": time,
 		"shipments": shipments.duplicate(true), "next_shipment_id": next_shipment_id, "deliveries": deliveries,
+		"finale_shown": finale_shown,
 	}
 
 
@@ -493,6 +529,7 @@ static func from_dict(data: Dictionary) -> Campaign:
 	campaign.time = float(data.get("time", campaign.colonies[0].sol))
 	campaign.next_shipment_id = int(data.get("next_shipment_id", 1))
 	campaign.deliveries = int(data.get("deliveries", 0))
+	campaign.finale_shown = data.get("finale_shown", false) == true
 	var list: Variant = data.get("shipments")
 	if list is Array:
 		for item: Variant in list:
