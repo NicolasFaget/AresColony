@@ -750,6 +750,67 @@ static func rock_material(color := ROCK, dust := 0.55) -> Material:
 	return _materials[key]
 
 
+static var _baked := {}
+
+
+## Modèle fusionné d'un module, mis en cache : les modules identiques partagent leurs maillages, et
+## une pose ne reconstruit plus toute la colonie. Le maillage opaque reçoit des niveaux de détail :
+## vu de loin, le moteur dessine une version simplifiée (et ses ombres aussi).
+static func baked_building(building_id: String) -> Node3D:
+	if not _baked.has(building_id):
+		var model := bake(building(building_id))
+		var parts := []
+		for child in model.get_children():
+			var part := child as MeshInstance3D
+			var mesh: Mesh = part.mesh
+			if part.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+				mesh = with_lods(mesh)
+			parts.append([mesh, part.cast_shadow])
+		model.free()
+		_baked[building_id] = parts
+	var root := Node3D.new()
+	root.name = building_id
+	for part: Array in _baked[building_id]:
+		var instance := MeshInstance3D.new()
+		instance.mesh = part[0]
+		instance.cast_shadow = part[1]
+		root.add_child(instance)
+	return root
+
+
+## Copie d'un maillage avec des niveaux de détail simplifiés (choisis selon la taille à l'écran).
+static func with_lods(mesh: Mesh) -> Mesh:
+	var importer := ImporterMesh.new()
+	for s in mesh.get_surface_count():
+		importer.add_surface(mesh.surface_get_primitive_type(s), mesh.surface_get_arrays(s), [], {}, mesh.surface_get_material(s))
+	importer.generate_lods(25.0, 60.0, [])
+	return importer.get_mesh()
+
+
+## Caillou : un octaèdre à faces planes (8 triangles), aplati et tourné par son instance.
+static func pebble_mesh() -> Mesh:
+	var tips := [Vector3.RIGHT, Vector3.LEFT, Vector3.UP, Vector3.DOWN, Vector3.BACK, Vector3.FORWARD]
+	var faces := [[0, 2, 4], [4, 2, 1], [1, 2, 5], [5, 2, 0], [4, 3, 0], [1, 3, 4], [5, 3, 1], [0, 3, 5]]
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for face: Array in faces:
+		var a: Vector3 = tips[face[0]]
+		var b: Vector3 = tips[face[1]]
+		var c: Vector3 = tips[face[2]]
+		# Godot dessine les faces vues dans le sens des aiguilles d'une montre : (c − a) × (b − a)
+		# doit pointer vers l'extérieur.
+		var normal := (c - a).cross(b - a).normalized()
+		if normal.dot(a + b + c) < 0.0:
+			var swap := b
+			b = c
+			c = swap
+			normal = -normal
+		for v in [a, b, c]:
+			st.set_normal(normal)
+			st.add_vertex(v)
+	return st.commit()
+
+
 ## Fusionne toutes les pièces d'un modèle en un seul maillage (une surface par matériau) :
 ## bien moins d'objets à dessiner, ce qui compte beaucoup sur téléphone.
 ## Les pièces transparentes forment un second maillage, qui ne projette pas d'ombre.
@@ -775,6 +836,8 @@ static func bake(root: Node3D) -> Node3D:
 	var clear := ArrayMesh.new()
 	for mat in order:
 		var target := clear if mat is BaseMaterial3D and (mat as BaseMaterial3D).transparency != BaseMaterial3D.TRANSPARENCY_DISABLED else opaque
+		# Sommets partagés (indexés) : moins de sommets à transformer, et simplifiable en niveaux de détail.
+		tools[mat].index()
 		tools[mat].commit(target)
 		target.surface_set_material(target.get_surface_count() - 1, mat)
 	for mesh in [opaque, clear]:

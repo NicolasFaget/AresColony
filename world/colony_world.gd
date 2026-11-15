@@ -135,7 +135,7 @@ func _rebuild_buildings() -> void:
 	for i in _engine.state.buildings.size():
 		var def := _engine.def_of(i)
 		var model_id := "garage_empty" if def.id == "garage" and not _engine.state.expedition.is_empty() else def.id
-		var node := ModelBuilder.bake(_corridor(i) if def.id == "link" else ModelBuilder.building(model_id))
+		var node := ModelBuilder.bake(_corridor(i)) if def.id == "link" else ModelBuilder.baked_building(model_id)
 		node.position = footprint_center(_engine.cell_of(i), def.size)
 		add_child(node)
 		_building_nodes.append(node)
@@ -822,6 +822,9 @@ func _build_terrain() -> void:
 	var terrain := MeshInstance3D.new()
 	terrain.mesh = st.commit()
 	terrain.material_override = mat
+	# Le sol reçoit les ombres sans en projeter : ses collines douces n'en font presque pas, et
+	# c'était 29 000 triangles de plus à dessiner dans la carte des ombres.
+	terrain.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(terrain)
 	_build_pebbles()
 
@@ -849,11 +852,8 @@ func _vertex(x: float, z: float) -> Vector3:
 
 ## Milliers de petits cailloux (une seule instance multiple : peu coûteux).
 func _build_pebbles() -> void:
-	var mesh := SphereMesh.new()
-	mesh.radius = 1.0
-	mesh.height = 2.0
-	mesh.radial_segments = 5
-	mesh.rings = 2
+	# Cailloux minuscules : un octaèdre (8 triangles) suffit, au lieu d'une sphère (30).
+	var mesh := ModelBuilder.pebble_mesh()
 	var multimesh := MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D
 	multimesh.mesh = mesh
@@ -900,8 +900,8 @@ func _build_rocks() -> void:
 	var mesh := SphereMesh.new()
 	mesh.radius = 1.0
 	mesh.height = 2.0
-	mesh.radial_segments = 7
-	mesh.rings = 4
+	mesh.radial_segments = 6
+	mesh.rings = 3
 	var multimesh := MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D
 	multimesh.mesh = mesh
