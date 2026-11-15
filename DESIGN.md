@@ -266,6 +266,12 @@ fourchettes ; mettre ce tableau à jour après chaque rééquilibrage.
   moindre contrôle raté.
 - Absence : l'horloge de la campagne avance du temps écoulé, même si la colonie affichée se met en
   veille (les fusées continuent leur route).
+- Vue du Système solaire (bouton planète, `SolarView` + `world/solar_system.gd`) : Soleil, Terre et
+  les mondes du jeu dans un SubViewport à part (la colonie n'est plus dessinée pendant ce temps).
+  Les planètes tournent à leur vraie période en sols de jeu (Mars 22,6, Cérès 55, Jupiter 142,
+  Saturne 354 : les périodes synodiques des routes en découlent) ; tailles, distances et lunes ne
+  sont pas à l'échelle. Étiquettes de colonies à toucher (fiche, « Y aller »), fusées en vol sur
+  leur trajet, routes vertes quand la fenêtre de tir est ouverte. La liste reste derrière « Liste ».
 - Fin de campagne : quand une colonie de chacun des cinq mondes a rempli tous ses objectifs
   (`is_complete`), le signal `completed` ouvre un bilan (sols, colonies, colons, cargaisons, fiches,
   quiz), montré une seule fois (`finale_shown`, sauvegardé). La partie continue ensuite.

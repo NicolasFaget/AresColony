@@ -82,6 +82,13 @@ func _run() -> void:
 	for modal in main._modal_layer.get_children():
 		modal.queue_free()
 	await process_frame
+	# Vue du Système solaire : elle remplace la colonie à l'écran, puis la rend en se fermant.
+	main._show_network()
+	await _frames(10)
+	_check(is_instance_valid(main._solar) and not main._world.visible, "système solaire ouvert, colonie masquée")
+	main.on_back()
+	await _frames(5)
+	_check(not is_instance_valid(main._solar) and main._world.visible, "retour : système solaire fermé, colonie affichée")
 	main._show_settings()
 	await process_frame
 	_check(_press(main._modal_layer.get_child(-1), "Menu principal"), "bouton Menu principal trouvé")

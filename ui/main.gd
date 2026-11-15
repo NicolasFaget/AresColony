@@ -12,6 +12,8 @@ const CHATTER_EVERY := 1.5
 
 var _engine: ColonyEngine
 var _world: ColonyWorld
+## Vue du Système solaire, quand elle est ouverte.
+var _solar: SolarView
 var _status: StatusPanel
 var _alert: AlertBanner
 var _coach: CoachCard
@@ -554,6 +556,9 @@ func on_back() -> void:
 		if child is Modal:
 			child.close()
 			return
+	if is_instance_valid(_solar):
+		_close_network()
+		return
 	GameManager.open_menu()
 
 
@@ -722,8 +727,36 @@ func _on_colony_founded(index: int) -> void:
 	})
 
 
-## Réseau de colonies : chaque colonie, les fusées en vol, et les actions de l'astroport.
+## Réseau de colonies, vu dans le Système solaire (voir SolarView). Les fenêtres s'ouvrent par-dessus.
 func _show_network() -> void:
+	if is_instance_valid(_solar):
+		return
+	AudioManager.play("whoosh")
+	_solar = SolarView.new(GameManager.campaign)
+	_solar.inset_top = _safe_area.get_theme_constant("margin_top")
+	_solar.inset_bottom = _safe_area.get_theme_constant("margin_bottom")
+	_solar.closed.connect(_close_network)
+	_solar.colony_chosen.connect(func(index: int) -> void:
+		AudioManager.play("whoosh")
+		GameManager.switch_colony(index))
+	_solar.cargo_requested.connect(_show_cargo)
+	_solar.founding_requested.connect(_show_founding)
+	_solar.list_requested.connect(_show_network_list)
+	add_child(_solar)
+	move_child(_solar, _modal_layer.get_index())
+	# La colonie n'est plus dessinée tant que la vue est ouverte (une seule scène 3D à la fois).
+	_world.visible = false
+
+
+func _close_network() -> void:
+	if is_instance_valid(_solar):
+		_solar.queue_free()
+	_solar = null
+	_world.visible = true
+
+
+## Réseau de colonies en liste : chaque colonie, les fusées en vol, et les actions de l'astroport.
+func _show_network_list() -> void:
 	var campaign := GameManager.campaign
 	var holder: Array[Modal] = []
 	var box := UiFx.vbox(10)
