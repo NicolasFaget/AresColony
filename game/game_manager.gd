@@ -287,7 +287,9 @@ func _sync_renderer() -> void:
 		return
 	if quality_level() == 0:
 		var config := ConfigFile.new()
+		# La variante « .mobile » (définie par défaut dans Godot) l'emporte sur la clé de base.
 		config.set_value("rendering", "renderer/rendering_method", "gl_compatibility")
+		config.set_value("rendering", "renderer/rendering_method.mobile", "gl_compatibility")
 		config.save(RENDER_OVERRIDE_PATH)
 	elif FileAccess.file_exists(RENDER_OVERRIDE_PATH):
 		DirAccess.remove_absolute(RENDER_OVERRIDE_PATH)
