@@ -109,24 +109,41 @@ func _build_layout() -> void:
 		child.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_continue.add_child(continue_box)
 
+	# L'essentiel en grand (continuer, nouvelle colonie), le reste en petit sur une ligne.
+	# Pas de « Quitter » : le bouton Retour du téléphone (ou la fenêtre sur PC) s'en charge.
+	var small: Array[Button] = [_menu_button(Tr.t("Sauvegardes"), "SegmentButton", _show_slots),
+			_menu_button(Tr.t("Réglages"), "SegmentButton", _show_settings), _menu_button(Tr.t("À propos"), "SegmentButton", _show_about)]
+	for b in small:
+		b.custom_minimum_size.y = 54
+		b.add_theme_font_size_override("font_size", 19)
 	var buttons := UiFx.vbox(12, [
 		_continue,
 		_menu_button(Tr.t("Nouvelle colonie"), "GoldButton", _on_new_game),
-		_menu_button(Tr.t("Sauvegardes"), "Button", _show_slots),
-		UiFx.hbox(12, [_menu_button(Tr.t("Réglages"), "Button", _show_settings), _menu_button(Tr.t("À propos"), "Button", _show_about),
-				_menu_button(Tr.t("Quitter"), "Button", _quit)]),
+		UiFx.hbox(8, small),
 	])
+	# Version de développement : parties de test, repliées derrière un petit bouton.
 	if OS.is_debug_build():
-		buttons.add_child(UiFx.label(Tr.t("Parties de test"), "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER))
+		var tests_box := UiFx.vbox(8)
+		tests_box.visible = false
 		for row: Array in [[["ere1", Tr.t("Ère 1")], ["ere2", Tr.t("Ère 2")], ["ere3", Tr.t("Ère 3")], ["ere4", Tr.t("Ère 4")]],
 				[["ceres", Tr.t("Cérès")], ["titan", Tr.t("Titan")], ["europa", Tr.t("Europe")], ["enceladus", Tr.t("Encelade")]]]:
 			var tests := UiFx.hbox(8, [])
 			for test: Array in row:
-				tests.add_child(_menu_button(test[1], "Button", _on_test_game.bind(test[0])))
-			buttons.add_child(tests)
-	for row in buttons.get_children():
-		if row is HBoxContainer:
-			for b in row.get_children():
+				var b := _menu_button(test[1], "Button", _on_test_game.bind(test[0]))
+				b.custom_minimum_size.y = 54
+				tests.add_child(b)
+			tests_box.add_child(tests)
+		var toggle := Button.new()
+		toggle.flat = true
+		toggle.text = Tr.t("Parties de test")
+		toggle.focus_mode = Control.FOCUS_NONE
+		toggle.add_theme_color_override("font_color", Palette.TEXT_DIM)
+		toggle.pressed.connect(func() -> void: tests_box.visible = not tests_box.visible)
+		buttons.add_child(toggle)
+		buttons.add_child(tests_box)
+	for row in buttons.find_children("*", "HBoxContainer", true, false):
+		for b in row.get_children():
+			if b is Button:
 				b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var card := UiFx.panel("WindowPanel", buttons)
 
@@ -304,11 +321,6 @@ func _confirm_erase(slot: String, then_start: bool, list_modal: Modal) -> void:
 				_refresh()
 				_show_slots.call_deferred(),
 	})
-
-
-func _quit() -> void:
-	GameManager.save()
-	get_tree().quit()
 
 
 func _show_settings() -> void:

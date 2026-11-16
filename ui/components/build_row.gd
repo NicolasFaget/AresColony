@@ -21,19 +21,21 @@ func _ready() -> void:
 	thumb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 	var title := UiFx.label(def.name, "HeadingLabel")
-	var size_label := UiFx.label(Tr.t("%d×%d") % [def.size.x, def.size.y], "CaptionLabel")
+	# L'essentiel seulement : production et consommation, les colons logés ; le stockage
+	# n'apparaît que pour les réservoirs (le détail complet est dans la fiche du module posé).
 	var effects := UiFx.hbox(10)
 	for r: String in def.outputs:
 		effects.add_child(_effect(r, def.outputs[r], true))
 	for r: String in def.inputs:
 		effects.add_child(_effect(r, def.inputs[r], false))
-	for r: String in def.storage:
-		effects.add_child(_effect(r, def.storage[r], true, Tr.t("stock ")))
 	if def.housing > 0:
 		effects.add_child(_effect_icon("person", Palette.TEXT, Tr.t("+%d colons") % def.housing))
+	if effects.get_child_count() == 0:
+		for r: String in def.storage:
+			effects.add_child(_effect(r, def.storage[r], true, Tr.t("stock ")))
 	_lock = UiFx.label("", "SmallLabel")
 	_lock.add_theme_color_override("font_color", Palette.WARNING)
-	var info := UiFx.vbox(4, [UiFx.hbox(8, [title, size_label]), effects, _lock])
+	var info := UiFx.vbox(4, [title, effects, _lock])
 	info.alignment = BoxContainer.ALIGNMENT_CENTER
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 

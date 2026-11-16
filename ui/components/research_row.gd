@@ -9,6 +9,7 @@ var _status: Label
 var _bar: ProgressBar
 var _button: Button
 var _cost: Label
+var _summary: Label
 
 
 func _init(p_research: Defs.Research) -> void:
@@ -24,7 +25,9 @@ func _ready() -> void:
 	_bar.show_percentage = false
 	_bar.custom_minimum_size.y = 10
 	_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var info := UiFx.vbox(4, [title, UiFx.paragraph(research.summary, "BodyLabel"), _status, _bar])
+	# La description ne s'affiche que pour ce qu'on peut lancer ou ce qui est en cours.
+	_summary = UiFx.paragraph(research.summary, "BodyLabel")
+	var info := UiFx.vbox(4, [title, _summary, _status, _bar])
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	_button = Button.new()
@@ -52,6 +55,7 @@ func refresh() -> void:
 	theme_type_variation = "RowLocked" if state in ["locked", "excluded"] else "Row"
 	_bar.visible = state == "active"
 	_button.visible = state == "available"
+	_summary.visible = state in ["available", "active"]
 	match state:
 		"done":
 			_status.text = Tr.t("✓ Terminée")

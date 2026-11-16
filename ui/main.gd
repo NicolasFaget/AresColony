@@ -19,6 +19,7 @@ var _alert: AlertBanner
 var _coach: CoachCard
 var _window: GameWindow
 var _news: NewsTicker
+var _message_slot: Control
 var _safe_area: MarginContainer
 var _pages: Array[Page] = []
 var _research_page: ResearchPage
@@ -106,12 +107,26 @@ func _build_layout() -> void:
 	_status = StatusPanel.new()
 	_status.settings_requested.connect(_show_settings)
 	_status.network_requested.connect(_show_network)
-	_status.photo_requested.connect(_show_photo_mode)
 	_status.resource_requested.connect(_show_resource)
 	root.add_child(_status)
+	# Une seule ligne de messages sous la barre : l'alerte, ou une nouvelle pendant quelques secondes.
+	_message_slot = Control.new()
+	_message_slot.custom_minimum_size.y = 44
+	_message_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_message_slot)
 	_alert = AlertBanner.new()
-	_alert.action_requested.connect(_go_to)
-	root.add_child(_alert)
+	_alert.action_requested.connect(func(tab: int, target: String) -> void:
+		if not _alert.advice().is_empty():
+			_news.post(_alert.advice())
+		_go_to(tab, target))
+	_message_slot.add_child(_alert)
+	_alert.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_news = NewsTicker.new()
+	_news.showing_changed.connect(func(on: bool) -> void:
+		_alert.set_muted(on)
+		_update_message_slot())
+	_message_slot.add_child(_news)
+	_news.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var spacer := UiFx.spacer()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(spacer)
@@ -153,9 +168,6 @@ func _build_layout() -> void:
 		page.visible = false
 	_pages[0].visible = true
 
-	_news = NewsTicker.new()
-	add_child(_news)
-	_news.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 
 	var fx := Control.new()
 	fx.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -295,17 +307,17 @@ func _layout_changed() -> void:
 	_safe_area.add_theme_constant_override("margin_bottom", int(bottom) + MARGIN)
 	_window.custom_minimum_size.y = 0.0 if _window.collapsed else size.y * WINDOW_SHARE
 	await get_tree().process_frame
-	var covered_top := (_alert if _alert.visible else _status).get_global_rect().end.y
+	var covered_top := _status.get_global_rect().end.y
 	var bottom_top := _window.get_global_rect().position.y
 	for panel: Control in [_placement_bar, _coach]:
 		if panel.visible:
 			bottom_top = minf(bottom_top, panel.get_global_rect().position.y)
 	var covered_bottom := size.y - bottom_top
-	_news.offset_left = MARGIN + 6
-	_news.offset_right = -MARGIN - 6
-	_news.offset_bottom = bottom_top - size.y - 8
-	_news.offset_top = _news.offset_bottom - 50
 	_world.rig.covered_fraction = clampf((covered_bottom - covered_top) / size.y, -0.5, 0.9)
+
+
+func _update_message_slot() -> void:
+	_message_slot.visible = _alert.has_alert() or _news.visible
 
 
 func _refresh() -> void:
@@ -330,9 +342,10 @@ func _refresh() -> void:
 func _refresh_guidance() -> void:
 	var alerts := ColonyAdvisor.alerts(_engine)
 	var top: Dictionary = alerts[0] if not alerts.is_empty() else {}
-	var was_visible := _alert.visible
-	var was_danger: bool = _alert.visible and _alert._alert.get("level") == "danger"
+	var was_visible := _alert.has_alert()
+	var was_danger: bool = _alert.has_alert() and _alert._alert.get("level") == "danger"
 	_alert.show_alert(top, maxi(0, alerts.size() - 1))
+	_update_message_slot()
 	if not top.is_empty() and top.level == "danger" and not was_danger:
 		AudioManager.play("alert")
 		GameManager.vibrate(40)
@@ -346,7 +359,7 @@ func _refresh_guidance() -> void:
 			_news.post(Tr.t("Guide terminé : votre colonie respire, boit et mange. Bravo !"))
 		else:
 			_news.post(Tr.t("Guide de l'ère terminé. Bravo, commandant !"))
-	if _alert.visible != was_visible or _coach.visible != coach_was_visible:
+	if _alert.has_alert() != was_visible or _coach.visible != coach_was_visible:
 		_layout_changed.call_deferred()
 
 
@@ -1601,7 +1614,19 @@ func _show_settings() -> void:
 		AudioManager.play("click")
 		holder[0].close()
 		GameManager.open_menu())
+	var photo := Button.new()
+	photo.text = Tr.t("Mode photo")
+	photo.icon = UiFx.icon("camera")
+	photo.expand_icon = true
+	photo.add_theme_constant_override("icon_max_width", 28)
+	photo.custom_minimum_size.y = 60
+	photo.focus_mode = Control.FOCUS_NONE
+	photo.pressed.connect(func() -> void:
+		AudioManager.play("click")
+		holder[0].close()
+		_show_photo_mode())
 	var extra := SettingsPanel.build()
+	extra.add_child(photo)
 	extra.add_child(UiFx.paragraph(Tr.t("Glissez pour parcourir le cratère, pincez (ou molette) pour zoomer.\n")
 			+ Tr.t("Touchez un module pour le détail, une ressource pour son explication.\n")
 			+ Tr.t("Hors-ligne : pilote automatique prudent, 8 h au plus, sans tempête."),
@@ -1751,7 +1776,6 @@ func _show_photo_mode() -> void:
 	_stop_placement()
 	_world.set_photo_mode(true)
 	_safe_area.visible = false
-	_news.visible = false
 	get_viewport().scaling_3d_scale = _world.render_scale(true)
 	var hint := UiFx.label(Tr.t("Glissez pour tourner, pincez pour zoomer."), "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	hint.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
@@ -1791,7 +1815,6 @@ func _close_photo_mode() -> void:
 	_photo_bar = null
 	_world.set_photo_mode(false)
 	_safe_area.visible = true
-	_news.visible = true
 	get_viewport().scaling_3d_scale = _world.render_scale()
 	_layout_changed()
 

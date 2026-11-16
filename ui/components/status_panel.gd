@@ -1,33 +1,37 @@
 class_name StatusPanel
 extends PanelContainer
-## Barre du haut, compacte : heure et météo, lecture/pause, vitesse, réglages, puis les six
-## ressources (valeur et tendance). Toucher une ressource ouvre son explication détaillée.
+## Barre du haut, sur une seule ligne : météo, les cinq ressources vitales (valeur et tendance),
+## lecture/pause, vitesse, réglages. Le bouton « + » déplie une seconde ligne : sol et heure, les
+## autres ressources (données, méthane, azote), le Système solaire. Toucher une ressource ouvre
+## son explication détaillée.
 
 signal settings_requested
 signal network_requested
-signal photo_requested
 signal resource_requested(resource: String)
 
 const SPEED_STEPS: Array[int] = [1, 2, 4]
+const VITAL := [ColonyContent.ENERGY, ColonyContent.OXYGEN, ColonyContent.WATER, ColonyContent.FOOD, ColonyContent.MATERIALS]
+const EXTRA := [ColonyContent.DATA, ColonyContent.METHANE, ColonyContent.NITROGEN]
 
 var _clock: Label
 var _weather_icon: TextureRect
 var _play: Button
 var _network: Button
 var _speed: Button
+var _more: Button
+var _more_row: Control
 var _values := {}
 var _trends := {}
 var _chips := {}
 var _last_speed := 1
+var expanded := false
 
 
 func _ready() -> void:
 	theme_type_variation = "WindowPanel"
 
-	_weather_icon = UiFx.image(UiFx.icon("sun"), 26, Palette.WARNING)
-	_clock = UiFx.label("", "HeadingLabel")
-	_clock.add_theme_font_size_override("font_size", 21)
-	_clock.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_weather_icon = UiFx.image(UiFx.icon("sun"), 24, Palette.WARNING)
+	_weather_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 	_play = _icon_button("pause", func() -> void:
 		var engine := GameManager.engine
@@ -36,19 +40,43 @@ func _ready() -> void:
 		var engine := GameManager.engine
 		var index := SPEED_STEPS.find(maxi(engine.state.speed, 1))
 		engine.set_speed(SPEED_STEPS[(index + 1) % SPEED_STEPS.size()]))
-	_speed.custom_minimum_size.x = 64
-	_network = _icon_button("planet", func() -> void: network_requested.emit())
-	_network.add_theme_color_override("icon_normal_color", Palette.MONEY)
-	var photo := _icon_button("camera", func() -> void: photo_requested.emit())
-	photo.add_theme_color_override("icon_normal_color", Palette.TEXT_MUTED)
+	_speed.custom_minimum_size.x = 50
 	var settings := _icon_button("gear", func() -> void: settings_requested.emit())
 	settings.add_theme_color_override("icon_normal_color", Palette.TEXT_MUTED)
+	_more = _icon_button("", toggle_expanded)
+	_more.custom_minimum_size.x = 40
+	_more.text = "+"
 
-	var resources := UiFx.hbox(4)
-	for r in ColonyContent.RESOURCES:
-		resources.add_child(_resource_chip(r))
+	var main_row := UiFx.hbox(4, [_weather_icon])
+	for r: String in VITAL:
+		main_row.add_child(_resource_chip(r))
+	for b in [_more, _play, _speed, settings]:
+		main_row.add_child(b)
 
-	add_child(UiFx.vbox(6, [UiFx.hbox(8, [_weather_icon, _clock, _network, photo, _play, _speed, settings]), resources]))
+	_clock = UiFx.label("", "SmallLabel")
+	_clock.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+	_network = _icon_button("planet", func() -> void: network_requested.emit())
+	_network.add_theme_color_override("icon_normal_color", Palette.MONEY)
+	_clock.custom_minimum_size.x = 150
+	_more_row = UiFx.hbox(6, [_clock])
+	for r: String in EXTRA:
+		var chip := _resource_chip(r)
+		chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		chip.custom_minimum_size.x = 96
+		_more_row.add_child(chip)
+	var spacer := UiFx.spacer()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_more_row.add_child(spacer)
+	_more_row.add_child(_network)
+	_more_row.visible = false
+
+	add_child(UiFx.vbox(4, [main_row, _more_row]))
+	refresh()
+
+
+func toggle_expanded() -> void:
+	expanded = not expanded
+	_more_row.visible = expanded
 	refresh()
 
 
@@ -82,6 +110,7 @@ func refresh() -> void:
 			or engine.state.amount(ColonyContent.METHANE) > 0.0 or engine.capacity(ColonyContent.METHANE) > 0.0
 	_chips[ColonyContent.NITROGEN].visible = engine.state.amount(ColonyContent.NITROGEN) > 0.0 \
 			or engine.capacity(ColonyContent.NITROGEN) > 0.0
+	var extra_low := false
 	for r in ColonyContent.RESOURCES:
 		_values[r].text = NumberFormatter.format(engine.state.amount(r))
 		var flow: float = flows[r]
@@ -91,13 +120,17 @@ func refresh() -> void:
 		# Réserve vitale qui s'épuise bientôt : la valeur passe en rouge.
 		var low: bool = days.get(r, INF) < ColonyAdvisor.WARNING_SOLS
 		_values[r].add_theme_color_override("font_color", Palette.DANGER if low else Palette.TEXT)
+		extra_low = extra_low or (low and r in EXTRA and _chips[r].visible)
+	# Ligne repliée : le « + » prévient si une des ressources cachées va manquer.
+	_more.text = "−" if expanded else "+"
+	_more.add_theme_color_override("font_color", Palette.DANGER if extra_low and not expanded else Palette.TEXT_MUTED)
 
 
 func _icon_button(icon_name: String, action: Callable) -> Button:
 	var button := Button.new()
 	button.theme_type_variation = "SegmentButton"
 	button.focus_mode = Control.FOCUS_NONE
-	button.custom_minimum_size = Vector2(50, 46)
+	button.custom_minimum_size = Vector2(46, 44)
 	if not icon_name.is_empty():
 		button.icon = UiFx.icon(icon_name)
 		button.expand_icon = true
@@ -111,16 +144,17 @@ func _icon_button(icon_name: String, action: Callable) -> Button:
 
 func _resource_chip(resource: String) -> Control:
 	var value := UiFx.label("", "NumberLabel")
-	value.add_theme_font_size_override("font_size", 18)
+	value.add_theme_font_size_override("font_size", 17)
 	var trend := UiFx.label("", "CaptionLabel")
-	trend.add_theme_font_size_override("font_size", 11)
+	trend.add_theme_font_size_override("font_size", 10)
 	_values[resource] = value
 	_trends[resource] = trend
-	var content := UiFx.hbox(3, [UiFx.image(UiFx.icon(resource), 20, Palette.resource_color(resource)), value, trend])
+	var content := UiFx.hbox(2, [UiFx.image(UiFx.icon(resource), 18, Palette.resource_color(resource)), value, trend])
 	content.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var chip := Button.new()
 	chip.theme_type_variation = "SegmentButton"
-	chip.custom_minimum_size = Vector2(0, 40)
+	chip.custom_minimum_size = Vector2(0, 44)
 	chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	chip.focus_mode = Control.FOCUS_NONE
 	chip.add_child(content)

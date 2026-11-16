@@ -1,6 +1,9 @@
 class_name NewsTicker
 extends PanelContainer
-## Messages éphémères : un à la fois, qui apparaît en fondu puis s'efface.
+## Messages éphémères : un à la fois, qui apparaît en fondu puis s'efface. Il partage la ligne
+## de l'alerte (voir main.gd) : pendant qu'il s'affiche, l'alerte s'efface.
+
+signal showing_changed(on: bool)
 
 const DISPLAY_SECONDS := 4.0
 const MAX_QUEUE := 4
@@ -14,7 +17,7 @@ var _showing := false
 
 func _ready() -> void:
 	theme_type_variation = "News"
-	custom_minimum_size.y = 50
+	custom_minimum_size.y = 44
 	_label = UiFx.label("", "NewsLabel")
 	_clip = Control.new()
 	_clip.clip_contents = true
@@ -30,6 +33,7 @@ func _ready() -> void:
 		_label.text = Tr.t("De retour : %s, sol %d.") % [Tr.t(engine.region().name), engine.sol_number()]
 	_showing = true
 	_timer = DISPLAY_SECONDS
+	showing_changed.emit(true)
 
 
 func post(message: String) -> void:
@@ -44,6 +48,9 @@ func _process(delta: float) -> void:
 	_label.position.y = (_clip.size.y - _label.size.y) / 2.0
 	modulate.a = move_toward(modulate.a, 1.0 if _showing else 0.0, delta * 3.0)
 	if not _showing:
+		if visible and modulate.a <= 0.0:
+			visible = false
+			showing_changed.emit(false)
 		return
 	_timer -= delta
 	if _timer <= 0.0:
@@ -53,6 +60,9 @@ func _process(delta: float) -> void:
 
 
 func _next() -> void:
+	if not visible:
+		visible = true
+		showing_changed.emit(true)
 	_label.text = _queue.pop_front()
 	_label.reset_size()
 	_showing = true

@@ -23,6 +23,7 @@ var _icons: Array[TextureRect] = []
 var _badges: Array[Control] = []
 var _labels: Array[Label] = []
 var _handle: Control
+var _drag := 0.0
 
 
 func _ready() -> void:
@@ -76,11 +77,23 @@ func toggle_collapsed() -> void:
 	collapsed_changed.emit(collapsed)
 
 
+## Poignée : un appui, ou un glissement vers le bas, referme le panneau.
 func _on_handle_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
-		GameManager.vibrate(8)
-		AudioManager.play("whoosh", -6.0)
-		toggle_collapsed()
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_drag = 0.0
+		elif not collapsed:
+			_close()
+	elif event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+		_drag += event.relative.y
+		if _drag > 40.0 and not collapsed:
+			_close()
+
+
+func _close() -> void:
+	GameManager.vibrate(8)
+	AudioManager.play("whoosh", -6.0)
+	toggle_collapsed()
 
 
 func _build_tab(index: int, group: ButtonGroup) -> Button:
@@ -128,7 +141,7 @@ func _build_tab(index: int, group: ButtonGroup) -> Button:
 ## Poignée du panneau, avec une flèche discrète quand il est replié.
 class _Handle extends Control:
 	func _init() -> void:
-		custom_minimum_size = Vector2(0, 22)
+		custom_minimum_size = Vector2(0, 30)
 		mouse_filter = Control.MOUSE_FILTER_STOP
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
