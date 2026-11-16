@@ -326,6 +326,14 @@ fourchettes ; mettre ce tableau à jour après chaque rééquilibrage.
   téléphone ralentit en chauffant (26 → 18 images/s en une minute au même réglage). Diagnostic :
   version de développement + fichier `user://bench` (`adb shell run-as <paquet> touch files/bench`)
   → `world/render_bench.gd` essaie des réglages 8 s chacun et écrit `user://bench.log`.
+- Moteur de rendu : en graphismes fluides, le téléphone passe au moteur OpenGL (Compatibility),
+  ~30 images/s au lieu de ~25 sur Mali-G57 ; sinon Vulkan (Mobile). `GameManager._sync_renderer`
+  écrit ou efface `user://override.cfg` (lu au lancement grâce à
+  `application/config/project_settings_override`) : le changement vaut au lancement suivant.
+- Pas de paramètre de shader par objet (`instance uniform`) : OpenGL n'en accepte que 256 objets.
+  Lampes éteintes et poussière des panneaux passent par des copies de matériaux
+  (`ModelBuilder.variant` / `set_surface_param`), la lueur de nuit par le paramètre global
+  `night_glow` (project.godot, [shader_globals]).
 - Le soleil qui bouge n'éclaire pas le ciel (`SKY_MODE_LIGHT_ONLY`) : un second soleil
   (`_sky_sun`, ciel seulement) est recopié de temps en temps, sinon Godot recalcule la lumière du
   ciel à chaque image.

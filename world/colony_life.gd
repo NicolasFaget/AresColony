@@ -91,15 +91,15 @@ func refresh() -> void:
 	var count := mini(_nodes.size(), _engine.state.buildings.size())
 	var dark := night()
 	var modules: Array = _glow.get_meta("modules", [])
+	# Lueur des lampes la nuit : un seul paramètre pour toute la scène.
+	RenderingServer.global_shader_parameter_set("night_glow", snappedf(dark, 0.05))
 	var glow_on := false
 	for i in count:
-		var on := _running(i)
-		# Paliers de 0,1 : on ne touche les instances que si la lueur change vraiment.
-		var lit := snappedf((1.0 + 1.3 * dark) if on else 0.08, 0.1)
+		# Lampes éteintes quand le module s'arrête : on ne touche aux surfaces que si ça change.
+		var lit := 1.0 if _running(i) else 0.0
 		if lit != _lit[i]:
 			_lit[i] = lit
-			for mesh: GeometryInstance3D in _nodes[i].find_children("*", "GeometryInstance3D", true, false):
-				mesh.set_instance_shader_parameter("lit", lit)
+			ModelBuilder.set_surface_param(_nodes[i], "lamp", "off", lit == 0.0)
 	if _glow.multimesh != null:
 		for k in modules.size():
 			var i: int = modules[k]

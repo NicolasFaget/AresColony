@@ -3,8 +3,8 @@
 uniform vec3 cell_color : source_color = vec3(0.04, 0.08, 0.22);
 uniform vec3 grid_color : source_color = vec3(0.7, 0.74, 0.8);
 uniform float cells = 9.0;
-// Poussière déposée (0 à 1), propre à chaque module.
-instance uniform float dust = 0.0;
+// Poussière déposée (0 à 1) : une variante du matériau par palier de 0,1 (voir ModelBuilder.variant).
+uniform float dust = 0.0;
 
 varying vec3 local_pos;
 varying vec3 local_normal;

@@ -21,6 +21,8 @@ const WARM_LIGHT := Color("#ffd9a0")
 const ROCK := Color("#5e2e1c")
 
 static var _materials := {}
+## Copies de matériaux qui ne diffèrent que par un paramètre (lampes éteintes, poussière des panneaux).
+static var _variants := {}
 ## Graphismes fluides : shaders légers (lumière calculée aux sommets), voir set_lite.
 static var lite := false
 const LITE_SHADERS := {
@@ -91,7 +93,7 @@ static func shader(path: String) -> Shader:
 ## Passe tous les matériaux déjà créés (et ceux à venir) en version légère, ou l'inverse.
 static func set_lite(on: bool, extra: Array[ShaderMaterial] = []) -> void:
 	lite = on
-	var all: Array = _materials.values() + extra
+	var all: Array = _materials.values() + _variants.values() + extra
 	for mat: Variant in all:
 		if not mat is ShaderMaterial or (mat as ShaderMaterial).shader == null:
 			continue
@@ -99,6 +101,32 @@ static func set_lite(on: bool, extra: Array[ShaderMaterial] = []) -> void:
 		for normal: String in LITE_SHADERS:
 			if path == normal or path == LITE_SHADERS[normal]:
 				(mat as ShaderMaterial).shader = shader(normal)
+
+
+## Copie du matériau avec un paramètre changé (gardée en cache : une copie par valeur).
+static func variant(base: ShaderMaterial, param: String, value: Variant) -> ShaderMaterial:
+	var key := "%d|%s|%s" % [base.get_instance_id(), param, value]
+	if not _variants.has(key):
+		var copy: ShaderMaterial = base.duplicate()
+		copy.set_shader_parameter(param, value)
+		_variants[key] = copy
+	return _variants[key]
+
+
+## Dans tout le sous-arbre, remplace chaque surface qui utilise ce shader (« lamp », « solar »…)
+## par sa variante avec `param` = `value`. Le matériau d'origine reste celui du maillage.
+static func set_surface_param(root: Node, shader_name: String, param: String, value: Variant) -> void:
+	var meshes: Array[Node] = root.find_children("*", "MeshInstance3D", true, false)
+	if root is MeshInstance3D:
+		meshes.append(root)
+	for node in meshes:
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance.mesh == null:
+			continue
+		for s in mesh_instance.mesh.get_surface_count():
+			var base := mesh_instance.mesh.surface_get_material(s) as ShaderMaterial
+			if base != null and base.shader != null and base.shader.resource_path.get_file().begins_with(shader_name):
+				mesh_instance.set_surface_override_material(s, variant(base, param, value))
 
 
 static func hull(color: Color, metallic := 0.0, roughness := 0.62, crinkle := 0.0, dust := 0.45,

@@ -12,6 +12,7 @@ config/quit_on_go_back=false
 config/features=PackedStringArray("4.5", "Mobile")
 boot_splash/bg_color=Color(0.043, 0.035, 0.024, 1)
 boot_splash/show_image=false
+config/project_settings_override="user://override.cfg"
 
 [autoload]
 
@@ -49,3 +50,10 @@ environment/defaults/default_clear_color=Color(0.1, 0.15, 0.19, 1)
 [internationalization]
 
 locale/fallback="fr"
+
+[shader_globals]
+
+night_glow={
+"type": "float",
+"value": 0.0
+}

@@ -20,6 +20,8 @@ const REPORT_MIN_SECONDS := 60.0
 ## Emplacements de sauvegarde (le premier reprend l'ancien fichier unique « save »).
 const SLOTS: Array[String] = ["save", "save2", "save3"]
 const SETTINGS_PATH := "user://settings.json"
+## Réglages du moteur lus au lancement (project.godot : application/config/project_settings_override).
+const RENDER_OVERRIDE_PATH := "user://override.cfg"
 ## Dossier des emplacements de sauvegarde (un test peut en choisir un autre).
 var save_dir := "user://"
 const MENU_SCENE := "res://ui/menu.tscn"
@@ -269,11 +271,26 @@ func quality_level() -> int:
 func set_graphics(mode: String) -> void:
 	graphics = mode
 	_save_settings()
+	_sync_renderer()
 
 
 func set_graphics_level(level: int) -> void:
 	graphics_level = level
 	_save_settings()
+	_sync_renderer()
+
+
+## Téléphone modeste (graphismes fluides) : moteur OpenGL, bien plus rapide sur les petits GPU ;
+## sinon le moteur Vulkan, plus beau. Le changement prend effet au prochain lancement.
+func _sync_renderer() -> void:
+	if not OS.has_feature("mobile"):
+		return
+	if quality_level() == 0:
+		var config := ConfigFile.new()
+		config.set_value("rendering", "renderer/rendering_method", "gl_compatibility")
+		config.save(RENDER_OVERRIDE_PATH)
+	elif FileAccess.file_exists(RENDER_OVERRIDE_PATH):
+		DirAccess.remove_absolute(RENDER_OVERRIDE_PATH)
 
 
 func set_graphics_ceiling(level: int) -> void:
@@ -338,6 +355,7 @@ func _load_settings() -> void:
 			graphics_level = clampi(int(data.graphics_level), -1, 2)
 		if data.get("graphics_ceiling") is float:
 			graphics_ceiling = clampi(int(data.graphics_ceiling), 0, 2)
+		_sync_renderer()
 
 
 # ---------- Interne ----------

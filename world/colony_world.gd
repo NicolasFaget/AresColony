@@ -287,8 +287,10 @@ func _update_lights() -> void:
 		light.visible = color != Color("#5be49b")
 	for i in mini(_building_nodes.size(), _engine.state.buildings.size()):
 		if _engine.def_of(i).solar:
-			for mesh: GeometryInstance3D in _building_nodes[i].find_children("*", "GeometryInstance3D", true, false):
-				mesh.set_instance_shader_parameter("dust", _engine.dust_of(i))
+			var dust := snappedf(_engine.dust_of(i), 0.1)
+			if _building_nodes[i].get_meta("dust", -1.0) != dust:
+				_building_nodes[i].set_meta("dust", dust)
+				ModelBuilder.set_surface_param(_building_nodes[i], "solar", "dust", dust)
 	_life.refresh()
 
 
