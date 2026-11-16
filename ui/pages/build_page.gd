@@ -13,8 +13,9 @@ var _synergies: Button
 func _ready() -> void:
 	_hint = add_subtitle(Tr.t("Posez les modules contre un module déjà relié à l'atterrisseur."))
 	_synergies = Button.new()
-	_synergies.theme_type_variation = "GoldButton"
-	_synergies.custom_minimum_size = Vector2(0, 56)
+	# Bouton secondaire : il ne doit pas attirer l'œil plus que « Placer ».
+	_synergies.custom_minimum_size = Vector2(0, 50)
+	_synergies.add_theme_color_override("font_color", Palette.MONEY)
 	_synergies.focus_mode = Control.FOCUS_NONE
 	_synergies.pressed.connect(func() -> void:
 		AudioManager.play("click")
@@ -47,3 +48,5 @@ func refresh() -> void:
 	for row in _rows:
 		row.refresh()
 	_synergies.text = Tr.t("✦ Synergies entre voisins (%d actives)") % engine.active_synergy_count()
+	# L'aide de placement ne sert qu'aux débuts : elle disparaît une fois le guide terminé.
+	_hint.visible = not engine.state.tutorial_done

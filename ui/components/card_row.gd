@@ -36,9 +36,10 @@ func _ready() -> void:
 	_mystery.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_mystery.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
-	_new_badge = _badge(Tr.t("NOUVEAU · +%d") % int(ColonyEngine.CARD_READ_REWARD), Palette.MONEY)
+	# Ce que rapporte la fiche, en clair : « À lire · +5 données », « Quiz · +10 données ».
+	_new_badge = _badge(Tr.t("À lire · +%d données") % int(ColonyEngine.CARD_READ_REWARD), Palette.MONEY)
 	_quiz_badge = _badge("", Palette.ACCENT)
-	var badges := UiFx.hbox(4, [_new_badge, _quiz_badge])
+	var badges := UiFx.vbox(2, [_new_badge, _quiz_badge])
 	badges.alignment = BoxContainer.ALIGNMENT_CENTER
 
 	_title = UiFx.paragraph("", "HeadingLabel", HORIZONTAL_ALIGNMENT_CENTER)
@@ -65,10 +66,10 @@ func refresh() -> void:
 	_quiz_badge.visible = unlocked and not card.quiz.is_empty()
 	if state.quiz_answers.has(card.id):
 		var good: bool = state.quiz_answers[card.id]
-		_quiz_badge.text = Tr.t("QUIZ ✓") if good else Tr.t("QUIZ ✗")
+		_quiz_badge.text = Tr.t("Quiz réussi ✓") if good else Tr.t("Quiz manqué")
 		_quiz_badge.add_theme_color_override("font_color", Palette.SUCCESS if good else Palette.TEXT_DIM)
 	else:
-		_quiz_badge.text = Tr.t("QUIZ · +%d") % int(ColonyEngine.QUIZ_REWARD)
+		_quiz_badge.text = Tr.t("Quiz · +%d données") % int(ColonyEngine.QUIZ_REWARD)
 		_quiz_badge.add_theme_color_override("font_color", Palette.ACCENT)
 
 
@@ -85,7 +86,7 @@ func _unlock_hint() -> String:
 func _badge(text: String, color: Color) -> Label:
 	var badge := UiFx.label(text, "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	badge.add_theme_color_override("font_color", color)
-	badge.add_theme_font_size_override("font_size", 13)
+	badge.add_theme_font_size_override("font_size", 15)
 	return badge
 
 

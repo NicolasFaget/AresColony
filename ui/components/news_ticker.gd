@@ -13,6 +13,8 @@ var _clip: Control
 var _queue: Array[String] = []
 var _timer := 0.0
 var _showing := false
+## Vrai pendant une alerte rouge : elle garde la ligne, les nouvelles attendent leur tour.
+var _hold := false
 
 
 func _ready() -> void:
@@ -40,7 +42,23 @@ func post(message: String) -> void:
 	_queue.append(message)
 	while _queue.size() > MAX_QUEUE:
 		_queue.pop_front()
-	if not _showing:
+	if not _showing and not _hold:
+		_next()
+
+
+## Affiche ce message tout de suite, même pendant une alerte rouge (le joueur l'a demandé).
+func post_now(message: String) -> void:
+	_queue.push_front(message)
+	_next()
+
+
+func set_hold(on: bool) -> void:
+	if on == _hold:
+		return
+	_hold = on
+	if on and _showing:
+		_timer = 0.0
+	elif not on and not _showing and not _queue.is_empty():
 		_next()
 
 
@@ -55,7 +73,7 @@ func _process(delta: float) -> void:
 	_timer -= delta
 	if _timer <= 0.0:
 		_showing = false
-		if not _queue.is_empty():
+		if not _queue.is_empty() and not _hold:
 			_next()
 
 

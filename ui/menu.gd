@@ -111,8 +111,8 @@ func _build_layout() -> void:
 
 	# L'essentiel en grand (continuer, nouvelle colonie), le reste en petit sur une ligne.
 	# Pas de « Quitter » : le bouton Retour du téléphone (ou la fenêtre sur PC) s'en charge.
-	var small: Array[Button] = [_menu_button(Tr.t("Sauvegardes"), "SegmentButton", _show_slots),
-			_menu_button(Tr.t("Réglages"), "SegmentButton", _show_settings), _menu_button(Tr.t("À propos"), "SegmentButton", _show_about)]
+	var small: Array[Button] = [_menu_button(Tr.t("Sauvegardes"), "Button", _show_slots),
+			_menu_button(Tr.t("Réglages"), "Button", _show_settings), _menu_button(Tr.t("À propos"), "Button", _show_about)]
 	for b in small:
 		b.custom_minimum_size.y = 54
 		b.add_theme_font_size_override("font_size", 19)

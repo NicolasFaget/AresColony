@@ -20,6 +20,8 @@ var _coach: CoachCard
 var _window: GameWindow
 var _news: NewsTicker
 var _message_slot: Control
+## Appareil photo flottant, à droite au-dessus des onglets (panneau fermé seulement).
+var _camera_button: Button
 var _safe_area: MarginContainer
 var _pages: Array[Page] = []
 var _research_page: ResearchPage
@@ -117,7 +119,8 @@ func _build_layout() -> void:
 	_alert = AlertBanner.new()
 	_alert.action_requested.connect(func(tab: int, target: String) -> void:
 		if not _alert.advice().is_empty():
-			_news.post(_alert.advice())
+			# Demandé par le joueur : le conseil passe tout de suite, même devant une alerte rouge.
+			_news.post_now(_alert.advice())
 		_go_to(tab, target))
 	_message_slot.add_child(_alert)
 	_alert.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -168,6 +171,21 @@ func _build_layout() -> void:
 		page.visible = false
 	_pages[0].visible = true
 
+
+	_camera_button = Button.new()
+	_camera_button.theme_type_variation = "Button"
+	_camera_button.icon = UiFx.icon("camera")
+	_camera_button.expand_icon = true
+	_camera_button.add_theme_constant_override("icon_max_width", 28)
+	_camera_button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_camera_button.focus_mode = Control.FOCUS_NONE
+	_camera_button.custom_minimum_size = Vector2(60, 60)
+	_camera_button.size = _camera_button.custom_minimum_size
+	_camera_button.modulate = Color(1, 1, 1, 0.85)
+	_camera_button.pressed.connect(func() -> void:
+		AudioManager.play("click")
+		_show_photo_mode())
+	add_child(_camera_button)
 
 	var fx := Control.new()
 	fx.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -313,6 +331,8 @@ func _layout_changed() -> void:
 		if panel.visible:
 			bottom_top = minf(bottom_top, panel.get_global_rect().position.y)
 	var covered_bottom := size.y - bottom_top
+	_camera_button.visible = _window.collapsed and _placing.is_empty() and _photo_bar == null
+	_camera_button.position = Vector2(size.x - MARGIN - 64, bottom_top - 72)
 	_world.rig.covered_fraction = clampf((covered_bottom - covered_top) / size.y, -0.5, 0.9)
 
 
@@ -345,6 +365,7 @@ func _refresh_guidance() -> void:
 	var was_visible := _alert.has_alert()
 	var was_danger: bool = _alert.has_alert() and _alert._alert.get("level") == "danger"
 	_alert.show_alert(top, maxi(0, alerts.size() - 1))
+	_news.set_hold(not top.is_empty() and top.level == "danger")
 	_update_message_slot()
 	if not top.is_empty() and top.level == "danger" and not was_danger:
 		AudioManager.play("alert")
@@ -710,24 +731,40 @@ func _show_building(index: int) -> void:
 		learn.clip_text = true
 		learn.pressed.connect(func() -> void: _show_card(def.card))
 		extra.add_child(learn)
+	# Démolir : en bas de la fiche, discret et loin de « Fermer » (avec confirmation).
+	if not def.fixed:
+		var demolish := Button.new()
+		demolish.flat = true
+		demolish.text = Tr.t("Démolir ce module (+%s matériaux)") % NumberFormatter.format(def.cost * ColonyEngine.DEMOLISH_REFUND)
+		demolish.focus_mode = Control.FOCUS_NONE
+		demolish.add_theme_color_override("font_color", Palette.DANGER)
+		demolish.add_theme_font_size_override("font_size", 17)
+		demolish.pressed.connect(func() -> void:
+			AudioManager.play("click")
+			holder[0].close()
+			_confirm_demolish.call_deferred(index))
+		var gap := UiFx.spacer()
+		gap.custom_minimum_size.y = 12
+		extra.add_child(gap)
+		extra.add_child(demolish)
 	var options := {
 		"icon": "tab_build", "title": Tr.t(def.name), "body": def.description, "extra": extra, "confirm_text": Tr.t("Fermer"),
 	}
-	if not def.fixed:
-		options.cancel_text = Tr.t("Démolir (+%s)") % NumberFormatter.format(def.cost * ColonyEngine.DEMOLISH_REFUND)
-		options.cancel_style = "Button"
+	var scroll: ScrollContainer = null
 	if _engine.max_level(index) > 1:
-		# Fiche longue (améliorations) : elle défile.
-		var scroll := ScrollContainer.new()
+		# Fiche longue (améliorations) : elle défile, mais sans laisser de vide si elle est courte.
+		scroll = ScrollContainer.new()
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		scroll.custom_minimum_size.y = minf(860.0, size.y * 0.62)
 		extra.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		scroll.add_child(extra)
 		options.extra = scroll
 	var modal := Modal.open(_modal_layer, options)
 	holder.append(modal)
-	if not def.fixed:
-		modal.cancelled.connect(func() -> void: _confirm_demolish.call_deferred(index))
+	if scroll != null:
+		var cap := minf(860.0, size.y * 0.62)
+		scroll.custom_minimum_size.y = minf(extra.get_combined_minimum_size().y, cap)
+		extra.minimum_size_changed.connect(func() -> void:
+			scroll.custom_minimum_size.y = minf(extra.get_combined_minimum_size().y, cap))
 
 
 func _confirm_demolish(index: int) -> void:
@@ -1773,9 +1810,11 @@ func _show_colonist(index: int) -> void:
 func _show_photo_mode() -> void:
 	if _photo_bar != null:
 		return
-	_stop_placement()
+	if not _placing.is_empty():
+		_stop_placement()
 	_world.set_photo_mode(true)
 	_safe_area.visible = false
+	_camera_button.visible = false
 	get_viewport().scaling_3d_scale = _world.render_scale(true)
 	var hint := UiFx.label(Tr.t("Glissez pour tourner, pincez pour zoomer."), "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	hint.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))

@@ -59,6 +59,8 @@ icons["lock"] = ui(f'<path d="M20 28 V20 a12 12 0 0 1 24 0 V28" stroke="{W}" str
 icons["check"] = ui(stroke("M12 34 L26 48 L52 18", 8))
 icons["clock"] = ui(f'<circle cx="32" cy="32" r="24" stroke="{W}" stroke-width="5" fill="none"/>' + stroke("M32 18 V32 L42 38"))
 icons["close"] = ui(stroke("M16 16 L48 48 M48 16 L16 48", 7))
+icons["chevron_down"] = ui(stroke("M14 24 L32 42 L50 24", 8))
+icons["chevron_up"] = ui(stroke("M14 40 L32 22 L50 40", 8))
 icons["warning"] = ui(f'<path d="M32 6 L60 56 H4 Z" fill="{W}" stroke="{W}" stroke-width="4" stroke-linejoin="round"/>'
                       f'<path d="M32 24 V38" stroke="#000" stroke-width="6" stroke-linecap="round" opacity=".55"/><circle cx="32" cy="47" r="3.5" fill="#000" opacity=".55"/>')
 icons["news"] = ui(f'<path d="M8 26 V38 H16 L40 50 V14 L16 26 Z" fill="{W}" stroke="{W}" stroke-width="3" stroke-linejoin="round"/>'

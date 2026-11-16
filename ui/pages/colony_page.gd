@@ -1,13 +1,16 @@
 class_name ColonyPage
 extends Page
 ## Onglet « Colonie » : note, objectif en cours, entretien, équipage et santé.
+## Chaque bloc montre l'essentiel ; le détail (jauges de la note, équipage) se déplie au toucher.
 
 var _objective_title: Label
 var _objective_text: Label
 var _objective_bar: ProgressBar
-var _objectives_done: Label
+var _objective_caption: Label
+var _objective_reward: Label
 var _crew_title: Label
 var _crew: VBoxContainer
+var _crew_summary: Label
 var _info: Label
 var _grade: Label
 var _score: Label
@@ -34,14 +37,16 @@ func _ready() -> void:
 
 	_objective_title = UiFx.label("", "HeadingLabel")
 	_objective_text = UiFx.paragraph("", "BodyLabel")
+	_objective_reward = UiFx.label("", "SmallLabel")
+	_objective_reward.add_theme_color_override("font_color", Palette.MONEY)
 	_objective_bar = ProgressBar.new()
 	_objective_bar.show_percentage = false
 	_objective_bar.custom_minimum_size.y = 12
 	_objective_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_objectives_done = UiFx.paragraph("", "SmallLabel")
+	_objective_caption = UiFx.label("", "CaptionLabel")
 	var objective := UiFx.panel("Row", UiFx.vbox(6, [
-		UiFx.hbox(8, [UiFx.image(UiFx.icon("target"), 28, Palette.ACCENT), UiFx.label("Objectif", "CaptionLabel")]),
-		_objective_title, _objective_text, _objective_bar, _objectives_done,
+		UiFx.hbox(8, [UiFx.image(UiFx.icon("target"), 24, Palette.ACCENT), _objective_caption]),
+		_objective_title, _objective_text, _objective_bar, _objective_reward,
 	]))
 	objective.mouse_filter = Control.MOUSE_FILTER_PASS
 	list.add_child(objective)
@@ -79,11 +84,10 @@ func _ready() -> void:
 	list.add_child(_trips)
 
 	_crew_title = UiFx.label("", "HeadingLabel")
+	_crew_summary = UiFx.label("", "SmallLabel")
 	_crew = UiFx.vbox(8)
 	_info = UiFx.paragraph("", "SmallLabel")
-	var crew := UiFx.panel("Row", UiFx.vbox(8, [_crew_title, _crew, _info]))
-	crew.mouse_filter = Control.MOUSE_FILTER_PASS
-	list.add_child(crew)
+	list.add_child(Foldable.new(UiFx.vbox(2, [_crew_title, _crew_summary]), UiFx.vbox(8, [_crew, _info])))
 	add_bottom_padding()
 	refresh()
 
@@ -110,14 +114,17 @@ func refresh() -> void:
 		_objective_bar.value = 100.0
 	else:
 		_objective_title.text = Tr.t(objective.title)
-		_objective_text.text = Tr.t(objective.description) + Tr.t("\nRécompense : ") + _reward_text(objective.reward)
+		_objective_text.text = Tr.t(objective.description)
 		_objective_bar.value = engine.objective_progress(objective.id) * 100.0
-	var done: Array[String] = []
+	_objective_reward.text = (Tr.t("Récompense : ") + _reward_text(objective.reward)) if objective != null else ""
+	_objective_reward.visible = objective != null
+	var total := 0
+	var done := 0
 	for o in engine.objectives:
-		if o.era == engine.state.era and engine.state.objectives_done.has(o.id):
-			done.append("✓ " + Tr.t(o.title))
-	_objectives_done.text = "  ".join(done)
-	_objectives_done.visible = not done.is_empty()
+		if o.era == engine.state.era:
+			total += 1
+			done += 1 if engine.state.objectives_done.has(o.id) else 0
+	_objective_caption.text = Tr.t("Objectif · %d / %d de l'ère") % [done, total]
 
 	var challenge := engine.current_challenge()
 	_challenge.visible = not challenge.is_empty()
@@ -137,6 +144,18 @@ func refresh() -> void:
 		var extra := _crew.get_child(_crew.get_child_count() - 1)
 		_crew.remove_child(extra)
 		extra.queue_free()
+	var health := 0.0
+	var tired := 0
+	for colonist: Dictionary in engine.state.colonists:
+		health += colonist.health
+		tired += 1 if colonist.health <= 0.5 else 0
+	if engine.state.colonists.is_empty():
+		_crew_summary.text = Tr.t("Personne à bord.")
+	else:
+		_crew_summary.text = Tr.t("Santé moyenne : %d %%") % roundi(health / engine.state.colonists.size() * 100.0)
+		if tired > 0:
+			_crew_summary.text += Tr.t(" · %d en mauvaise forme") % tired
+	_crew_summary.add_theme_color_override("font_color", Palette.WARNING if tired > 0 else Palette.TEXT_MUTED)
 	for i in engine.state.colonists.size():
 		var colonist: Dictionary = engine.state.colonists[i]
 		var line := _crew.get_child(i)
@@ -175,13 +194,12 @@ func refresh() -> void:
 ## Note d'efficacité : grande lettre, score, quatre jauges et le conseil le plus utile.
 func _rating_panel() -> Control:
 	_grade = UiFx.label("", "TitleLabel", HORIZONTAL_ALIGNMENT_CENTER)
-	_grade.add_theme_font_size_override("font_size", 64)
-	_grade.custom_minimum_size.x = 84
+	_grade.add_theme_font_size_override("font_size", 48)
+	_grade.custom_minimum_size.x = 72
 	_score = UiFx.label("", "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	var left := UiFx.vbox(0, [_grade, _score])
 	left.alignment = BoxContainer.ALIGNMENT_CENTER
 	var bars := UiFx.vbox(4)
-	bars.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for part in ["Fonctionnement", "Raccordement", Tr.t("Synergies"), Tr.t("Améliorations")]:
 		var name := UiFx.label(part, "SmallLabel")
 		name.custom_minimum_size.x = 150
@@ -198,12 +216,12 @@ func _rating_panel() -> Control:
 		bars.add_child(UiFx.hbox(8, [name, bar, value]))
 	_rating_tip = UiFx.paragraph("", "SmallLabel")
 	_rating_tip.add_theme_color_override("font_color", Palette.ACCENT)
-	var panel := UiFx.panel("Row", UiFx.vbox(8, [
-		UiFx.label(Tr.t("Efficacité de la colonie"), "CaptionLabel"),
-		UiFx.hbox(12, [left, bars]), _rating_tip,
-	]))
-	panel.mouse_filter = Control.MOUSE_FILTER_PASS
-	return panel
+	_rating_tip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var summary := UiFx.vbox(2, [UiFx.label(Tr.t("Efficacité de la colonie"), "CaptionLabel"), _rating_tip])
+	summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	summary.alignment = BoxContainer.ALIGNMENT_CENTER
+	# Résumé : la note et le conseil ; les quatre jauges au toucher.
+	return Foldable.new(UiFx.hbox(12, [left, summary]), bars)
 
 
 func _refresh_rating() -> void:
