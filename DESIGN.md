@@ -317,6 +317,20 @@ fourchettes ; mettre ce tableau à jour après chaque rééquilibrage.
   deux émetteurs à points pour toute la colonie. Le cache des modèles garde des maillages, pas des
   nœuds (sinon fuite à la sortie). Partie de 65 modules : ~183 000 primitives, 419 appels de dessin.
 - Le ciel du mode photo (`world/world_scenery.gd`) n'est visible qu'en mode photo.
+- Graphismes à trois niveaux (`ColonyWorld.apply_quality`) : 0 fluides (sans ombres, brume ni
+  FXAA, shaders `*_lite` à lumière aux sommets, 3D à 0,42, 30 images/s au plus), 1 équilibrés
+  (3D à 0,55), 2 très beaux (3D à 0,8, halo, ombres à 2 cascades). En automatique, le jeu mesure
+  sa fluidité par tranches de 8 s : il descend sous 24 images/s, monte à 52 et plus, sans revenir
+  vers un niveau qu'il a dû quitter (`GameManager.graphics_level` / `graphics_ceiling`, retenus).
+- Mesures sur Mali-G57 MC2 (téléphone modeste) : une 3D vide coûte déjà ~14 ms au GPU, et le
+  téléphone ralentit en chauffant (26 → 18 images/s en une minute au même réglage). Diagnostic :
+  version de développement + fichier `user://bench` (`adb shell run-as <paquet> touch files/bench`)
+  → `world/render_bench.gd` essaie des réglages 8 s chacun et écrit `user://bench.log`.
+- Le soleil qui bouge n'éclaire pas le ciel (`SKY_MODE_LIGHT_ONLY`) : un second soleil
+  (`_sky_sun`, ciel seulement) est recopié de temps en temps, sinon Godot recalcule la lumière du
+  ciel à chaque image.
+- Photos : Android ne laisse écrire que dans Téléchargements ou Documents (MediaStore de Godot) ;
+  elles vont dans `Download/Ares Colony`, en JPEG (encodé une fois, plus rapide que le PNG).
 
 ## Langues
 

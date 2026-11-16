@@ -58,12 +58,11 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
-	# Mobile : la 3D est calculée en plus basse résolution puis agrandie (l'interface reste nette).
-	if OS.has_feature("mobile"):
-		get_viewport().scaling_3d_scale = 0.55
 	add_child(IconStudio.new())
 	_world = ColonyWorld.new()
 	add_child(_world)
+	# Mobile : la 3D est calculée en plus basse résolution puis agrandie (l'interface reste nette).
+	_world.apply_quality(GameManager.quality_level())
 	_world.cell_tapped.connect(_on_cell_tapped)
 	_world.colonist_tapped.connect(_show_colonist)
 	_world.ghost_moved.connect(func(_c: Vector2i) -> void: _refresh_placement())
@@ -577,6 +576,11 @@ func _on_resupply(report: Dictionary) -> void:
 
 
 ## Bouton Retour (Android) : ferme la fenêtre du dessus, sinon revient au menu principal.
+## Réglage des graphismes, changé depuis le panneau des réglages.
+func apply_quality(level: int) -> void:
+	_world.apply_quality(level)
+
+
 func on_back() -> void:
 	if _photo_bar != null:
 		_close_photo_mode()
@@ -1227,6 +1231,32 @@ func _show_maintenance() -> void:
 
 	box.add_child(UiFx.label("Machines", "HeadingLabel"))
 	var any := false
+	# Beaucoup de pannes : un seul bouton pour tout réparer (ce que les matériaux permettent).
+	if _engine.broken_count() >= 2:
+		var all := Button.new()
+		all.theme_type_variation = "GoldButton"
+		all.text = Tr.t("Tout réparer · %s matériaux") % NumberFormatter.format(_engine.repair_all_cost())
+		all.custom_minimum_size = Vector2(0, 64)
+		all.focus_mode = Control.FOCUS_NONE
+		var affordable := false
+		for i in _engine.state.buildings.size():
+			affordable = affordable or (_engine.is_broken(i) and _engine.repair_problem(i).is_empty())
+		all.disabled = not affordable
+		all.pressed.connect(func() -> void:
+			var fixed := _engine.repair_all()
+			if fixed.is_empty():
+				return
+			AudioManager.play("build")
+			GameManager.vibrate(25)
+			var left := _engine.broken_count()
+			_news.post(Tr.t("%d machines réparées.") % fixed.size() if left == 0
+					else Tr.t("%d machines réparées ; il manque des matériaux pour les %d autres.") % [fixed.size(), left])
+			reopen.call())
+		box.add_child(all)
+		if not affordable:
+			var short := UiFx.label(Tr.t("Pas assez de matériaux."), "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
+			short.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+			box.add_child(short)
 	for i in _engine.state.buildings.size():
 		if not _engine.is_broken(i):
 			continue
@@ -1722,8 +1752,7 @@ func _show_photo_mode() -> void:
 	_world.set_photo_mode(true)
 	_safe_area.visible = false
 	_news.visible = false
-	if OS.has_feature("mobile"):
-		get_viewport().scaling_3d_scale = 0.85
+	get_viewport().scaling_3d_scale = _world.render_scale(true)
 	var hint := UiFx.label(Tr.t("Glissez pour tourner, pincez pour zoomer."), "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	hint.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	hint.add_theme_constant_override("shadow_offset_y", 2)
@@ -1763,8 +1792,7 @@ func _close_photo_mode() -> void:
 	_world.set_photo_mode(false)
 	_safe_area.visible = true
 	_news.visible = true
-	if OS.has_feature("mobile"):
-		get_viewport().scaling_3d_scale = 0.55
+	get_viewport().scaling_3d_scale = _world.render_scale()
 	_layout_changed()
 
 
@@ -1789,18 +1817,36 @@ func _take_photo() -> void:
 	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(flash)
 	flash.create_tween().tween_property(flash, "color:a", 0.0, 0.35).finished.connect(flash.queue_free)
-	UiFx.float_text(Tr.t("Photo enregistrée dans Images › Ares Colony") if not path.begins_with("user://")
-			else Tr.t("Photo enregistrée"), Vector2(size.x / 2.0, size.y * 0.45), Palette.TEXT, 24)
+	var where := Tr.t("Photo enregistrée")
+	if "/Download" in path:
+		where = Tr.t("Photo enregistrée dans Téléchargements › Ares Colony")
+	elif not path.begins_with("user://"):
+		where = Tr.t("Photo enregistrée dans Images › Ares Colony")
+	UiFx.float_text(where, Vector2(size.x / 2.0, size.y * 0.45), Palette.TEXT, 24)
 
 
 ## Enregistre une image ; retourne son chemin ("" en cas d'échec).
 static func save_photo(image: Image) -> String:
-	var name := "ares_colony_%s.png" % Time.get_datetime_string_from_system().replace(":", "-").replace("T", "_")
-	var pictures := OS.get_system_dir(OS.SYSTEM_DIR_PICTURES)
-	for folder: String in ([pictures.path_join("Ares Colony")] if not pictures.is_empty() else []) + ["user://photos"]:
-		if DirAccess.make_dir_recursive_absolute(folder) != OK and not DirAccess.dir_exists_absolute(folder):
+	var name := "ares_colony_%s.jpg" % Time.get_datetime_string_from_system().replace(":", "-").replace("T", "_")
+	# Encodée une seule fois. Android ne laisse un jeu écrire que dans Téléchargements ou Documents
+	# (la galerie y voit les images) ; sinon, dans les données du jeu.
+	var data := image.save_jpg_to_buffer(0.92)
+	var folders: Array[String] = []
+	for dir in [OS.SYSTEM_DIR_DOWNLOADS, OS.SYSTEM_DIR_PICTURES, OS.SYSTEM_DIR_DOCUMENTS]:
+		var system := OS.get_system_dir(dir)
+		if not system.is_empty():
+			folders.append(system.path_join("Ares Colony"))
+	folders.append("user://photos")
+	for folder in folders:
+		if not DirAccess.dir_exists_absolute(folder) and DirAccess.make_dir_recursive_absolute(folder) != OK:
 			continue
 		var path := folder.path_join(name)
-		if image.save_png(path) == OK:
-			return path
+		var file := FileAccess.open(path, FileAccess.WRITE)
+		if file != null:
+			file.store_buffer(data)
+			file.close()
+			if FileAccess.get_open_error() == OK:
+				return path
+		if OS.is_debug_build():
+			print("Photo : %s refusé (%d)" % [path, FileAccess.get_open_error()])
 	return ""

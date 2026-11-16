@@ -1281,6 +1281,29 @@ func repair(index: int) -> bool:
 	return true
 
 
+## Prix total (en matériaux) pour réparer toutes les machines en panne.
+func repair_all_cost() -> float:
+	var total := 0.0
+	for i in state.buildings.size():
+		if is_broken(i):
+			total += repair_cost(i)[ColonyContent.MATERIALS]
+	return total
+
+
+## Répare toutes les machines en panne, dans l'ordre, tant que les matériaux suffisent.
+## Retourne les modules réparés.
+func repair_all() -> Array[int]:
+	var fixed: Array[int] = []
+	for i in state.buildings.size():
+		if is_broken(i) and repair_problem(i).is_empty():
+			_add(ColonyContent.MATERIALS, -repair_cost(i)[ColonyContent.MATERIALS])
+			state.buildings[i].erase("broken")
+			fixed.append(i)
+	if not fixed.is_empty():
+		changed.emit()
+	return fixed
+
+
 func _breakdowns(ds: float) -> void:
 	if breakdown_rate <= 0.0 or state.sol < BREAKDOWN_START or (state.shelter and is_storm()):
 		return

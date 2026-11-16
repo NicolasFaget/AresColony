@@ -21,6 +21,13 @@ const WARM_LIGHT := Color("#ffd9a0")
 const ROCK := Color("#5e2e1c")
 
 static var _materials := {}
+## Graphismes fluides : shaders légers (lumière calculée aux sommets), voir set_lite.
+static var lite := false
+const LITE_SHADERS := {
+	"res://world/terrain.gdshader": "res://world/terrain_lite.gdshader",
+	"res://world/hull.gdshader": "res://world/hull_lite.gdshader",
+	"res://world/solar.gdshader": "res://world/solar_lite.gdshader",
+}
 static var _grime: NoiseTexture2D
 
 
@@ -76,10 +83,28 @@ static func material(color: Color, emission := 0.0, metallic := 0.0) -> Material
 	return mat
 
 
+## Le shader demandé, ou sa version légère en graphismes fluides.
+static func shader(path: String) -> Shader:
+	return load(LITE_SHADERS[path] if lite and LITE_SHADERS.has(path) else path)
+
+
+## Passe tous les matériaux déjà créés (et ceux à venir) en version légère, ou l'inverse.
+static func set_lite(on: bool, extra: Array[ShaderMaterial] = []) -> void:
+	lite = on
+	var all: Array = _materials.values() + extra
+	for mat: Variant in all:
+		if not mat is ShaderMaterial or (mat as ShaderMaterial).shader == null:
+			continue
+		var path := (mat as ShaderMaterial).shader.resource_path
+		for normal: String in LITE_SHADERS:
+			if path == normal or path == LITE_SHADERS[normal]:
+				(mat as ShaderMaterial).shader = shader(normal)
+
+
 static func hull(color: Color, metallic := 0.0, roughness := 0.62, crinkle := 0.0, dust := 0.45,
 		panel_scale := 5.0) -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
-	mat.shader = preload("res://world/hull.gdshader")
+	mat.shader = shader("res://world/hull.gdshader")
 	mat.set_shader_parameter("albedo", color)
 	mat.set_shader_parameter("metallic", metallic)
 	mat.set_shader_parameter("roughness", roughness)
@@ -93,7 +118,7 @@ static func hull(color: Color, metallic := 0.0, roughness := 0.62, crinkle := 0.
 static func solar_material() -> Material:
 	if not _materials.has("solar"):
 		var mat := ShaderMaterial.new()
-		mat.shader = preload("res://world/solar.gdshader")
+		mat.shader = shader("res://world/solar.gdshader")
 		_materials["solar"] = mat
 	return _materials["solar"]
 

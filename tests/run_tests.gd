@@ -671,6 +671,18 @@ func _test_hazards() -> void:
 	var materials := engine.state.amount(R.MATERIALS)
 	_check(engine.repair(machine) and not engine.is_broken(machine), "réparation")
 	_check(_near(engine.state.amount(R.MATERIALS), materials - 9.0), "réparation : 30 % du prix")
+	# Tout réparer : autant de machines que les matériaux le permettent, dans l'ordre.
+	engine.place("moxie", lander + Vector2i(3, 2))
+	var second := engine.state.buildings.size() - 1
+	engine.state.buildings[machine].broken = true
+	engine.state.buildings[second].broken = true
+	_check(_near(engine.repair_all_cost(), 18.0), "tout réparer : prix total")
+	engine.state.resources[R.MATERIALS] = 12.0
+	var fixed := engine.repair_all()
+	_check(fixed == ([machine] as Array[int]) and engine.is_broken(second) and _near(engine.state.amount(R.MATERIALS), 3.0),
+			"tout réparer : seulement ce qu'on peut payer")
+	engine.state.resources[R.MATERIALS] = 50.0
+	_check(engine.repair_all() == ([second] as Array[int]) and engine.broken_count() == 0, "tout réparer : le reste")
 	# En temps réel, le jeu avance par tout petits pas (une image) : la fréquence doit rester la même.
 	var rates: Array[float] = []
 	for step in [0.02, 0.0005]:

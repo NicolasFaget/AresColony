@@ -33,6 +33,12 @@ var current_slot := ""
 var load_result: SaveService.LoadResult
 ## Réglages communs à toutes les parties.
 var settings := { "music": true, "sound": true, "haptics": true }
+## Graphismes : "auto" (le jeu s'adapte au téléphone), "high", "medium" ou "low".
+var graphics := "auto"
+## Niveau choisi par le mode automatique (-1 : pas encore mesuré) et plafond qu'il ne dépasse plus
+## (un niveau qu'il a déjà dû quitter parce que le téléphone peinait).
+var graphics_level := -1
+var graphics_ceiling := 2
 ## Langue de l'interface : "fr" ou "en" (par défaut, celle du téléphone).
 var locale := ""
 var _english_loaded := false
@@ -245,9 +251,42 @@ func set_setting(key: String, value: bool) -> void:
 	_save_settings()
 
 
+## Niveau de graphismes à utiliser : 0 fluides, 1 équilibrés, 2 très beaux.
+func quality_level() -> int:
+	match graphics:
+		"high":
+			return 2
+		"medium":
+			return 1
+		"low":
+			return 0
+	if graphics_level >= 0:
+		return graphics_level
+	# Premier lancement : équilibrés sur téléphone (le jeu montera ou descendra tout seul).
+	return 1 if OS.has_feature("mobile") else 2
+
+
+func set_graphics(mode: String) -> void:
+	graphics = mode
+	_save_settings()
+
+
+func set_graphics_level(level: int) -> void:
+	graphics_level = level
+	_save_settings()
+
+
+func set_graphics_ceiling(level: int) -> void:
+	graphics_ceiling = mini(graphics_ceiling, level)
+	_save_settings()
+
+
 func _save_settings() -> void:
 	var data := settings.duplicate()
 	data.locale = locale
+	data.graphics = graphics
+	data.graphics_level = graphics_level
+	data.graphics_ceiling = graphics_ceiling
 	var file := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
 	if file != null:
 		file.store_string(JSON.stringify(data))
@@ -293,6 +332,12 @@ func _load_settings() -> void:
 				settings[key] = data[key]
 		if data.get("locale") in ["fr", "en"]:
 			locale = data.locale
+		if data.get("graphics") in ["auto", "high", "medium", "low"]:
+			graphics = data.graphics
+		if data.get("graphics_level") is float:
+			graphics_level = clampi(int(data.graphics_level), -1, 2)
+		if data.get("graphics_ceiling") is float:
+			graphics_ceiling = clampi(int(data.graphics_ceiling), 0, 2)
 
 
 # ---------- Interne ----------

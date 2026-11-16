@@ -51,6 +51,17 @@ var _free_cells := {}
 var _env: Environment
 var _sky_mat: ProceduralSkyMaterial
 var _sun: DirectionalLight3D
+## Soleil vu par le ciel seulement, recopié de temps en temps : si le vrai soleil (qui bouge à
+## chaque image) éclairait le ciel, Godot recalculerait toute la lumière du ciel à chaque image.
+var _sky_sun: DirectionalLight3D
+var _sky_sun_timer := 0.0
+var _airless_sky_done := false
+var _terrain_mat: ShaderMaterial
+## Niveau de graphismes (0 fluides, 1 équilibrés, 2 très beaux), voir apply_quality.
+var quality := 1
+const SCALES := [0.42, 0.55, 0.8]
+var _quality_time := 0.0
+var _quality_frames := 0
 var _dust: CPUParticles3D
 var _motes: CPUParticles3D
 var _noise: FastNoiseLite
@@ -68,6 +79,8 @@ var _rover_beam: MeshInstance3D
 var _life: ColonyLife
 ## Décor propre à chaque monde, et ciel du mode photo (voir WorldScenery).
 var _scenery: WorldScenery
+## Banc d'essai du rendu (version de développement, fichier user://bench).
+var _bench: RenderBench
 
 
 func _ready() -> void:
@@ -92,7 +105,20 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if _bench == null and RenderBench.wanted() and is_visible_in_tree():
+		_bench = RenderBench.new(self, _sun, _env)
+	_adapt_quality(delta)
+	if _bench != null:
+		_bench.update(delta)
+		if _bench.skip_scripts:
+			return
 	_update_sky(delta)
+	_sky_sun_timer -= delta
+	if _sky_sun_timer <= 0.0:
+		_sky_sun_timer = 10.0 if OS.has_feature("mobile") else 0.4
+		_sky_sun.rotation = _sun.rotation
+		_sky_sun.light_energy = _sun.light_energy
+		_sky_sun.light_color = _sun.light_color
 	_update_dust_devils(delta)
 	_update_astronauts(delta)
 	_update_rover()
@@ -100,6 +126,72 @@ func _process(delta: float) -> void:
 	_scenery.update(delta, rig)
 	if rig.photo:
 		_keep_camera_above_ground()
+
+
+## Résolution de la 3D (l'interface reste nette) : sur téléphone, selon le niveau de graphismes.
+func render_scale(photo := false) -> float:
+	if not OS.has_feature("mobile"):
+		return 1.0
+	if photo:
+		return maxf(0.85, SCALES[quality])
+	return SCALES[quality]
+
+
+## Niveau de graphismes : 0 fluides (sans ombres ni brume, matières légères, 30 images par seconde
+## au plus : le téléphone chauffe moins), 1 équilibrés, 2 très beaux (3D plus nette, halo lumineux,
+## ombres plus fines).
+func apply_quality(level: int) -> void:
+	quality = clampi(level, 0, 2)
+	var low := quality == 0
+	var mobile := OS.has_feature("mobile")
+	_sun.shadow_enabled = not low
+	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL if mobile and quality < 2 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	_env.adjustment_enabled = not low
+	_env.fog_enabled = not low
+	_env.glow_enabled = quality == 2
+	ModelBuilder.set_lite(low, [_terrain_mat] as Array[ShaderMaterial])
+	var viewport := get_viewport()
+	var aa: Viewport.ScreenSpaceAA = ProjectSettings.get_setting_with_override("rendering/anti_aliasing/quality/screen_space_aa")
+	viewport.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED if low else aa
+	if not rig.photo:
+		viewport.scaling_3d_scale = render_scale()
+	Engine.max_fps = 30 if low else 0
+	_quality_time = 0.0
+	_quality_frames = 0
+
+
+## Graphismes automatiques : le jeu mesure sa fluidité par tranches de 8 s (après 4 s de mise en
+## route). Il descend d'un niveau si le téléphone peine, monte s'il a de la marge, sans jamais
+## remonter vers un niveau qu'il a déjà dû quitter. Le choix est retenu (GameManager).
+func _adapt_quality(delta: float) -> void:
+	if GameManager.graphics != "auto" or rig.photo or (_bench != null):
+		return
+	_quality_time += delta
+	if delta > 0.25:
+		# Chargement, retour d'arrière-plan : on recommence la mesure.
+		_quality_time = 0.0
+		_quality_frames = 0
+		return
+	if _quality_time < 4.0:
+		return
+	_quality_frames += 1
+	if _quality_time < 12.0:
+		return
+	var fps := _quality_frames / (_quality_time - 4.0)
+	var level := quality
+	if fps < 24.0 and quality > 0:
+		level = quality - 1
+		GameManager.set_graphics_ceiling(level)
+	elif fps >= 52.0 and quality < GameManager.graphics_ceiling:
+		level = quality + 1
+	if OS.is_debug_build():
+		print("Graphismes auto : %.1f images/s au niveau %d → niveau %d" % [fps, quality, level])
+	if level != quality:
+		GameManager.set_graphics_level(level)
+		apply_quality(level)
+	else:
+		_quality_time = 0.0
+		_quality_frames = 0
 
 
 ## Mode photo : la caméra ne passe jamais sous le sol (les collines autour du cratère).
@@ -667,6 +759,10 @@ func _update_airless_sky() -> void:
 	_motes.emitting = false
 	_dust.emitting = false
 	# Vu de Cérès (2,8 fois plus loin que la Terre), le Soleil n'est qu'un petit disque très vif.
+	# Réglé une seule fois : toucher au ciel le fait recalculer.
+	if _airless_sky_done:
+		return
+	_airless_sky_done = true
 	_sky_mat.sun_angle_max = 4.0
 	_sky_mat.sun_curve = 0.02
 	_sky_mat.sky_top_color = Color(0.0, 0.0, 0.01)
@@ -739,7 +835,12 @@ func _build_environment() -> void:
 	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL if OS.has_feature("mobile") else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	_sun.directional_shadow_max_distance = 70.0
 	_sun.light_angular_distance = 0.6
+	_sun.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY
 	add_child(_sun)
+	_sky_sun = DirectionalLight3D.new()
+	_sky_sun.sky_mode = DirectionalLight3D.SKY_MODE_SKY_ONLY
+	_sky_sun.light_angular_distance = 0.6
+	add_child(_sky_sun)
 
 	# Poussière soufflée par le vent pendant les tempêtes.
 	_dust = _particles(Color(0.85, 0.55, 0.35, 0.35), 0.07, 300, 4.0)
@@ -887,7 +988,8 @@ func _build_terrain() -> void:
 	st.generate_normals()
 
 	var mat := ShaderMaterial.new()
-	mat.shader = preload("res://world/terrain.gdshader")
+	mat.shader = ModelBuilder.shader("res://world/terrain.gdshader")
+	_terrain_mat = mat
 	if _engine.planet_id() == "titan":
 		# Titan : sables sombres d'hydrocarbures sur un socle de glace.
 		mat.set_shader_parameter("sand_color", Color(0.3, 0.2, 0.11))
@@ -922,6 +1024,7 @@ func _build_terrain() -> void:
 	# c'était 29 000 triangles de plus à dessiner dans la carte des ombres.
 	terrain.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(terrain)
+	terrain.add_to_group("bench_ground")
 	_build_pebbles()
 
 
@@ -975,6 +1078,7 @@ func _build_pebbles() -> void:
 		pebbles.material_override = ModelBuilder.rock_material(Color("#c4ccd4"), 0.0)
 	pebbles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(pebbles)
+	pebbles.add_to_group("bench_ground")
 
 
 ## Rochers : tous dans une seule instance multiple (un seul objet à dessiner).
@@ -1013,6 +1117,7 @@ func _build_rocks() -> void:
 	elif _engine.planet_id() == "enceladus":
 		rocks.material_override = ModelBuilder.rock_material(Color("#dfe5ea"), 0.0)
 	add_child(rocks)
+	rocks.add_to_group("bench_ground")
 
 
 func _rock_transform(at: Vector3, size: float) -> Transform3D:

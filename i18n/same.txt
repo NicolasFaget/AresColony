@@ -109,3 +109,13 @@ mécan
 %s. %s
 Ares Colony
 Rotor*
+/Download
+BENCH départ (%d essais de %d s)
+BENCH %-16s FPS %5.1f · CPU %5.1f ms · rendu CPU %5.1f ms · GPU %5.1f ms · primitives %d
+BENCH fin
+BENCH écran %s · échelle 3D %.2f · mode %d · rendu %s
+BENCH   %d matériaux changés
+matieres_legeres+sans_reflets
+matieres_legeres+sans_reflets+sans_fxaa
+ (%s)
+Graphismes auto : %.1f images/s au niveau %d → niveau %d
