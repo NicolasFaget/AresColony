@@ -119,3 +119,4 @@ matieres_legeres+sans_reflets
 matieres_legeres+sans_reflets+sans_fxaa
  (%s)
 Graphismes auto : %.1f images/s au niveau %d → niveau %d
+%d|%s|%s
