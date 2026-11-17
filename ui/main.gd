@@ -898,9 +898,11 @@ func _show_network_list() -> void:
 	actions.add_child(found)
 	box.add_child(actions)
 	if campaign.interplanetary_unlocked():
-		box.add_child(UiFx.label(Tr.t("Fenêtres de tir"), "HeadingLabel"))
+		# Longue liste : repliée, on la déplie au toucher.
+		var lines := UiFx.vbox(4)
 		for line in _window_lines(campaign):
-			box.add_child(UiFx.paragraph(line, "SmallLabel"))
+			lines.add_child(UiFx.paragraph(line, "SmallLabel"))
+		box.add_child(Foldable.new(UiFx.label(Tr.t("Fenêtres de tir"), "HeadingLabel"), lines))
 
 	var scroll := _fitted_scroll(box)
 	holder.append(Modal.open(_modal_layer, {
@@ -1448,22 +1450,18 @@ func _synergy_block(index: int) -> Control:
 
 ## Toutes les synergies : quels modules coller, quel effet, et pourquoi.
 func _show_synergies() -> void:
-	var list := UiFx.vbox(14)
+	var list := UiFx.vbox(6)
 	for synergy: Dictionary in ColonyContent.SYNERGIES:
 		var pair := Tr.t("%s + %s") % [Tr.t(_engine.building_defs[synergy.building].name), Tr.t(_engine.building_defs[synergy.neighbor].name)]
 		var title := UiFx.label("✦ " + Tr.t(synergy.name), "HeadingLabel")
 		title.add_theme_color_override("font_color", SYNERGY_COLOR)
-		var effect := UiFx.paragraph(Tr.t("%s → %s") % [pair, Tr.t(synergy.effect)], "BodyLabel")
-		list.add_child(UiFx.vbox(2, [title, effect, UiFx.paragraph(synergy.why, "SmallLabel")]))
-	var scroll := ScrollContainer.new()
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.custom_minimum_size.y = minf(760.0, size.y * 0.6)
-	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(list)
+		var effect := UiFx.paragraph(Tr.t("%s → %s") % [pair, Tr.t(synergy.effect)], "SmallLabel")
+		# L'explication scientifique se déplie au toucher.
+		list.add_child(Foldable.new(UiFx.vbox(2, [title, effect]), UiFx.paragraph(synergy.why, "SmallLabel")))
 	Modal.open(_modal_layer, {
 		"icon": "tab_build", "title": Tr.t("Synergies"),
 		"body": Tr.t("Collez ces modules l'un contre l'autre (sans conduite entre eux). Active : %d.") % _engine.active_synergy_count(),
-		"extra": scroll, "confirm_text": Tr.t("Fermer"),
+		"extra": list, "confirm_text": Tr.t("Fermer"),
 	})
 
 
@@ -1511,13 +1509,8 @@ func _show_card(card_id: String) -> void:
 		link.add_theme_color_override("font_color", Palette.FAME)
 		link.add_theme_font_size_override("font_size", 18)
 		content.add_child(link)
-	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var scroll := ScrollContainer.new()
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.custom_minimum_size.y = minf(820.0, size.y * 0.64)
-	scroll.add_child(content)
 	Modal.open(_modal_layer, {
-		"icon": "tab_knowledge", "title": card.title, "extra": scroll, "confirm_text": Tr.t("Fermer"),
+		"icon": "tab_knowledge", "title": card.title, "extra": content, "confirm_text": Tr.t("Fermer"),
 	})
 	var reward := _engine.read_card(card_id)
 	if reward > 0.0:

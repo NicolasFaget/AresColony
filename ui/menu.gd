@@ -70,6 +70,24 @@ func _build_background() -> void:
 
 
 func _build_layout() -> void:
+	# Dégradé sombre en bas : les boutons restent lisibles sans grand cadre, la colonie reste visible.
+	var gradient := Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 1.0])
+	gradient.colors = PackedColorArray([Color(0.03, 0.05, 0.09, 0.0), Color(0.03, 0.05, 0.09, 0.92)])
+	var shade_texture := GradientTexture2D.new()
+	shade_texture.gradient = gradient
+	shade_texture.fill_from = Vector2(0, 0)
+	shade_texture.fill_to = Vector2(0, 0.55)
+	shade_texture.width = 4
+	shade_texture.height = 64
+	var shade := TextureRect.new()
+	shade.texture = shade_texture
+	shade.stretch_mode = TextureRect.STRETCH_SCALE
+	shade.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	shade.offset_top = -560
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(shade)
+
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -109,18 +127,12 @@ func _build_layout() -> void:
 		child.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_continue.add_child(continue_box)
 
-	# L'essentiel en grand (continuer, nouvelle colonie), le reste en petit sur une ligne.
-	# Pas de « Quitter » : le bouton Retour du téléphone (ou la fenêtre sur PC) s'en charge.
-	var small: Array[Button] = [_menu_button(Tr.t("Sauvegardes"), "Button", _show_slots),
-			_menu_button(Tr.t("Réglages"), "Button", _show_settings), _menu_button(Tr.t("À propos"), "Button", _show_about)]
-	for b in small:
-		b.custom_minimum_size.y = 54
-		b.add_theme_font_size_override("font_size", 19)
-	var buttons := UiFx.vbox(12, [
-		_continue,
-		_menu_button(Tr.t("Nouvelle colonie"), "GoldButton", _on_new_game),
-		UiFx.hbox(8, small),
-	])
+	# L'essentiel en grand (continuer, nouvelle colonie), le reste en petit sur une ligne, avec
+	# une icône. Pas de « Quitter » : le bouton Retour du téléphone (ou la fenêtre sur PC) s'en charge.
+	var new_game := _menu_button(Tr.t("Nouvelle colonie"), "GoldButton", _on_new_game)
+	var small: Array[Button] = [_small_button("save", Tr.t("Sauvegardes"), _show_slots),
+			_small_button("gear", Tr.t("Réglages"), _show_settings), _small_button("info", Tr.t("À propos"), _show_about)]
+	var buttons := UiFx.vbox(12, [_continue, new_game, UiFx.hbox(10, small)])
 	# Version de développement : parties de test, repliées derrière un petit bouton.
 	if OS.is_debug_build():
 		var tests_box := UiFx.vbox(8)
@@ -145,7 +157,8 @@ func _build_layout() -> void:
 		for b in row.get_children():
 			if b is Button:
 				b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var card := UiFx.panel("WindowPanel", buttons)
+	# Pas de grand cadre sombre : les boutons flottent sur la colonie, qui reste visible.
+	var card := buttons
 
 	var version := UiFx.label(Tr.t("v%s · Mars") % ProjectSettings.get_setting("application/config/version", "0.1"),
 			"CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER)
@@ -157,6 +170,26 @@ func _build_layout() -> void:
 	_modal_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_modal_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_modal_layer)
+
+
+## Petit bouton du bas du menu : icône au-dessus, libellé dessous.
+func _small_button(icon_name: String, text: String, action: Callable) -> Button:
+	var button := _menu_button("", "Button", action)
+	button.custom_minimum_size.y = 78
+	var label := UiFx.label(text, "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER)
+	label.add_theme_font_size_override("font_size", 16)
+	label.add_theme_color_override("font_color", Palette.TEXT)
+	label.clip_text = true
+	var icon := UiFx.image(UiFx.icon(icon_name), 26, Palette.ACCENT)
+	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var content := UiFx.vbox(4, [icon, label])
+	content.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(content)
+	return button
 
 
 func _menu_button(text: String, style: String, action: Callable) -> Button:
@@ -276,8 +309,21 @@ func _show_slots(replacing := false) -> void:
 				actions.add_child(_slot_button(Tr.t("Charger"), "GreenButton", func() -> void:
 					holder[0].close()
 					GameManager.open_game(slot)))
-			actions.add_child(_slot_button(Tr.t("Recommencer") if replacing else Tr.t("Supprimer"), "Button", func() -> void:
-				_confirm_erase(slot, replacing, holder[0])))
+			if replacing:
+				actions.add_child(_slot_button(Tr.t("Recommencer"), "Button", func() -> void:
+					_confirm_erase(slot, true, holder[0])))
+			else:
+				# Supprimer : une petite corbeille, à l'écart de « Charger » (avec confirmation).
+				var erase := _slot_button("", "Button", func() -> void: _confirm_erase(slot, false, holder[0]))
+				erase.tooltip_text = "Supprimer"
+				erase.icon = UiFx.icon("trash")
+				erase.expand_icon = true
+				erase.add_theme_constant_override("icon_max_width", 24)
+				erase.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				erase.add_theme_color_override("icon_normal_color", Palette.TEXT_MUTED)
+				erase.size_flags_horizontal = Control.SIZE_SHRINK_END
+				erase.custom_minimum_size.x = 64
+				actions.add_child(erase)
 		var row := UiFx.panel("Row", UiFx.vbox(6, [name, info, actions]))
 		list.add_child(row)
 	holder.append(Modal.open(_modal_layer, {

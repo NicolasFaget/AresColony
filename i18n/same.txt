@@ -122,3 +122,4 @@ Graphismes auto : %.1f images/s au niveau %d → niveau %d
 %d|%s|%s
 +%s %s %s/sol
 −%s %s %s/sol
+Langue / Language

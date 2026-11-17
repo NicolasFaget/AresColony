@@ -16,7 +16,9 @@ static func build() -> VBoxContainer:
 	language.custom_minimum_size.y = 60
 	language.focus_mode = Control.FOCUS_NONE
 	language.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
-	language.text = "Langue / Language : %s" % ("Français" if GameManager.locale == "fr" else "English")
+	var language_value := UiFx.label("Français" if GameManager.locale == "fr" else "English", "BodyLabel", HORIZONTAL_ALIGNMENT_RIGHT)
+	language_value.add_theme_color_override("font_color", Palette.ACCENT)
+	_row(language, "Langue / Language", language_value)
 	language.pressed.connect(func() -> void:
 		AudioManager.play("click")
 		GameManager.change_locale("en" if GameManager.locale == "fr" else "fr"))
@@ -34,11 +36,14 @@ static func _graphics_button() -> Button:
 	var button := Button.new()
 	button.custom_minimum_size.y = 60
 	button.focus_mode = Control.FOCUS_NONE
+	var value := UiFx.label("", "BodyLabel", HORIZONTAL_ALIGNMENT_RIGHT)
+	value.add_theme_color_override("font_color", Palette.ACCENT)
+	_row(button, Tr.t("Graphismes"), value)
 	var paint := func() -> void:
-		var text := Tr.t("Graphismes : %s") % Tr.t(GRAPHICS_NAMES[GameManager.graphics])
+		var text := Tr.t(GRAPHICS_NAMES[GameManager.graphics])
 		if GameManager.graphics == "auto":
 			text += " (%s)" % Tr.t(LEVEL_NAMES[GameManager.quality_level()])
-		button.text = text
+		value.text = text
 	paint.call()
 	button.pressed.connect(func() -> void:
 		AudioManager.play("click")
@@ -54,19 +59,36 @@ static func _graphics_button() -> Button:
 	return button
 
 
+## Interrupteur : libellé à gauche, état à droite (coloré quand il est activé).
 static func _toggle(title: String, key: String, after: Callable) -> Button:
 	var value: bool = GameManager.settings[key]
 	var button := Button.new()
-	button.toggle_mode = true
-	button.button_pressed = value
 	button.custom_minimum_size.y = 60
 	button.focus_mode = Control.FOCUS_NONE
+	var state := UiFx.label("", "BodyLabel", HORIZONTAL_ALIGNMENT_RIGHT)
+	_row(button, Tr.t(title), state)
 	var paint := func(on: bool) -> void:
-		button.theme_type_variation = "GreenButton" if on else "Button"
-		button.text = Tr.t("%s : %s") % [Tr.t(title), Tr.t("activé") if on else Tr.t("désactivé")]
+		state.text = Tr.t("activé") if on else Tr.t("désactivé")
+		state.add_theme_color_override("font_color", Palette.ACCENT if on else Palette.TEXT_DIM)
 	paint.call(value)
-	button.toggled.connect(func(on: bool) -> void:
+	button.pressed.connect(func() -> void:
+		var on: bool = not GameManager.settings[key]
 		paint.call(on)
 		GameManager.set_setting(key, on)
 		after.call(on))
 	return button
+
+
+## Habille un bouton en ligne de réglage : libellé à gauche, valeur à droite.
+static func _row(button: Button, title: String, value: Label) -> void:
+	button.theme_type_variation = "Button"
+	var name := UiFx.label(title, "BodyLabel")
+	name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var content := UiFx.hbox(10, [name, value])
+	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	content.offset_left = 18
+	content.offset_right = -18
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	value.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(content)

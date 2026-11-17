@@ -60,6 +60,8 @@ icons["check"] = ui(stroke("M12 34 L26 48 L52 18", 8))
 icons["clock"] = ui(f'<circle cx="32" cy="32" r="24" stroke="{W}" stroke-width="5" fill="none"/>' + stroke("M32 18 V32 L42 38"))
 icons["close"] = ui(stroke("M16 16 L48 48 M48 16 L16 48", 7))
 icons["menu"] = ui(stroke("M12 18 H52 M12 32 H52 M12 46 H52", 7))
+icons["info"] = ui(f'<circle cx="32" cy="32" r="25" stroke="{W}" stroke-width="5" fill="none"/><circle cx="32" cy="20" r="4" fill="{W}"/>' + stroke("M32 30 V46", 7))
+icons["save"] = ui(f'<path d="M10 8 H44 L54 18 V52 a4 4 0 0 1 -4 4 H14 a4 4 0 0 1 -4 -4 Z" stroke="{W}" stroke-width="5" fill="none" stroke-linejoin="round"/><rect x="20" y="34" width="24" height="16" rx="2" fill="{W}"/><rect x="20" y="10" width="18" height="10" fill="{W}"/>')
 icons["chevron_down"] = ui(stroke("M14 24 L32 42 L50 24", 8))
 icons["chevron_up"] = ui(stroke("M14 40 L32 22 L50 40", 8))
 icons["warning"] = ui(f'<path d="M32 6 L60 56 H4 Z" fill="{W}" stroke="{W}" stroke-width="4" stroke-linejoin="round"/>'

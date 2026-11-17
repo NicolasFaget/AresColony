@@ -19,7 +19,7 @@ func _check(ok: bool, label: String) -> void:
 
 func _press(node: Node, text: String) -> bool:
 	for b in node.find_children("*", "Button", true, false):
-		if (b as Button).text == text and b.is_visible_in_tree():
+		if ((b as Button).text == text or (b as Button).tooltip_text == text) and b.is_visible_in_tree():
 			(b as Button).pressed.emit()
 			return true
 	return false
