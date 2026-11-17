@@ -128,10 +128,11 @@ func _build_layout() -> void:
 	_continue.add_child(continue_box)
 
 	# L'essentiel en grand (continuer, nouvelle colonie), le reste en petit sur une ligne, avec
-	# une icône. Pas de « Quitter » : le bouton Retour du téléphone (ou la fenêtre sur PC) s'en charge.
+	# une icône.
 	var new_game := _menu_button(Tr.t("Nouvelle colonie"), "GoldButton", _on_new_game)
 	var small: Array[Button] = [_small_button("save", Tr.t("Sauvegardes"), _show_slots),
-			_small_button("gear", Tr.t("Réglages"), _show_settings), _small_button("info", Tr.t("À propos"), _show_about)]
+			_small_button("gear", Tr.t("Réglages"), _show_settings), _small_button("info", Tr.t("À propos"), _show_about),
+			_small_button("close", Tr.t("Quitter"), _quit)]
 	var buttons := UiFx.vbox(12, [_continue, new_game, UiFx.hbox(10, small)])
 	# Version de développement : parties de test, repliées derrière un petit bouton.
 	if OS.is_debug_build():
@@ -371,6 +372,11 @@ func _confirm_erase(slot: String, then_start: bool, list_modal: Modal) -> void:
 
 func _show_settings() -> void:
 	Modal.open(_modal_layer, { "icon": "gear", "title": Tr.t("Réglages"), "extra": SettingsPanel.build(), "confirm_text": Tr.t("Fermer") })
+
+
+func _quit() -> void:
+	GameManager.save()
+	get_tree().quit()
 
 
 func _show_about() -> void:
