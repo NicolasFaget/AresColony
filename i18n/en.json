@@ -61,6 +61,7 @@
 "%s%s %s %s/sol": "%s%s %s %s/sol",
 "(en marche ; à l'arrêt pour l'instant)": "(when running; stopped for now)",
 "(moyenne sur un sol, nuits comprises)": "(average over a sol, nights included)",
+"(selon le soleil : rien la nuit, peu en tempête)": "(depends on the sun: nothing at night, little in a storm)",
 "+%d colons": "+%d colonists",
 "+%d données": "+%d data",
 "+10 % d'énergie": "+10 % energy",
@@ -249,6 +250,7 @@
 "Comment Cassini a-t-elle montré que l'océan d'Encelade fait le tour de la lune ?": "How did Cassini show that Enceladus's ocean goes all the way around the moon?",
 "Comment Hubble a-t-il repéré les panaches d'Europe ?": "How did Hubble spot Europa's plumes?",
 "Comment a-t-on d'abord détecté cet impact ?": "How was this impact first detected?",
+"Comment jouer": "How to play",
 "Comment se forme l'oxygène à la surface d'Europe ?": "How does oxygen form on Europa's surface?",
 "Compost des déchets": "Waste compost",
 "Compresseur d'azote": "Nitrogen compressor",
@@ -1157,6 +1159,7 @@
 "Système solaire": "Solar System",
 "Séisme martien ! Les sismomètres de la colonie l'ont enregistré : %s.": "Marsquake! The colony's seismometers recorded it: %s.",
 "Sépare l'eau en oxygène et hydrogène : plus efficace que le CO₂.": "Splits water into oxygen and hydrogen: more efficient than CO₂.",
+"Taille : %d × %d cases · %s matériaux": "Size: %d × %d tiles · %s materials",
 "Tailles et distances pas à l'échelle": "Sizes and distances not to scale",
 "Tempête : la poussière masque le soleil.": "Storm: dust is hiding the Sun.",
 "Tempête de poussière ! Les panneaux solaires ne reçoivent plus que 20 % de la lumière.": "Dust storm! Solar panels now get only 20 % of the light.",
@@ -1490,5 +1493,6 @@
 "✦  NOUVELLE DÉCOUVERTE  ✦": "✦  NEW DISCOVERY  ✦",
 "✦ %s : %s": "✦ %s: %s",
 "✦ %s : %s (%s)": "✦ %s: %s (%s)",
+"✦ Collé à : %s → %s": "✦ Next to: %s → %s",
 "✦ Synergies entre voisins (%d actives)": "✦ Synergies between neighbours (%d active)"
 }

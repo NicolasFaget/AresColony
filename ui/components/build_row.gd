@@ -1,14 +1,20 @@
 class_name BuildRow
 extends PanelContainer
 ## Ligne d'un module à construire : vignette 3D, effet par sol, coût, bouton « Placer ».
+## Toucher la ligne (ailleurs que sur le bouton) ouvre la fiche d'information du module.
 
 signal place_requested(building_id: String)
+signal info_requested(building_id: String)
+
+const TAP_SLOP := 14.0
 
 var def: Defs.Building
 
 var _button: Button
 var _cost: Label
 var _lock: Label
+var _press_at := Vector2.ZERO
+var _pressing := false
 
 
 func _init(p_def: Defs.Building) -> void:
@@ -52,8 +58,32 @@ func _ready() -> void:
 	_button.add_child(content)
 	UiFx.on_tap(_button, func() -> void: place_requested.emit(def.id))
 
-	add_child(UiFx.hbox(12, [thumb, info, _button]))
+	var row := UiFx.hbox(12, [thumb, info, _button])
+	add_child(row)
+	# Tout sauf le bouton laisse passer le toucher jusqu'à la ligne.
+	for part: Control in [thumb, info]:
+		part.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		for child in part.find_children("*", "Control", true, false):
+			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gui_input.connect(_on_input)
 	refresh()
+
+
+## Toucher (sans glisser, pour laisser défiler la liste) ouvre la fiche du module.
+func _on_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_press_at = event.position
+			_pressing = true
+		elif _pressing:
+			_pressing = false
+			if event.position.distance_to(_press_at) < TAP_SLOP:
+				AudioManager.play("click")
+				UiFx.pop(self, 0.03)
+				info_requested.emit(def.id)
+	elif event is InputEventMouseMotion and _pressing and event.position.distance_to(_press_at) >= TAP_SLOP:
+		_pressing = false
 
 
 func refresh() -> void:

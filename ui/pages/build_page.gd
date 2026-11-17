@@ -3,6 +3,7 @@ extends Page
 ## Onglet « Construire » : les modules, débloqués d'abord.
 
 signal place_requested(building_id: String)
+signal info_requested(building_id: String)
 signal synergies_requested
 
 var _rows: Array[BuildRow] = []
@@ -24,6 +25,7 @@ func _ready() -> void:
 	for def in GameManager.engine.buildable_defs():
 		var row := BuildRow.new(def)
 		row.place_requested.connect(place_requested.emit)
+		row.info_requested.connect(info_requested.emit)
 		_rows.append(row)
 		list.add_child(row)
 	add_bottom_padding()

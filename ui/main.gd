@@ -20,8 +20,6 @@ var _coach: CoachCard
 var _window: GameWindow
 var _news: NewsTicker
 var _message_slot: Control
-## Appareil photo flottant, à droite au-dessus des onglets (panneau fermé seulement).
-var _camera_button: Button
 var _safe_area: MarginContainer
 var _pages: Array[Page] = []
 var _research_page: ResearchPage
@@ -153,6 +151,7 @@ func _build_layout() -> void:
 
 	var build := BuildPage.new()
 	build.place_requested.connect(_start_placement)
+	build.info_requested.connect(_show_build_info)
 	build.synergies_requested.connect(_show_synergies)
 	var colony := ColonyPage.new()
 	colony.maintenance_requested.connect(_show_maintenance)
@@ -171,21 +170,6 @@ func _build_layout() -> void:
 		page.visible = false
 	_pages[0].visible = true
 
-
-	_camera_button = Button.new()
-	_camera_button.theme_type_variation = "Button"
-	_camera_button.icon = UiFx.icon("camera")
-	_camera_button.expand_icon = true
-	_camera_button.add_theme_constant_override("icon_max_width", 28)
-	_camera_button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_camera_button.focus_mode = Control.FOCUS_NONE
-	_camera_button.custom_minimum_size = Vector2(60, 60)
-	_camera_button.size = _camera_button.custom_minimum_size
-	_camera_button.modulate = Color(1, 1, 1, 0.85)
-	_camera_button.pressed.connect(func() -> void:
-		AudioManager.play("click")
-		_show_photo_mode())
-	add_child(_camera_button)
 
 	var fx := Control.new()
 	fx.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -331,8 +315,6 @@ func _layout_changed() -> void:
 		if panel.visible:
 			bottom_top = minf(bottom_top, panel.get_global_rect().position.y)
 	var covered_bottom := size.y - bottom_top
-	_camera_button.visible = _window.collapsed and _placing.is_empty() and _photo_bar == null
-	_camera_button.position = Vector2(size.x - MARGIN - 64, bottom_top - 72)
 	_world.rig.covered_fraction = clampf((covered_bottom - covered_top) / size.y, -0.5, 0.9)
 
 
@@ -1391,6 +1373,59 @@ func _upgrade_block(index: int, holder: Array[Modal]) -> Control:
 
 
 ## Synergies d'un module dans sa fiche : actives (dorées, avec le pourquoi) ou possibles.
+## Fiche d'un module à construire (toucher sa ligne dans l'onglet Construire) : à quoi il sert,
+## ce qu'il produit et consomme, ses synergies, puis « Placer ».
+func _show_build_info(def_id: String) -> void:
+	var def: Defs.Building = _engine.building_defs[def_id]
+	var lines: Array[String] = []
+	for r: String in def.outputs:
+		lines.append(Tr.t("+%s %s %s/sol") % [NumberFormatter.format(def.outputs[r]), Tr.t(ColonyContent.RESOURCE_UNITS[r]), Tr.t(ColonyContent.RESOURCE_NAMES[r]).to_lower()])
+	for r: String in def.inputs:
+		lines.append(Tr.t("−%s %s %s/sol") % [NumberFormatter.format(def.inputs[r]), Tr.t(ColonyContent.RESOURCE_UNITS[r]), Tr.t(ColonyContent.RESOURCE_NAMES[r]).to_lower()])
+	if def.solar:
+		lines.append(Tr.t("(selon le soleil : rien la nuit, peu en tempête)"))
+	for r: String in def.storage:
+		lines.append(Tr.t("Stockage : +%s %s %s") % [NumberFormatter.format(def.storage[r]), Tr.t(ColonyContent.RESOURCE_UNITS[r]), Tr.t(ColonyContent.RESOURCE_NAMES[r]).to_lower()])
+	if def.housing > 0:
+		lines.append(Tr.t("Loge %d colons") % def.housing)
+	lines.append(Tr.t("Taille : %d × %d cases · %s matériaux") % [def.size.x, def.size.y, NumberFormatter.format(def.cost)])
+	var extra := UiFx.vbox(8, [UiFx.panel("Thumb", UiFx.building_icon(def.id, Vector2(200, 160))),
+			UiFx.paragraph("\n".join(lines), "BodyLabel", HORIZONTAL_ALIGNMENT_CENTER)])
+	(extra.get_child(0) as Control).size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	for synergy: Dictionary in ColonyContent.SYNERGIES:
+		if synergy.building != def_id and synergy.neighbor != def_id:
+			continue
+		var other: String = synergy.neighbor if synergy.building == def_id else synergy.building
+		var bonus := UiFx.paragraph(Tr.t("✦ Collé à : %s → %s") % [Tr.t(_engine.building_defs[other].name), Tr.t(synergy.effect)], "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
+		bonus.add_theme_color_override("font_color", SYNERGY_COLOR)
+		extra.add_child(bonus)
+	var holder: Array[Modal] = []
+	if not def.card.is_empty() and _engine.state.cards_unlocked.has(def.card):
+		var learn := Button.new()
+		learn.text = Tr.t("En savoir plus : ") + Tr.t(_engine.cards[def.card].title)
+		learn.focus_mode = Control.FOCUS_NONE
+		learn.clip_text = true
+		learn.pressed.connect(func() -> void:
+			holder[0].close()
+			_show_card.call_deferred(def.card))
+		extra.add_child(learn)
+	var options := { "icon": "tab_build", "title": Tr.t(def.name), "body": def.description, "extra": extra }
+	var unlocked := _engine.is_unlocked(def)
+	var affordable := _engine.state.amount(ColonyContent.MATERIALS) >= def.cost
+	if unlocked and affordable:
+		options.confirm_text = Tr.t("Placer")
+		options.confirm_style = "GoldButton"
+		options.on_confirm = func() -> void: _start_placement.call_deferred(def_id)
+		options.cancel_text = Tr.t("Fermer")
+	else:
+		var why := UiFx.paragraph(Tr.t("Pas assez de matériaux.") if unlocked
+				else Tr.t("Recherche nécessaire : %s") % Tr.t(_engine.research_defs[def.research].name), "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
+		why.add_theme_color_override("font_color", Palette.WARNING)
+		extra.add_child(why)
+		options.confirm_text = Tr.t("Fermer")
+	holder.append(Modal.open(_modal_layer, options))
+
+
 func _synergy_block(index: int) -> Control:
 	var box := UiFx.vbox(6)
 	var active := _engine.synergies_of(index)
@@ -1640,39 +1675,51 @@ func _next_step_hint() -> String:
 	return Tr.t("Objectif : %s.") % Tr.t(objective.title) if objective != null else Tr.t("Tout tourne. Bon retour, commandant !")
 
 
+## Menu du jeu (bouton à trois barres) : mode photo, réglages, aide, retour au menu principal.
 func _show_settings() -> void:
-	var to_menu := Button.new()
-	to_menu.text = Tr.t("Menu principal")
-	to_menu.custom_minimum_size.y = 60
-	to_menu.focus_mode = Control.FOCUS_NONE
 	# Partagée avec les boutons, créés avant la fenêtre (voir DESIGN.md, Pièges).
 	var holder: Array[Modal] = []
-	to_menu.pressed.connect(func() -> void:
-		AudioManager.play("click")
-		holder[0].close()
-		GameManager.open_menu())
-	var photo := Button.new()
-	photo.text = Tr.t("Mode photo")
-	photo.icon = UiFx.icon("camera")
-	photo.expand_icon = true
-	photo.add_theme_constant_override("icon_max_width", 28)
-	photo.custom_minimum_size.y = 60
-	photo.focus_mode = Control.FOCUS_NONE
-	photo.pressed.connect(func() -> void:
-		AudioManager.play("click")
-		holder[0].close()
-		_show_photo_mode())
-	var extra := SettingsPanel.build()
-	extra.add_child(photo)
-	extra.add_child(UiFx.paragraph(Tr.t("Glissez pour parcourir le cratère, pincez (ou molette) pour zoomer.\n")
+	var entry := func(icon_name: String, text: String, action: Callable) -> Button:
+		var button := Button.new()
+		button.text = text
+		button.icon = UiFx.icon(icon_name)
+		button.expand_icon = true
+		button.add_theme_constant_override("icon_max_width", 26)
+		button.add_theme_constant_override("h_separation", 14)
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.custom_minimum_size.y = 64
+		button.focus_mode = Control.FOCUS_NONE
+		button.pressed.connect(func() -> void:
+			AudioManager.play("click")
+			holder[0].close()
+			action.call_deferred())
+		return button
+	var box := UiFx.vbox(10, [
+		entry.call("camera", Tr.t("Mode photo"), _show_photo_mode),
+		entry.call("gear", Tr.t("Réglages"), _show_options),
+		entry.call("tab_knowledge", Tr.t("Comment jouer"), _show_help),
+		entry.call("close", Tr.t("Menu principal"), GameManager.open_menu),
+		UiFx.label(Tr.t("La partie est sauvegardée automatiquement."), "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER),
+	])
+	holder.append(Modal.open(_modal_layer, {
+		"icon": "menu", "title": Tr.t("Menu"), "extra": box, "confirm_text": Tr.t("Reprendre"),
+	}))
+
+
+func _show_options() -> void:
+	Modal.open(_modal_layer, {
+		"icon": "gear", "title": Tr.t("Réglages"), "extra": SettingsPanel.build(), "confirm_text": Tr.t("Fermer"),
+	})
+
+
+func _show_help() -> void:
+	Modal.open(_modal_layer, {
+		"icon": "tab_knowledge", "title": Tr.t("Comment jouer"),
+		"body": Tr.t("Glissez pour parcourir le cratère, pincez (ou molette) pour zoomer.\n")
 			+ Tr.t("Touchez un module pour le détail, une ressource pour son explication.\n")
 			+ Tr.t("Hors-ligne : pilote automatique prudent, 8 h au plus, sans tempête."),
-			"SmallLabel", HORIZONTAL_ALIGNMENT_CENTER))
-	extra.add_child(to_menu)
-	extra.add_child(UiFx.label(Tr.t("La partie est sauvegardée automatiquement."), "CaptionLabel", HORIZONTAL_ALIGNMENT_CENTER))
-	holder.append(Modal.open(_modal_layer, {
-		"icon": "gear", "title": Tr.t("Réglages"), "extra": extra, "confirm_text": Tr.t("Fermer"),
-	}))
+		"confirm_text": Tr.t("Fermer"),
+	})
 
 
 func _show_load_problem() -> void:
@@ -1814,7 +1861,6 @@ func _show_photo_mode() -> void:
 		_stop_placement()
 	_world.set_photo_mode(true)
 	_safe_area.visible = false
-	_camera_button.visible = false
 	get_viewport().scaling_3d_scale = _world.render_scale(true)
 	var hint := UiFx.label(Tr.t("Glissez pour tourner, pincez pour zoomer."), "SmallLabel", HORIZONTAL_ALIGNMENT_CENTER)
 	hint.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
