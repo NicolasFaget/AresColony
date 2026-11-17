@@ -91,7 +91,6 @@ func _on_handle_input(event: InputEvent) -> void:
 
 
 func _close() -> void:
-	GameManager.vibrate(8)
 	AudioManager.play("whoosh", -6.0)
 	toggle_collapsed()
 
@@ -121,7 +120,6 @@ func _build_tab(index: int, group: ButtonGroup) -> Button:
 	button.button_down.connect(UiFx.press_in.bind(icon))
 	button.button_up.connect(UiFx.press_out.bind(icon))
 	button.pressed.connect(func() -> void:
-		GameManager.vibrate(8)
 		AudioManager.play("tab")
 		# Toucher l'onglet déjà ouvert referme le panneau.
 		if not collapsed and index == current:

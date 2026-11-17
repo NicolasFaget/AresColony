@@ -114,7 +114,6 @@ func _on_start() -> void:
 func _start() -> void:
 	if GameManager.engine.start_research(research.id):
 		AudioManager.play("click")
-		GameManager.vibrate(15)
 	else:
 		AudioManager.play("fail")
 		UiFx.shake(_button)

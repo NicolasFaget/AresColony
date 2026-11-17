@@ -1,7 +1,7 @@
 extends Node
 ## Autoload « GameManager » : seul point de contact entre le cœur du jeu et Godot.
 ## Emplacements de sauvegarde, partie en cours (boucle de simulation, sauvegarde automatique,
-## pilote automatique hors-ligne), réglages du joueur, vibrations.
+## pilote automatique hors-ligne), réglages du joueur.
 ## Les écrans lisent `engine` et appellent ses méthodes ; ils ne touchent ni au disque ni à l'horloge.
 
 ## Retour après une absence : rapport du pilote automatique (voir ColonyEngine.apply_offline).
@@ -34,7 +34,7 @@ var engine: ColonyEngine
 var current_slot := ""
 var load_result: SaveService.LoadResult
 ## Réglages communs à toutes les parties.
-var settings := { "music": true, "sound": true, "haptics": true }
+var settings := { "music": true, "sound": true }
 ## Graphismes : "auto" (le jeu s'adapte au téléphone), "high", "medium" ou "low".
 var graphics := "auto"
 ## Niveau choisi par le mode automatique (-1 : pas encore mesuré) et plafond qu'il ne dépasse plus
@@ -334,11 +334,6 @@ func _apply_locale() -> void:
 				translation.add_message(key, data[key])
 			TranslationServer.add_translation(translation)
 	TranslationServer.set_locale(locale)
-
-
-func vibrate(duration_ms := 12) -> void:
-	if settings.haptics and OS.has_feature("mobile"):
-		Input.vibrate_handheld(duration_ms)
 
 
 func _load_settings() -> void:

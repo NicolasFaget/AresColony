@@ -1,6 +1,6 @@
 class_name SettingsPanel
 extends RefCounted
-## Interrupteurs des réglages communs (musique, sons, vibrations), partagés par le menu et le jeu.
+## Interrupteurs des réglages communs (musique, sons, graphismes, langue), partagés par le menu et le jeu.
 
 
 static func build() -> VBoxContainer:
@@ -9,7 +9,6 @@ static func build() -> VBoxContainer:
 	box.add_child(_toggle(Tr.t("Sons et ambiance"), "sound", func(_on: bool) -> void:
 		AudioManager.apply_settings()
 		AudioManager.play("click")))
-	box.add_child(_toggle("Vibrations", "haptics", func(_on: bool) -> void: GameManager.vibrate(20)))
 	box.add_child(_graphics_button())
 	# Langue : le libellé est bilingue, pour qu'on s'y retrouve dans les deux sens.
 	var language := Button.new()

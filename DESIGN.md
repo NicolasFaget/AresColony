@@ -22,7 +22,7 @@ Reste avant publication : fiche Google Play, signature, politique de confidentia
 - Contrôle du menu : `godot --headless --path . -s tests/ui_menu_check.gd` (sauvegardes dans
   `user://ui_check`, jamais celles du joueur).
 - Icônes : `python tools/make_icons.py` ; sons : `python tools/make_sounds.py` (aucune dépendance).
-- Android : preset « Android » (arm64, vibrations) dans `export_presets.cfg`.
+- Android : preset « Android » (arm64, sans vibrations) dans `export_presets.cfg`.
 - Intégration continue (`.github/workflows/ci.yml`, à chaque envoi sur GitHub) : tests de simulation,
   contrôle du menu, traductions (`tools/i18n_check.py` échoue s'il manque un texte), puis APK de
   débogage téléchargeable dans l'onglet Actions.

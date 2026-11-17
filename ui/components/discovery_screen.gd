@@ -94,7 +94,6 @@ func _ready() -> void:
 	create_tween().tween_property(self, "modulate:a", 1.0, 0.3)
 	_entrance.call_deferred(picture, figure)
 	AudioManager.play("milestone")
-	GameManager.vibrate(30)
 
 
 func _entrance(picture: Control, figure: Control) -> void:

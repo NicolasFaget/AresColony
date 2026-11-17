@@ -15,7 +15,7 @@ SKIP_WORDS = {"Fermer", "Annuler", "Construire", "Colonie", "Recherche", "Savoir
               "Continuer", "Terminer", "Mesuré", "Expérimenté", "Chimie", "Hypothèse", "Expéditions", "Entretien",
               "Synergies", "Montrer", "Partir", "Choisir"}
 EXTRA = {"Encelade", "Europe", "plombier", "informaticien", "pharmacienne", "soudeur", "glaciologue", "Azote", "urbaniste", "cuisinier", "maintenant", "rations", "pilote", "chimiste", "biologiste", "botaniste", "Eau", "Nourriture", "Batteries",
-         "Atterrisseur", "Conduite", "Expéditions", "Garage", "Musique", "Vibrations"}
+         "Atterrisseur", "Conduite", "Expéditions", "Garage", "Musique"}
 pat = re.compile(r'"((?:[^"\\]|\\.)*)"')
 found = {}
 for f in glob.glob(os.path.join(root, "**", "*.gd"), recursive=True):
