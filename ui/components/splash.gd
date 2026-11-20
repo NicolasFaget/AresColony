@@ -1,6 +1,6 @@
 class_name Splash
 extends Control
-## Écran du studio Kassándra Games (repris de Dune Hawk) : l'œil se dessine, puis l'iris, trois rayons
+## Écran du studio Code Frontier Games (repris de Dune Hawk) : l'œil se dessine, puis l'iris, trois rayons
 ## et le nom du studio. Émet `done` après MIN secondes, une fois `ready_to_go` vrai ; un toucher l'abrège.
 
 signal done
@@ -93,7 +93,7 @@ func _draw() -> void:
 		draw_line(p0, p0 + Vector2(sin(a), -cos(a)) * 26 * kr, amber, 5.0, true)
 	# Le nom du studio monte un peu en apparaissant.
 	var kn := _ease((_t - 0.6) / 0.7)
-	_spaced("KASSÁNDRA", Vector2(cx, oy + 424 + 12 * (1 - kn)), 66, 16, Color(CREAM, fade * kn))
+	_spaced("CODE FRONTIER", Vector2(cx, oy + 424 + 12 * (1 - kn)), 52, 10, Color(CREAM, fade * kn))
 	var ks := _ease((_t - 1.0) / 0.6)
 	_spaced("GAMES", Vector2(cx, oy + 470), 18, 12, Color(AMBER, fade * ks))
 	draw_rect(Rect2(cx - 70 - 120 * ks, oy + 462, 120 * ks, 2), Color(AMBER, fade * ks))
