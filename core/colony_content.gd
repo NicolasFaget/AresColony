@@ -1090,6 +1090,14 @@ const CHATTER := [
 	"Message de la Terre : « Pensez à vous hydrater. » Merci, la Terre.",
 	"Malik parle aux tomates. Elles poussent mieux. La science n'explique pas tout.",
 	"Concours de lancer de pierres : record battu grâce à la gravité réduite.",
+	"Inventaire : 3 tournevis, 2 rouleaux d'adhésif, 1 harmonica. Personne ne sait qui a apporté l'harmonica.",
+	"Soirée cinéma : le film de science-fiction a été jugé « pas réaliste du tout » par toute la colonie.",
+	"Les colons ont voté : la musique du module de recherche sera désormais choisie à tour de rôle.",
+	"Rappel du médecin : deux heures de sport par jour, sinon les muscles fondent en gravité réduite.",
+	"Un message de la Terre vient d'arriver. Il a été envoyé il y a plusieurs minutes : il parle d'un temps déjà passé.",
+	"Quelqu'un a encore laissé la porte du sas ouverte. Heureusement, le sas a deux portes.",
+	"Le compost de la serre sent fort. Les botanistes disent que c'est l'odeur du succès.",
+	"Concours du plus beau caillou : le jury n'a pas réussi à départager les finalistes.",
 ]
 
 
@@ -1100,6 +1108,7 @@ const CHATTER := [
 ## « risk » : probabilité, perte et texte si le sort tourne mal, texte si tout va bien ;
 ## « shelter » : panneaux repliés pendant la tempête qui arrive. Sans réponse à temps, le choix
 ## « default » (le plus prudent) s'applique, ou l'autre s'il n'est pas payable. {name} : un colon tiré au sort.
+## « need » : module raccordé nécessaire ; « planets » : mondes où elle peut arriver ; « era » : ère minimale.
 const DILEMMAS := {
 	"storm_shelter": { "default": 1, "special": true, "title": "Tempête en approche",
 		"text": "Les satellites voient arriver une tempête de poussière. Faut-il replier les panneaux solaires ?",
@@ -1117,7 +1126,7 @@ const DILEMMAS := {
 			{ "label": "Repos pour tous", "health": 1.0,
 				"outcome": "Les colons récupèrent : santé au maximum." },
 		] },
-	"strange_rock": { "default": 1, "title": "Une roche étrange",
+	"strange_rock": { "default": 1, "planets": ["mars", "ceres"], "title": "Une roche étrange",
 		"text": "{name} a trouvé une roche aux reflets verts : peut-être de l'olivine, un minéral fréquent dans les roches volcaniques.",
 		"choices": [
 			{ "label": "L'analyser", "cost": { ENERGY: 15.0 }, "gain": { DATA: 30.0 },
@@ -1153,13 +1162,129 @@ const DILEMMAS := {
 					"safe": "La fuite a été colmatée à la sortie suivante." },
 				"outcome": "−6 oxygène, et 4 risques sur 10 d'en perdre 25." },
 		] },
-	"ice_vein": { "default": 1, "title": "Filon de glace",
+	"ice_vein": { "default": 1, "planets": ["mars", "ceres"], "title": "Filon de glace",
 		"text": "Le radar de {name} a repéré de la glace juste sous la surface, à deux pas de la colonie.",
 		"choices": [
 			{ "label": "Creuser maintenant", "cost": { MATERIALS: 15.0 }, "gain": { WATER: 40.0 },
 				"outcome": "−15 matériaux pour la foreuse, +40 eau." },
 			{ "label": "Le cartographier", "gain": { DATA: 12.0 },
 				"outcome": "+12 données." },
+		] },
+	# --- Propres à un monde (« planets ») ou à une ère avancée (« era ») ---
+	"meteorite": { "default": 0, "planets": ["mars"], "title": "Une météorite de fer",
+		"text": "{name} a repéré un bloc sombre et luisant : une météorite de fer et de nickel, comme celles qu'ont trouvées les rovers Opportunity et Curiosity.",
+		"choices": [
+			{ "label": "L'étudier", "cost": { ENERGY: 10.0 }, "gain": { DATA: 30.0 },
+				"outcome": "−10 énergie, +30 données." },
+			{ "label": "La fondre au four", "gain": { MATERIALS: 20.0 },
+				"outcome": "Du métal presque pur : +20 matériaux." },
+		] },
+	"perchlorates": { "default": 1, "planets": ["mars"], "need": "greenhouse", "title": "Sol toxique",
+		"text": "Le régolithe martien contient des perchlorates, des sels toxiques découverts par la sonde Phoenix. {name} propose de laver un grand lot de sol pour la serre.",
+		"choices": [
+			{ "label": "Laver le sol", "cost": { WATER: 20.0 }, "gain": { FOOD: 30.0 },
+				"outcome": "−20 eau, +30 nourriture." },
+			{ "label": "Cultiver sans sol", "cost": { ENERGY: 12.0 }, "gain": { FOOD: 12.0 },
+				"outcome": "Hydroponie sous lampes : −12 énergie, +12 nourriture." },
+		] },
+	"dust_devil": { "default": 1, "planets": ["mars"], "title": "Tourbillon de poussière",
+		"text": "Un tourbillon de poussière haut de plusieurs centaines de mètres passe au bord du cratère. {name} voudrait le suivre en rover.",
+		"choices": [
+			{ "label": "Le suivre", "cost": { ENERGY: 10.0 }, "gain": { DATA: 25.0 },
+				"outcome": "−10 énergie, +25 données sur les vents martiens." },
+			{ "label": "L'observer de loin", "gain": { DATA: 5.0 },
+				"outcome": "+5 données, sans risque." },
+		] },
+	"bright_salts": { "default": 0, "planets": ["ceres"], "title": "Les sels brillants",
+		"text": "{name} a trouvé une tache blanche éclatante : du carbonate de sodium, comme les taches du cratère Occator observées par la sonde Dawn.",
+		"choices": [
+			{ "label": "Analyser les sels", "cost": { ENERGY: 15.0 }, "gain": { DATA: 30.0 },
+				"outcome": "−15 énergie, +30 données." },
+			{ "label": "Les raffiner", "gain": { MATERIALS: 18.0 },
+				"outcome": "+18 matériaux." },
+		] },
+	"tholins": { "default": 0, "planets": ["titan"], "title": "Neige orange",
+		"text": "Des tholins tombent doucement du ciel : des molécules organiques formées dans la brume orange de Titan. {name} voudrait les étudier.",
+		"choices": [
+			{ "label": "Les étudier", "cost": { ENERGY: 12.0 }, "gain": { DATA: 30.0 },
+				"outcome": "−12 énergie, +30 données." },
+			{ "label": "Pomper le lac voisin", "cost": { MATERIALS: 10.0 }, "gain": { METHANE: 30.0 },
+				"outcome": "−10 matériaux pour les tuyaux, +30 méthane." },
+		] },
+	"jupiter_burst": { "default": 0, "planets": ["europa"], "title": "Orage de particules",
+		"text": "La magnétosphère de Jupiter s'agite : les radiations montent en surface. {name} devait sortir réparer une antenne.",
+		"choices": [
+			{ "label": "Reporter la sortie", "gain": { MATERIALS: -10.0 },
+				"outcome": "L'antenne attend : −10 matériaux de pièces abîmées." },
+			{ "label": "Sortir quand même", "health": -0.2, "gain": { MATERIALS: 25.0 },
+				"outcome": "+25 matériaux récupérés, mais l'équipe est irradiée (santé −20 %)." },
+		] },
+	"plume_grains": { "default": 0, "planets": ["enceladus"], "title": "Grains du panache",
+		"text": "Les collecteurs ont piégé des grains de silice venus de l'océan d'Encelade, comme ceux qu'a détectés la sonde Cassini : signe d'eau chaude au fond.",
+		"choices": [
+			{ "label": "Les analyser", "cost": { ENERGY: 15.0 }, "gain": { DATA: 35.0 },
+				"outcome": "−15 énergie, +35 données." },
+			{ "label": "Garder la glace", "gain": { WATER: 25.0 },
+				"outcome": "+25 eau." },
+		] },
+	# --- Partout ---
+	"birthday": { "default": 1, "title": "Anniversaire",
+		"text": "C'est l'anniversaire de {name} ! L'équipage se demande comment le fêter, à des millions de kilomètres de la Terre.",
+		"choices": [
+			{ "label": "Grand repas", "cost": { FOOD: 12.0 }, "health": 0.3,
+				"outcome": "−12 nourriture ; tout le monde reprend des forces (santé +30 %)." },
+			{ "label": "Message vidéo de la famille", "cost": { ENERGY: 5.0 }, "health": 0.1,
+				"outcome": "−5 énergie pour l'antenne, un vrai moment de joie (santé +10 %)." },
+		] },
+	"old_rover": { "default": 1, "title": "Le vieux rover",
+		"text": "{name} propose de démonter le rover de reconnaissance, en panne depuis des sols, pour récupérer ses pièces.",
+		"choices": [
+			{ "label": "Le démonter", "gain": { MATERIALS: 25.0 },
+				"outcome": "+25 matériaux." },
+			{ "label": "Le garder comme musée", "gain": { DATA: 10.0 },
+				"outcome": "Ses archives de route sont copiées : +10 données." },
+		] },
+	"sleep_study": { "default": 1, "title": "Étude du sommeil",
+		"text": "{name} veut mesurer comment l'équipage dort loin du cycle jour-nuit terrestre. Il faudra porter des capteurs toute la nuit.",
+		"choices": [
+			{ "label": "Participer", "health": -0.1, "gain": { DATA: 25.0 },
+				"outcome": "Nuits agitées (santé −10 %), mais +25 données." },
+			{ "label": "Dormir tranquille", "health": 0.15,
+				"outcome": "Une vraie nuit de repos : santé +15 %." },
+		] },
+	"water_loop": { "default": 1, "title": "Recyclage de l'eau",
+		"text": "Sur l'ISS, on recycle près de 98 % de l'eau, urine comprise. {name} pense pouvoir faire aussi bien ici, avec quelques pièces.",
+		"choices": [
+			{ "label": "Améliorer le circuit", "cost": { MATERIALS: 20.0 }, "gain": { WATER: 35.0 },
+				"outcome": "−20 matériaux, +35 eau récupérée." },
+			{ "label": "Plus tard", "gain": { WATER: -5.0 },
+				"outcome": "Les fuites continuent : −5 eau." },
+		] },
+	"battery_heat": { "default": 0, "need": "battery", "title": "Batterie brûlante",
+		"text": "Un pack de batteries chauffe anormalement. {name} conseille de le couper le temps qu'il refroidisse.",
+		"choices": [
+			{ "label": "Couper et refroidir", "gain": { ENERGY: -20.0 },
+				"outcome": "−20 énergie, aucun risque." },
+			{ "label": "Laisser tourner",
+				"risk": { "chance": 0.3, "gain": { ENERGY: -60.0 }, "text": "Le pack a surchauffé et s'est vidé : −60 énergie.",
+					"safe": "La température est redescendue toute seule." },
+				"outcome": "3 risques sur 10 de perdre 60 énergie." },
+		] },
+	"school_call": { "default": 1, "title": "Appel d'une école",
+		"text": "Une classe sur Terre voudrait poser ses questions à {name}. Les réponses mettront plusieurs minutes à arriver, à la vitesse de la lumière.",
+		"choices": [
+			{ "label": "Répondre aux élèves", "cost": { ENERGY: 15.0 }, "health": 0.15, "gain": { DATA: 8.0 },
+				"outcome": "−15 énergie, +8 données, et le moral remonte (santé +15 %)." },
+			{ "label": "Envoyer une vidéo", "gain": { DATA: 10.0 },
+				"outcome": "Moins d'antenne, plus de travail : +10 données." },
+		] },
+	"ai_planner": { "default": 1, "era": 3, "title": "Le planificateur",
+		"text": "{name} a entraîné un programme qui prévoit la production de la colonie. Il demande beaucoup de données pour s'améliorer.",
+		"choices": [
+			{ "label": "Lui donner les données", "cost": { DATA: 40.0 }, "gain": { ENERGY: 50.0, MATERIALS: 20.0 },
+				"outcome": "−40 données ; machines mieux réglées : +50 énergie, +20 matériaux." },
+			{ "label": "Garder les calculs à la main", "gain": { DATA: 15.0 },
+				"outcome": "L'équipe affine ses propres modèles : +15 données." },
 		] },
 }
 
@@ -1169,7 +1294,7 @@ const DILEMMAS := {
 ## « full » (réserve remplie à `target` de sa capacité), « no_breakdown » (sols sans aucune panne),
 ## « clean » (poussière moyenne sous `target`), « read » (fiches lues en plus), « build » (modules
 ## posés en plus, hors conduites), « synergy » (une synergie de plus), « upgrade » (une amélioration),
-## « research » (une recherche terminée).
+## « research » (une recherche terminée), « crew » (colons en plus), « healthy » (santé moyenne).
 const CHALLENGES := {
 	"full_water": { "kind": "full", "resource": WATER, "target": 0.9, "sols": 6.0, "reward": { DATA: 15.0 },
 		"title": "Citerne pleine", "text": "Remplir la réserve d'eau à 90 %." },
@@ -1191,6 +1316,18 @@ const CHALLENGES := {
 		"title": "Mise à niveau", "text": "Améliorer un module." },
 	"research": { "kind": "research", "target": 1.0, "sols": 6.0, "reward": { MATERIALS: 15.0 },
 		"title": "Labo en ébullition", "text": "Terminer une recherche." },
+	"full_oxygen": { "kind": "full", "resource": OXYGEN, "target": 0.9, "sols": 6.0, "reward": { DATA: 15.0 },
+		"title": "Air pur", "text": "Remplir la réserve d'oxygène à 90 %." },
+	"full_materials": { "kind": "full", "resource": MATERIALS, "target": 0.8, "sols": 8.0, "reward": { DATA: 20.0 },
+		"title": "Entrepôt plein", "text": "Remplir la réserve de matériaux à 80 %." },
+	"big_build": { "kind": "build", "target": 6.0, "sols": 10.0, "reward": { MATERIALS: 45.0 },
+		"title": "Grand chantier", "text": "Construire 6 modules (hors conduites)." },
+	"library": { "kind": "read", "target": 4.0, "sols": 10.0, "reward": { DATA: 35.0 },
+		"title": "Bibliothécaire", "text": "Lire 4 fiches de découverte." },
+	"crew": { "kind": "crew", "target": 1.0, "sols": 12.0, "reward": { FOOD: 25.0 },
+		"title": "Bienvenue à bord", "text": "Accueillir un colon de plus." },
+	"healthy": { "kind": "healthy", "target": 0.9, "sols": 6.0, "reward": { MATERIALS: 20.0 },
+		"title": "Pleine forme", "text": "Porter la santé moyenne de l'équipage à 90 %." },
 }
 
 # ---------- Répliques des colons ----------
@@ -1217,14 +1354,19 @@ const ROLE_LINES := {
 
 ## Selon la situation de la colonie ; %s : le prénom.
 const MOOD_LINES := {
-	"storm": ["%s : « On ne voit plus le bout de la galerie. Heureusement qu'on a des batteries. »",
+	"storm": ["%s : « J'ai compté : 47 grains de poussière sur mon hublot. Non, 48. »",
+		"%s : « On ne voit plus le bout de la galerie. Heureusement qu'on a des batteries. »",
 		"%s : « La poussière siffle sur la coque. Partie de cartes au module habitat ? »"],
-	"night": ["%s : « Les fenêtres allumées dans la nuit, on dirait presque un village. »",
+	"night": ["%s : « Deux lunes dans le ciel cette nuit. Phobos file si vite qu'on le voit bouger. »",
+		"%s : « Les fenêtres allumées dans la nuit, on dirait presque un village. »",
 		"%s : « Il fait −80 °C dehors. Le chauffage, c'est la vraie star de la colonie. »"],
-	"broken": ["%s : « Une machine est en panne. Qui a vu la clé de 12 ? »"],
-	"crowded": ["%s : « On commence à être serrés. Un habitat de plus ne serait pas du luxe. »"],
+	"broken": ["%s : « Encore une panne ? Je vais finir par dormir dans l'atelier. »",
+		"%s : « Une machine est en panne. Qui a vu la clé de 12 ? »"],
+	"crowded": ["%s : « Il y a une file d'attente pour la douche. Sur Mars. »",
+		"%s : « On commence à être serrés. Un habitat de plus ne serait pas du luxe. »"],
 	"aurora": ["%s : « Tout le monde à la verrière ! Une aurore verte ! »"],
-	"happy": ["%s : « Tout tourne. C'est presque inquiétant. »",
+	"happy": ["%s : « On a construit tout ça à partir de cailloux et d'air. Pas mal, non ? »",
+		"%s : « Tout tourne. C'est presque inquiétant. »",
 		"%s : « Je crois que je commence à m'habituer à ce ciel. »"],
 }
 

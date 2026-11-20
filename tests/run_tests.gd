@@ -1738,6 +1738,26 @@ func _test_dilemmas() -> void:
 	engine.advance(0.05)
 	_check(not engine.state.shelter, "fin de tempête : panneaux redéployés")
 
+	# Décisions propres à un monde ou à une ère.
+	engine = _calm_engine()
+	var possible := engine.possible_dilemmas()
+	_check(not possible.has("tholins") and not possible.has("plume_grains") and not possible.has("bright_salts"), "Mars : pas de décision d'un autre monde")
+	_check(not possible.has("ai_planner"), "ère 1 : pas de décision d'ère 3")
+	_check(not possible.has("perchlorates"), "sans serre : pas de décision de serre")
+	engine.state.era = 3
+	_check(engine.possible_dilemmas().has("ai_planner"), "ère 3 : le planificateur peut arriver")
+	for id: String in R.DILEMMAS:
+		for planet: String in R.DILEMMAS[id].get("planets", []):
+			_check(R.PLANETS.has(planet), "décision %s : monde %s connu" % [id, planet])
+
+	# Anniversaire : le grand repas coûte de la nourriture et redonne des forces.
+	engine = _calm_engine()
+	engine.state.colonists[0].health = 0.5
+	var food := engine.state.amount(R.FOOD)
+	engine._raise_dilemma("birthday", engine.state.sol + 2.0)
+	engine.resolve_dilemma(0)
+	_check(_near(engine.state.amount(R.FOOD), food - 12.0) and _near(engine.state.colonists[0].health, 0.8), "anniversaire : −12 nourriture, santé +30 %")
+
 	# Sauvegarde : la décision en attente est gardée.
 	engine = _calm_engine()
 	engine._raise_dilemma("ice_vein", 42.0)
@@ -1787,6 +1807,17 @@ func _test_challenges() -> void:
 	engine.state.challenge = { "id": "read", "start": 99.0, "progress": 0.0, "until": engine.state.sol + 0.1 }
 	engine.advance(0.2)
 	_check(engine.state.challenges_done == 0 and engine.state.challenge.get("id", "") != "read" or engine.state.challenge.is_empty(), "défi expiré")
+
+	# Défi « Pleine forme » : suit la santé moyenne de l'équipage.
+	engine = _rich_engine()
+	for colonist: Dictionary in engine.state.colonists:
+		colonist.health = 0.6
+	_check(engine._challenge_possible(R.CHALLENGES.healthy), "équipage fatigué : défi santé possible")
+	engine.state.challenge = { "id": "healthy", "start": 0.6, "progress": 0.0, "until": engine.state.sol + 6.0 }
+	_check(_near(engine.challenge_progress(), 0.6 / 0.9, 1e-3), "défi santé : avancement")
+	for colonist: Dictionary in engine.state.colonists:
+		colonist.health = 1.0
+	_check(_near(engine.challenge_progress(), 1.0) and not engine._challenge_possible(R.CHALLENGES.healthy), "équipage en forme : défi rempli")
 
 	# Sauvegarde du défi en cours.
 	engine.state.challenge = { "id": "upgrade", "start": 3.0, "progress": 0.0, "until": 50.0 }

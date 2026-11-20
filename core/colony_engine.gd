@@ -1445,6 +1445,35 @@ func resolve_dilemma(choice: int, auto := false) -> Dictionary:
 	return report
 
 
+## Décisions qui peuvent arriver maintenant (ni spéciales, ni la dernière, adaptées au monde,
+## à l'ère et aux modules de la colonie).
+func possible_dilemmas() -> Array[String]:
+	var choices: Array[String] = []
+	for id: String in ColonyContent.DILEMMAS:
+		var def: Dictionary = ColonyContent.DILEMMAS[id]
+		if def.get("special", false) or id == state.last_dilemma:
+			continue
+		if def.has("need") and not _has_connected(def.need):
+			continue
+		if def.has("planets") and not planet_id() in def.planets:
+			continue
+		if def.get("era", 0) > state.era:
+			continue
+		if not _gains_fit(def):
+			continue
+		choices.append(id)
+	return choices
+
+
+## Une décision ne propose pas de gagner une ressource que la colonie ne peut pas stocker.
+func _gains_fit(def: Dictionary) -> bool:
+	for option: Dictionary in def.choices:
+		for r: String in option.get("gain", {}):
+			if option.gain[r] > 0.0 and capacity(r) <= 0.0:
+				return false
+	return true
+
+
 ## Vrai si le coût est payable (un choix automatique sans les moyens ne paie rien).
 func _can_pay(cost: Dictionary) -> bool:
 	for r: String in cost:
@@ -1477,20 +1506,23 @@ func _dilemmas() -> void:
 	if state.sol < state.next_dilemma:
 		return
 	state.next_dilemma = state.sol + _rng.randf_range(DILEMMA_MIN_SOLS, DILEMMA_MAX_SOLS)
-	var choices: Array[String] = []
-	for id: String in ColonyContent.DILEMMAS:
-		var def: Dictionary = ColonyContent.DILEMMAS[id]
-		if def.get("special", false) or id == state.last_dilemma:
-			continue
-		if def.has("need") and not _has_connected(def.need):
-			continue
-		choices.append(id)
+	var choices := possible_dilemmas()
 	if choices.is_empty():
 		return
 	_raise_dilemma(choices[_rng.randi_range(0, choices.size() - 1)], state.sol + DILEMMA_SOLS)
 
 
 # ---------- Défis ----------
+
+## Santé moyenne de l'équipage (0 à 1 ; 1 sans colons).
+func average_health() -> float:
+	if state.colonists.is_empty():
+		return 1.0
+	var total := 0.0
+	for colonist: Dictionary in state.colonists:
+		total += colonist.health
+	return total / state.colonists.size()
+
 
 ## Défi en cours (définition de ColonyContent.CHALLENGES), ou {}.
 func current_challenge() -> Dictionary:
@@ -1507,7 +1539,7 @@ func challenge_progress() -> float:
 	var value := _challenge_value(def)
 	var start: float = state.challenge.start
 	match def.kind:
-		"full":
+		"full", "healthy":
 			return clampf(value / def.target, 0.0, 1.0)
 		"no_breakdown":
 			return clampf(float(state.challenge.progress) / def.target, 0.0, 1.0)
@@ -1538,6 +1570,10 @@ func _challenge_value(def: Dictionary) -> float:
 			return levels
 		"research":
 			return state.research_done.size()
+		"crew":
+			return state.colonists.size()
+		"healthy":
+			return average_health()
 	return 0.0
 
 
@@ -1557,6 +1593,10 @@ func _challenge_possible(def: Dictionary) -> bool:
 				if _connected[i] and not next_upgrade(i).is_empty():
 					return true
 			return false
+		"crew":
+			return housing() > state.colonists.size() and recruits_left() > 0
+		"healthy":
+			return not state.colonists.is_empty() and average_health() < def.target - 0.15
 		"research":
 			if not state.research_active.is_empty():
 				return true
