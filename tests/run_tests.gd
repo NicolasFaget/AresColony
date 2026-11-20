@@ -19,6 +19,7 @@ func _init() -> void:
 	_test_synergies()
 	_test_cards()
 	_test_upgrades()
+	_test_care()
 	_test_hazards()
 	_test_era2()
 	_test_era3()
@@ -734,6 +735,29 @@ func _test_hazards() -> void:
 
 
 # ---------- Améliorations et note ----------
+
+## Infirmerie : récupération trois fois plus rapide, pertes réduites ; entrepôt : plus de stockage.
+func _test_care() -> void:
+	var engine := _rich_engine()
+	engine.state.resources[R.ENERGY] = 40.0
+	var water := engine.capacity(R.WATER)
+	_check(engine.place("warehouse", ColonyBot.connected_spot(engine, "warehouse")), "entrepôt posé")
+	_check(_near(engine.capacity(R.WATER), water + 80.0), "entrepôt : +80 eau de stockage")
+	for colonist: Dictionary in engine.state.colonists:
+		colonist.health = 0.5
+	engine.advance(0.5)
+	var alone: float = engine.state.colonists[0].health
+	_check(not engine.has_care(), "sans infirmerie : pas de soins")
+	for colonist: Dictionary in engine.state.colonists:
+		colonist.health = 0.5
+	_check(engine.place("medbay", ColonyBot.connected_spot(engine, "medbay")), "infirmerie posée")
+	engine.advance(0.05)
+	_check(engine.has_care(), "infirmerie raccordée : soins actifs")
+	for colonist: Dictionary in engine.state.colonists:
+		colonist.health = 0.5
+	engine.advance(0.5)
+	_check(engine.state.colonists[0].health - 0.5 > (alone - 0.5) * 2.5, "infirmerie : récupération bien plus rapide")
+
 
 func _test_upgrades() -> void:
 	var engine := _rich_engine()

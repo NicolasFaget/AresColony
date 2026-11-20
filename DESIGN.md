@@ -201,6 +201,13 @@ sol 1,5 et raffine la saumure au sol 29 ; Titan respire au sol 0,8 et pompe le m
 (générateur à radio-isotopes de l'atterrisseur, +20 kWh/sol, comme Dragonfly ; pompe à 45 matériaux
 et 4 kWh/sol) ; aucune évacuation.
 
+Modules d'appoint : entrepôt pressurisé (sans recherche : +80 eau, +60 nourriture, +40 O₂,
++300 matériaux) ; laboratoire (ère 1, 6 kWh → 3 données/sol) ; atelier de recyclage (ère 1,
+5 kWh → 1,5 matériau/sol, tombe en panne) ; infirmerie (ère 2, 4 kWh/sol : récupération ×3, pertes
+de santé ×0,67, `Building.care`) ; générateur à radio-isotopes (ère 2, 6 kWh/sol constants, sans
+poussière ni panne, comme l'MMRTG de Curiosity). Le joueur simulé ne les construit pas : l'équilibrage
+de référence n'en dépend pas.
+
 Réacteur à fission : 60 kWh/sol jour et nuit, mais 1 matériau/sol d'entretien (moteurs Stirling,
 radiateurs). Sans matériaux, il ralentit, et une alerte « Réacteur à l'arrêt » le signale.
 

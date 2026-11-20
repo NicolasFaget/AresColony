@@ -247,6 +247,11 @@ static func building(building_id: String) -> Node3D:
 		"n2_compressor": _n2_compressor(root)
 		"cryobot": _cryobot(root)
 		"plume_trap": _plume_trap(root)
+		"warehouse": _warehouse(root)
+		"lab": _lab(root)
+		"recycler": _recycler(root)
+		"medbay": _medbay(root)
+		"rtg": _rtg(root)
 	return root
 
 
@@ -767,6 +772,86 @@ static func _electrolyser(r: Node3D) -> void:
 	strut(r, Vector3(0.2, 0.25, -0.18), Vector3(0.2, 0.25, 0.0), 0.03, GREY)
 	cylinder(r, Vector3(0.3, 0.36, -0.28), 0.04, 0.02, RED, Vector3(90, 0, 0), -1.0, 10)
 	light(r, Vector3(-0.1, 0.27, -0.405), LIGHT, 0.022, 2.5)
+
+
+## Entrepôt : hangar voûté bas, portes roulantes, caisses empilées devant.
+static func _warehouse(r: Node3D) -> void:
+	_pad(r, 1.9)
+	box(r, Vector3(0, 0.27, -0.15), Vector3(1.6, 0.4, 1.1), WHITE)
+	cylinder(r, Vector3(0, 0.47, -0.15), 0.55, 1.6, Color("#d6d4cc"), Vector3(0, 0, 90), -1.0, 18)
+	for x in [-0.8, 0.8]:
+		cylinder(r, Vector3(x, 0.47, -0.15), 0.56, 0.04, GREY, Vector3(0, 0, 90), -1.0, 18)
+	for x in [-0.4, 0.4]:
+		box(r, Vector3(x, 0.26, 0.405), Vector3(0.6, 0.36, 0.02), DARK)
+		for k in 4:
+			box(r, Vector3(x, 0.12 + k * 0.08, 0.418), Vector3(0.58, 0.012, 0.01), GREY)
+	var crate := Color("#b88a4a")
+	box(r, Vector3(-0.6, 0.17, 0.68), Vector3(0.22, 0.2, 0.22), crate)
+	box(r, Vector3(-0.36, 0.17, 0.7), Vector3(0.22, 0.2, 0.22), crate.darkened(0.15))
+	box(r, Vector3(-0.48, 0.37, 0.69), Vector3(0.22, 0.2, 0.22), crate.lightened(0.1))
+	box(r, Vector3(0.55, 0.15, 0.7), Vector3(0.3, 0.16, 0.2), BLUE)
+	light(r, Vector3(0, 0.58, 0.42), WARM_LIGHT, 0.03, 2.0)
+
+
+## Laboratoire : module blanc, bandeau de hublots, petite antenne et mât de capteurs.
+static func _lab(r: Node3D) -> void:
+	_pad(r, 0.95)
+	box(r, Vector3(0, 0.3, 0), Vector3(0.7, 0.46, 0.6), WHITE)
+	box(r, Vector3(0, 0.55, 0), Vector3(0.74, 0.04, 0.64), DARK)
+	box(r, Vector3(0, 0.36, 0.305), Vector3(0.56, 0.1, 0.02), Color("#2b3f52"))
+	for k in 3:
+		box(r, Vector3(-0.19 + k * 0.19, 0.36, 0.312), Vector3(0.13, 0.07, 0.01), Color("#9fd8ff"), Vector3.ZERO, 1.2)
+	cylinder(r, Vector3(0.22, 0.72, -0.15), 0.015, 0.3, GREY, Vector3.ZERO, -1.0, 6)
+	var dish := sphere(r, Vector3(0.22, 0.88, -0.15), 0.11, WHITE, Vector3(1, 0.32, 1), 0.0, true)
+	dish.rotation_degrees = Vector3(0, 0, 30)
+	cylinder(r, Vector3(-0.22, 0.7, -0.12), 0.012, 0.28, GREY, Vector3.ZERO, -1.0, 6)
+	box(r, Vector3(-0.22, 0.85, -0.12), Vector3(0.1, 0.04, 0.04), DARK)
+	light(r, Vector3(-0.22, 0.89, -0.12), Color("#5be49b"), 0.02)
+
+
+## Atelier de recyclage : bâti gris, trémie de broyage, sortie de granulés et bac de matière.
+static func _recycler(r: Node3D) -> void:
+	_pad(r, 0.95)
+	box(r, Vector3(-0.08, 0.27, 0), Vector3(0.5, 0.4, 0.5), Color("#7d858e"))
+	box(r, Vector3(-0.08, 0.48, 0), Vector3(0.54, 0.03, 0.54), DARK)
+	var hopper := cylinder(r, Vector3(-0.08, 0.62, 0), 0.22, 0.24, GREY, Vector3.ZERO, 0.1, 4)
+	hopper.rotation_degrees.y = 45.0
+	box(r, Vector3(-0.08, 0.3, 0.255), Vector3(0.3, 0.18, 0.02), DARK)
+	box(r, Vector3(-0.08, 0.36, 0.262), Vector3(0.26, 0.02, 0.01), ORANGE, Vector3.ZERO, 1.2)
+	strut(r, Vector3(0.17, 0.22, 0.1), Vector3(0.33, 0.12, 0.25), 0.03, DARK)
+	box(r, Vector3(0.32, 0.1, 0.27), Vector3(0.18, 0.08, 0.16), Color("#5a6470"))
+	for k in 3:
+		sphere(r, Vector3(0.28 + k * 0.04, 0.15, 0.25 + (k % 2) * 0.04), 0.03, Color("#d9c7a3"), Vector3.ONE, 0.0, false, 8)
+	light(r, Vector3(0.12, 0.42, 0.255), LIGHT, 0.022)
+
+
+## Infirmerie : module cylindrique blanc, croix rouge, hublot éclairé.
+static func _medbay(r: Node3D) -> void:
+	_pad(r, 0.95)
+	cylinder(r, Vector3(0, 0.3, 0), 0.36, 0.46, WHITE, Vector3.ZERO, -1.0, 24)
+	sphere(r, Vector3(0, 0.53, 0), 0.36, WHITE, Vector3(1, 0.35, 1), 0.0, true, 24)
+	cylinder(r, Vector3(0, 0.1, 0), 0.37, 0.04, GREY, Vector3.ZERO, -1.0, 24)
+	box(r, Vector3(0, 0.34, 0.355), Vector3(0.22, 0.07, 0.03), RED)
+	box(r, Vector3(0, 0.34, 0.355), Vector3(0.07, 0.22, 0.03), RED)
+	sphere(r, Vector3(0.25, 0.34, 0.26), 0.06, WARM_LIGHT, Vector3(1, 1, 0.3), 1.5, false, 12)
+	light(r, Vector3(0, 0.66, 0), Color("#ff6f61"), 0.025)
+
+
+## Générateur à radio-isotopes : cylindre sombre hérissé d'ailettes, sur un petit socle.
+static func _rtg(r: Node3D) -> void:
+	_pad(r, 0.95)
+	box(r, Vector3(0, 0.1, 0), Vector3(0.36, 0.06, 0.36), GREY)
+	cylinder(r, Vector3(0, 0.42, 0), 0.12, 0.6, DARK, Vector3.ZERO, -1.0, 16)
+	for k in 8:
+		var a := k * TAU / 8.0
+		box(r, Vector3(cos(a) * 0.2, 0.42, sin(a) * 0.2), Vector3(0.16, 0.56, 0.02), Color("#4a525c"), Vector3(0, -rad_to_deg(a), 0))
+	cylinder(r, Vector3(0, 0.74, 0), 0.13, 0.04, GREY, Vector3.ZERO, -1.0, 16)
+	cylinder(r, Vector3(0, 0.12, 0), 0.13, 0.04, GREY, Vector3.ZERO, -1.0, 16)
+	# Le cœur reste chaud : une lueur orangée au sommet.
+	var core := cylinder(r, Vector3(0, 0.77, 0), 0.06, 0.02, ORANGE, Vector3.ZERO, -1.0, 12)
+	core.material_override = material(ORANGE, 1.4)
+	strut(r, Vector3(0.12, 0.2, 0.12), Vector3(0.36, 0.08, 0.36), 0.02, ORANGE)
+	box(r, Vector3(-0.32, 0.12, 0.3), Vector3(0.14, 0.1, 0.1), Color("#e0c341"))
 
 
 # ---------- Personnages et véhicules ----------

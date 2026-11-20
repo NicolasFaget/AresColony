@@ -33,6 +33,8 @@ class Building:
 
 	## Colons protégés des radiations pendant une éruption solaire.
 	var shelter: int
+	## Infirmerie : soigne les colons (voir ColonyEngine.CARE_RECOVERY).
+	var care: bool
 
 	func _init(p: Dictionary) -> void:
 		id = p.id
@@ -50,6 +52,7 @@ class Building:
 		description = p.get("description", "")
 		fixed = p.get("fixed", false)
 		shelter = p.get("shelter", 0)
+		care = p.get("care", false)
 
 
 ## Recherche : coûte des données scientifiques et prend un peu de temps.

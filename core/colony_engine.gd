@@ -62,6 +62,9 @@ const DEMOLISH_REFUND := 0.5
 const CARD_READ_REWARD := 5.0
 const QUIZ_REWARD := 10.0
 ## Coût d'une amélioration (niveau 2, puis 3) : part du coût du module en matériaux, et données.
+## Infirmerie : récupération plus rapide, pertes de santé réduites.
+const CARE_RECOVERY := 3.0
+const CARE_PROTECTION := 0.67
 const UPGRADE_MATERIALS: Array[float] = [0.8, 1.2]
 const UPGRADE_DATA: Array[float] = [15.0, 30.0]
 ## Objectif « Colonie modèle » : note B avec au moins autant de modules (hors conduites).
@@ -1064,11 +1067,22 @@ func _storm_factor() -> float:
 
 # ---------- Colons ----------
 
+## Une infirmerie qui tourne : les colons récupèrent CARE_RECOVERY fois plus vite et perdent
+## CARE_PROTECTION fois moins de santé.
+func has_care() -> bool:
+	for i in state.buildings.size():
+		if _connected[i] and def_of(i).care and efficiency(i) > 0.5:
+			return true
+	return false
+
+
 func _update_health(satisfied: Dictionary, ds: float) -> void:
+	var care := has_care()
+	var protection := CARE_PROTECTION if care else 1.0
 	# Sans oxygène, les réserves de secours des combinaisons tiennent environ un sol.
-	var loss: float = (1.0 - satisfied.get(ColonyContent.OXYGEN, 1.0)) * 1.2 \
+	var loss: float = ((1.0 - satisfied.get(ColonyContent.OXYGEN, 1.0)) * 1.2 \
 			+ (1.0 - satisfied.get(ColonyContent.WATER, 1.0)) * 0.4 \
-			+ (1.0 - satisfied.get(ColonyContent.FOOD, 1.0)) * 0.25
+			+ (1.0 - satisfied.get(ColonyContent.FOOD, 1.0)) * 0.25) * protection
 	var cause := ""
 	if loss > 0.0:
 		var worst := 1.0
@@ -1081,6 +1095,7 @@ func _update_health(satisfied: Dictionary, ds: float) -> void:
 	if planet().get("radiation", false) and dose < JUPITER_DAMAGE:
 		dose = JUPITER_DAMAGE
 		dose_cause = "jupiter"
+	dose *= protection
 	var shelter := shelter_capacity() if dose > 0.0 else 0
 	for i in range(state.colonists.size() - 1, -1, -1):
 		var colonist: Dictionary = state.colonists[i]
@@ -1091,7 +1106,7 @@ func _update_health(satisfied: Dictionary, ds: float) -> void:
 			mine += dose
 			why = dose_cause
 		if mine <= 0.0:
-			colonist.health = minf(1.0, colonist.health + 0.3 * ds)
+			colonist.health = minf(1.0, colonist.health + 0.3 * ds * (CARE_RECOVERY if care else 1.0))
 		elif not _autopilot:
 			# Résistance un peu différente selon les colons : ils ne partent pas tous en même temps.
 			colonist.health -= mine * ds * (1.0 + 0.12 * (i % 4))

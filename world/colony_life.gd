@@ -12,7 +12,7 @@ const VENTS := {
 	"sabatier": Vector3(-0.35, 1.32, -0.3),
 }
 ## Modules sans fenêtre ni lampe : pas de lumière au sol la nuit.
-const DARK_MODULES := ["link", "solar", "battery", "tank"]
+const DARK_MODULES := ["link", "solar", "battery", "tank", "rtg"]
 
 var _world: Node3D
 var _engine: ColonyEngine

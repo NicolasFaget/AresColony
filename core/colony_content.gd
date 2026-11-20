@@ -51,9 +51,10 @@ const COLONIST_NEEDS := { OXYGEN: 0.84, WATER: 2.5, FOOD: 1.0, ENERGY: 0.5 }
 ## Données scientifiques produites par chaque colon par sol.
 const COLONIST_DATA := 1.0
 ## Modules qui peuvent tomber en panne (les machines).
-const BREAKABLE := ["moxie", "extractor", "greenhouse", "electrolyser", "kiln", "sabatier", "biodome", "brine", "methane_pump"]
+const BREAKABLE := ["recycler", "moxie", "extractor", "greenhouse", "electrolyser", "kiln", "sabatier", "biodome", "brine", "methane_pump"]
 ## Ce que racontent les colons quand une machine lâche.
 const BREAKDOWN_LINES := {
+	"recycler": "Le broyeur de l'atelier de recyclage s'est coincé sur une vieille botte.",
 	"moxie": "L'électrolyseur de CO₂ a surchauffé. Il sent le grille-pain.",
 	"extractor": "La foreuse de l'extracteur est coincée dans la glace. Elle boude.",
 	"greenhouse": "Une pompe d'arrosage de la serre a lâché. Les radis s'inquiètent.",
@@ -88,6 +89,21 @@ static func buildings() -> Array[Defs.Building]:
 			"id": "habitat", "name": "Habitat gonflable", "size": Vector2i(2, 2), "cost": 60.0,
 			"inputs": { ENERGY: 4.0 }, "housing": 4, "storage": { OXYGEN: 30.0, FOOD: 30.0 },
 			"description": "Loge 4 colons de plus. Le chauffage consomme de l'énergie.",
+		}),
+		Defs.Building.new({
+			"id": "warehouse", "name": "Entrepôt pressurisé", "size": Vector2i(2, 2), "cost": 40.0,
+			"storage": { OXYGEN: 40.0, WATER: 80.0, FOOD: 60.0, MATERIALS: 300.0 },
+			"description": "Des étagères à l'abri du vide et du froid : eau, vivres, oxygène et matériaux de construction.",
+		}),
+		Defs.Building.new({
+			"id": "lab", "name": "Laboratoire", "cost": 35.0, "research": "lab",
+			"inputs": { ENERGY: 6.0 }, "outputs": { DATA: 3.0 },
+			"description": "Microscopes, spectromètres et paillasses : la science avance plus vite qu'avec le seul labo de l'atterrisseur.",
+		}),
+		Defs.Building.new({
+			"id": "recycler", "name": "Atelier de recyclage", "cost": 30.0, "research": "refab",
+			"inputs": { ENERGY: 5.0 }, "outputs": { MATERIALS: 1.5 },
+			"description": "Broie les emballages, les pièces cassées et les déchets plastiques pour en faire de la matière première. Peu, mais dès le début.",
 		}),
 		Defs.Building.new({
 			"id": "moxie", "name": "Électrolyseur de CO₂", "cost": 30.0, "research": "moxie",
@@ -141,6 +157,16 @@ static func buildings() -> Array[Defs.Building]:
 			"id": "erv", "name": "Véhicule de retour", "size": Vector2i(2, 2), "cost": 250.0, "research": "erv",
 			"storage": { METHANE: 200.0 }, "card": "mars_direct",
 			"description": "La fusée qui ramènera un jour l'équipage. Ses réservoirs se remplissent avec le méthane fabriqué sur Mars.",
+		}),
+		Defs.Building.new({
+			"id": "medbay", "name": "Infirmerie", "cost": 50.0, "research": "medicine",
+			"inputs": { ENERGY: 4.0 }, "care": true,
+			"description": "Un médecin, des lits et de quoi soigner : les colons y récupèrent trois fois plus vite, et les pénuries comme les radiations les épuisent un tiers moins.",
+		}),
+		Defs.Building.new({
+			"id": "rtg", "name": "Générateur à radio-isotopes", "cost": 90.0, "research": "rtg",
+			"outputs": { ENERGY: 6.0 },
+			"description": "La chaleur du plutonium 238 devient électricité, comme sur les rovers Curiosity et Perseverance : peu d'énergie, mais jour et nuit, sans poussière ni panne.",
 		}),
 		Defs.Building.new({
 			"id": "bunker", "name": "Habitat enterré", "size": Vector2i(2, 2), "cost": 120.0, "research": "shielding",
@@ -364,7 +390,7 @@ const REGION_ORDER := ["jezero", "arcadia"]
 ## Régions où l'on peut fonder une colonie depuis l'astroport.
 const FOUNDING_REGIONS := ["jezero", "arcadia", "ceres", "titan", "europa", "enceladus"]
 ## Modules chauffés : leur besoin d'énergie suit l'effet « heating » de la région.
-const HEATED := ["habitat", "greenhouse", "bunker", "biodome"]
+const HEATED := ["habitat", "greenhouse", "bunker", "biodome", "medbay"]
 
 ## Expéditions en rover (ère 2) : sites réels, découverts dans l'ordre de la région ; ensuite,
 ## des prospections qui rapportent des matériaux.
@@ -390,6 +416,38 @@ const PROSPECTION := { "id": "prospect", "name": "Prospection de minerais", "car
 ## Améliorations de chaque module : niveau 2 puis niveau 3, chacune fondée sur une vraie technologie.
 ## Multiplicateurs (outputs, inputs, storage) et places supplémentaires (housing), cumulés par niveau.
 const UPGRADES := {
+	"lab": [
+		{ "name": "Spectromètre laser", "effect": "+30 % de données",
+			"outputs": { DATA: 1.3 },
+			"why": "L'instrument ChemCam de Curiosity vaporise au laser un point de roche, à plusieurs mètres, et lit la lumière émise pour en connaître la composition." },
+		{ "name": "Microscope électronique", "effect": "+25 % de données",
+			"outputs": { DATA: 1.25 },
+			"why": "Un microscope électronique distingue des détails environ mille fois plus fins qu'un microscope optique : grains de poussière, cristaux, peut-être des traces de vie." },
+	],
+	"rtg": [
+		{ "name": "Thermocouples avancés", "effect": "+25 % d'énergie",
+			"outputs": { ENERGY: 1.25 },
+			"why": "La NASA a étudié une version améliorée de son générateur, l'eMMRTG : de nouveaux matériaux thermoélectriques, les skutterudites, donneraient environ 25 % d'électricité en plus." },
+		{ "name": "Grandes ailettes", "effect": "+20 % d'énergie",
+			"outputs": { ENERGY: 1.2 },
+			"why": "Un thermocouple produit d'autant plus d'électricité que l'écart de température est grand entre son côté chaud et son côté froid : de plus grandes ailettes refroidissent mieux le côté froid." },
+	],
+	"recycler": [
+		{ "name": "Imprimante à filament recyclé", "effect": "+30 % de matériaux",
+			"outputs": { MATERIALS: 1.3 },
+			"why": "Le Refabricator, testé à bord de la Station spatiale à partir de 2019, transformait des déchets plastiques en filament pour imprimer de nouvelles pièces." },
+		{ "name": "Tri optique", "effect": "+25 % de matériaux",
+			"outputs": { MATERIALS: 1.25 },
+			"why": "Des caméras et des jets d'air trient les déchets par matière, comme dans les centres de tri sur Terre : chaque matière est mieux recyclée." },
+	],
+	"warehouse": [
+		{ "name": "Rayonnages automatisés", "effect": "+50 % de stockage",
+			"storage": { OXYGEN: 1.5, WATER: 1.5, FOOD: 1.5, MATERIALS: 1.5 },
+			"why": "Dans les entrepôts modernes, des robots rangent les caisses en hauteur : on stocke bien plus dans le même volume." },
+		{ "name": "Chambre froide", "effect": "+30 % de stockage",
+			"storage": { OXYGEN: 1.3, WATER: 1.3, FOOD: 1.3, MATERIALS: 1.3 },
+			"why": "Dehors, il fait souvent −60 °C : une partie de l'entrepôt, à peine isolée, sert de chambre froide sans dépenser d'énergie (principe simplifié pour le jeu)." },
+	],
 	"solar": [
 		{ "name": "Cellules à triple jonction", "effect": "+30 % d'énergie",
 			"outputs": { ENERGY: 1.3 },
@@ -500,6 +558,18 @@ const SYNERGIES := [
 		"name": "Circuit court", "effect": "−25 % d'énergie",
 		"outputs": {}, "inputs": { ENERGY: 0.75 },
 		"why": "L'eau arrive directement de l'extracteur : moins de pompage et de réchauffage (principe d'ingénierie simplifié pour le jeu)." },
+	{ "id": "habitat_rtg", "building": "habitat", "neighbor": "rtg",
+		"name": "Chaleur du plutonium", "effect": "−25 % d'énergie de chauffage",
+		"outputs": {}, "inputs": { ENERGY: 0.75 },
+		"why": "Un générateur à radio-isotopes dégage bien plus de chaleur que d'électricité : environ 2 000 W de chaleur pour 110 W électriques pour celui de Curiosity. Cette chaleur peut chauffer un habitat voisin." },
+	{ "id": "lab_garage", "building": "lab", "neighbor": "garage",
+		"name": "Échantillons frais", "effect": "+25 % de données",
+		"outputs": { DATA: 1.25 }, "inputs": {},
+		"why": "Les roches rapportées par le rover sont analysées aussitôt, avant que l'air du sas ne les altère (principe simplifié pour le jeu)." },
+	{ "id": "recycler_kiln", "building": "recycler", "neighbor": "kiln",
+		"name": "Chutes recyclées", "effect": "+30 % de matériaux pour l'atelier",
+		"outputs": { MATERIALS: 1.3 }, "inputs": {},
+		"why": "Les briques ratées et les chutes du four repartent aussitôt au broyeur (principe simplifié pour le jeu)." },
 	{ "id": "solar_battery", "building": "solar", "neighbor": "battery",
 		"name": "Stockage au plus près", "effect": "+10 % d'énergie",
 		"outputs": { ENERGY: 1.1 }, "inputs": {},
@@ -515,6 +585,10 @@ static func research() -> Array[Defs.Research]:
 				"card": "ice", "summary": "Révèle la glace enfouie et débloque l'extracteur." }),
 		Defs.Research.new({ "id": "batteries", "name": "Batteries lithium-ion", "cost": 15.0, "duration": 1.0,
 				"card": "batteries", "summary": "Débloque les batteries pour tenir la nuit." }),
+		Defs.Research.new({ "id": "lab", "name": "Laboratoire", "cost": 12.0, "duration": 1.0,
+				"requires": ["batteries"], "summary": "Débloque le laboratoire : plus de données pour la recherche." }),
+		Defs.Research.new({ "id": "refab", "name": "Recyclage des déchets", "cost": 15.0, "duration": 1.0,
+				"requires": ["batteries"], "summary": "Débloque l'atelier de recyclage : un peu de matériaux bien avant le four." }),
 		Defs.Research.new({ "id": "greenhouse", "name": "Serre pressurisée", "cost": 20.0, "duration": 1.5,
 				"requires": ["ice"], "card": "greenhouse", "summary": "Débloque la serre : cultiver sur Mars." }),
 		Defs.Research.new({ "id": "electrolysis", "name": "Électrolyse de l'eau", "cost": 25.0, "duration": 1.5,
@@ -540,6 +614,10 @@ static func research() -> Array[Defs.Research]:
 		Defs.Research.new({ "id": "erv", "name": "Mars Direct", "cost": 80.0, "duration": 3.0, "era": 2,
 				"requires": ["sabatier"], "card": "mars_direct",
 				"summary": "Débloque le véhicule de retour, à remplir de méthane fabriqué sur Mars." }),
+		Defs.Research.new({ "id": "medicine", "name": "Médecine spatiale", "cost": 45.0, "duration": 2.0, "era": 2,
+				"requires": ["greenhouse"], "summary": "Débloque l'infirmerie : les colons se remettent bien plus vite." }),
+		Defs.Research.new({ "id": "rtg", "name": "Générateur à radio-isotopes", "cost": 55.0, "duration": 2.0, "era": 2,
+				"requires": ["batteries"], "summary": "Débloque le générateur à radio-isotopes : un peu d'énergie, jour et nuit, même en tempête." }),
 		# Choix exclusifs (un par ère) : lancer l'une des deux recherches écarte l'autre.
 		Defs.Research.new({ "id": "solid_state", "name": "Batteries à électrolyte solide", "cost": 45.0, "duration": 2.0, "era": 2,
 				"requires": ["cleaning"], "rival": "hardened", "effects": { "battery": 1.5 },
