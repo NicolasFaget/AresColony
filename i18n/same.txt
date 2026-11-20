@@ -124,3 +124,9 @@ Graphismes auto : %.1f images/s au niveau %d → niveau %d
 −%s %s %s/sol
 Langue / Language
 %s|%s|%s|%d
+NASA JPL (2018)
+≈ 40 s
+Raponi et al., Science Advances (2018)
+≈ 400 m/s
+NaCl
+2018

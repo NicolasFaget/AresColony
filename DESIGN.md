@@ -127,7 +127,12 @@ de vie de l'application.
   sans dégâts, coupés avec `breakdown_rate = 0`) : séisme martien (+20 données ; InSight, magnitude 5
   en 2022), vapeur d'eau de Cérès (+20 eau, +10 données ; Herschel 2014), averse de méthane sur
   Titan (+25 méthane, +10 données ; Cassini 2010), geyser d'Europe (+15 eau, +25 données ;
-  Hubble 2016, hypothèse). Chacun débloque sa fiche et s'accompagne d'un nuage dans la scène.
+  Hubble 2016, hypothèse). Un second événement par monde, tiré au hasard avec le premier :
+  éclipse de Phobos (+20 données ; Perseverance 2022), givre du cratère Juling (+15 eau, +15 données ;
+  Dawn 2016), dune de Titan (+20 matériaux, +10 données ; Cassini), sel d'Europe (+15 matériaux,
+  +20 données ; Hubble 2019), anneau E d'Encelade (+15 eau, +20 données). Chacun débloque sa fiche
+  et s'accompagne d'un nuage dans la scène. Le signal `world_event` porte l'identifiant de
+  l'événement ; `ColonyContent.world_event(id)` le retrouve.
 - Fiches : chacune a un chiffre clé, une illustration et un quiz à trois choix, tirés uniquement de
   son texte sourcé. Déblocage = écran plein « Nouvelle découverte » ; première lecture +5 données,
   bonne réponse au quiz +10 (une seule tentative).
@@ -202,11 +207,14 @@ sol 1,5 et raffine la saumure au sol 29 ; Titan respire au sol 0,8 et pompe le m
 et 4 kWh/sol) ; aucune évacuation.
 
 Modules d'appoint : entrepôt pressurisé (sans recherche : +80 eau, +60 nourriture, +40 O₂,
-+300 matériaux) ; laboratoire (ère 1, 6 kWh → 3 données/sol) ; atelier de recyclage (ère 1,
-5 kWh → 1,5 matériau/sol, tombe en panne) ; infirmerie (ère 2, 4 kWh/sol : récupération ×3, pertes
-de santé ×0,67, `Building.care`) ; générateur à radio-isotopes (ère 2, 6 kWh/sol constants, sans
-poussière ni panne, comme l'MMRTG de Curiosity). Le joueur simulé ne les construit pas : l'équilibrage
-de référence n'en dépend pas.
++300 matériaux) ; laboratoire (5 kWh → 5 données/sol) ; atelier de recyclage (4 kWh → 2,5 matériaux
+/sol, tombe en panne) ; infirmerie (ère 2, 4 kWh/sol : récupération ×3, pertes de santé ×0,67,
+`Building.care`) ; générateur à radio-isotopes (ère 2, 70 matériaux, 8 kWh/sol constants, sans
+poussière ni panne, comme l'MMRTG de Curiosity). Le joueur simulé les recherche après le véhicule de
+retour et les construit en dernier : la campagne est un peu plus rapide (méthane au sol 55 au lieu
+de 62, retour au sol 119 au lieu de 121). Construits trop tôt, avant le garage et le Sabatier, ils
+la ralentissaient d'une dizaine de sols. Fiches liées : SAM de Curiosity (laboratoire), Refabricator (recyclage), perte
+osseuse (infirmerie), MMRTG (générateur).
 
 Réacteur à fission : 60 kWh/sol jour et nuit, mais 1 matériau/sol d'entretien (moteurs Stirling,
 radiateurs). Sans matériaux, il ralentit, et une alerte « Réacteur à l'arrêt » le signale.

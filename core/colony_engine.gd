@@ -30,8 +30,8 @@ signal dust_devil(cleaned: int)
 ## Météorite : le module touché (endommagé), ou -1 si elle est tombée à côté.
 signal meteor_impact(index: int)
 signal aurora_started
-## Événement propre au monde (ColonyContent.WORLD_EVENTS) : gains réellement reçus.
-signal world_event(planet: String, gains: Dictionary)
+## Événement propre au monde (ColonyContent.WORLD_EVENTS) : son identifiant, gains réellement reçus.
+signal world_event(planet: String, event_id: String, gains: Dictionary)
 ## Une décision attend le joueur (ColonyContent.DILEMMAS), puis son compte rendu.
 signal dilemma_raised(dilemma_id: String)
 signal dilemma_resolved(report: Dictionary)
@@ -1361,11 +1361,12 @@ func _meteors() -> void:
 	changed.emit()
 
 
-## Un événement naturel propre à chaque monde (séisme martien, vapeur de Cérès, pluie de Titan,
-## geyser d'Europe) : sans dégâts, un petit gain et une fiche. Dès l'ère 2 sur Mars.
+## Un événement naturel propre au monde, tiré parmi les siens (séisme ou éclipse de Phobos sur Mars,
+## vapeur ou givre sur Cérès, pluie ou dunes sur Titan…) : sans dégâts, un petit gain et une fiche.
+## Dès l'ère 2 sur Mars.
 func _world_event() -> void:
-	var event: Dictionary = ColonyContent.WORLD_EVENTS.get(planet_id(), {})
-	if breakdown_rate <= 0.0 or event.is_empty() or (planet_id() == "mars" and state.era < 2):
+	var events: Array = ColonyContent.WORLD_EVENTS.get(planet_id(), [])
+	if breakdown_rate <= 0.0 or events.is_empty() or (planet_id() == "mars" and state.era < 2):
 		return
 	if state.next_world_event >= 1e8:
 		state.next_world_event = state.sol + _rng.randf_range(WORLD_EVENT_MIN_SOLS, WORLD_EVENT_MAX_SOLS)
@@ -1374,6 +1375,7 @@ func _world_event() -> void:
 	if state.sol < state.next_world_event:
 		return
 	state.next_world_event = state.sol + _rng.randf_range(WORLD_EVENT_MIN_SOLS, WORLD_EVENT_MAX_SOLS)
+	var event: Dictionary = events[_rng.randi_range(0, events.size() - 1)]
 	state.event_seed = _rng.state
 	var gains := {}
 	for r: String in event.reward:
@@ -1382,7 +1384,7 @@ func _world_event() -> void:
 		if state.amount(r) - before >= 0.5:
 			gains[r] = state.amount(r) - before
 	unlock_card(event.card)
-	world_event.emit(planet_id(), gains)
+	world_event.emit(planet_id(), event.id, gains)
 	changed.emit()
 
 

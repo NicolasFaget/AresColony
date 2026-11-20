@@ -97,12 +97,14 @@ static func buildings() -> Array[Defs.Building]:
 		}),
 		Defs.Building.new({
 			"id": "lab", "name": "Laboratoire", "cost": 35.0, "research": "lab",
-			"inputs": { ENERGY: 6.0 }, "outputs": { DATA: 3.0 },
+			"inputs": { ENERGY: 5.0 }, "outputs": { DATA: 5.0 },
+			"card": "sam_lab",
 			"description": "Microscopes, spectromètres et paillasses : la science avance plus vite qu'avec le seul labo de l'atterrisseur.",
 		}),
 		Defs.Building.new({
 			"id": "recycler", "name": "Atelier de recyclage", "cost": 30.0, "research": "refab",
-			"inputs": { ENERGY: 5.0 }, "outputs": { MATERIALS: 1.5 },
+			"inputs": { ENERGY: 4.0 }, "outputs": { MATERIALS: 2.5 },
+			"card": "refabricator",
 			"description": "Broie les emballages, les pièces cassées et les déchets plastiques pour en faire de la matière première. Peu, mais dès le début.",
 		}),
 		Defs.Building.new({
@@ -161,11 +163,13 @@ static func buildings() -> Array[Defs.Building]:
 		Defs.Building.new({
 			"id": "medbay", "name": "Infirmerie", "cost": 50.0, "research": "medicine",
 			"inputs": { ENERGY: 4.0 }, "care": true,
+			"card": "bone_loss",
 			"description": "Un médecin, des lits et de quoi soigner : les colons y récupèrent trois fois plus vite, et les pénuries comme les radiations les épuisent un tiers moins.",
 		}),
 		Defs.Building.new({
-			"id": "rtg", "name": "Générateur à radio-isotopes", "cost": 90.0, "research": "rtg",
-			"outputs": { ENERGY: 6.0 },
+			"id": "rtg", "name": "Générateur à radio-isotopes", "cost": 70.0, "research": "rtg",
+			"outputs": { ENERGY: 8.0 },
+			"card": "mmrtg",
 			"description": "La chaleur du plutonium 238 devient électricité, comme sur les rovers Curiosity et Perseverance : peu d'énergie, mais jour et nuit, sans poussière ni panne.",
 		}),
 		Defs.Building.new({
@@ -302,19 +306,48 @@ const PLANETS := {
 			"cryobot": "Inutile de forer ici : sur Encelade, l'océan remonte de lui-même par les geysers." } },
 }
 const PLANET_ORDER := ["mars", "ceres", "titan", "europa", "enceladus"]
-## Un événement naturel propre à chaque monde (fiche sourcée), de temps en temps : un petit gain.
+
+
+## Événement naturel par son identifiant ({} s'il n'existe pas).
+static func world_event(event_id: String) -> Dictionary:
+	for planet: String in WORLD_EVENTS:
+		for event: Dictionary in WORLD_EVENTS[planet]:
+			if event.id == event_id:
+				return event
+	return {}
+## Événements naturels propres à chaque monde (fiche sourcée), de temps en temps : un petit gain.
 ## news : texte de la nouvelle, %s reçoit les gains.
 const WORLD_EVENTS := {
-	"mars": { "card": "marsquake", "reward": { DATA: 20.0 },
-		"news": "Séisme martien ! Les sismomètres de la colonie l'ont enregistré : %s." },
-	"ceres": { "card": "ceres_vapour", "reward": { WATER: 20.0, DATA: 10.0 },
-		"news": "La glace de Cérès se sublime au soleil : un panache de vapeur d'eau. Les pièges froids récupèrent %s." },
-	"titan": { "card": "titan_rain", "reward": { METHANE: 25.0, DATA: 10.0 },
-		"news": "Averse de méthane sur Titan ! Les collecteurs en récupèrent : %s." },
-	"europa": { "card": "europa_plume", "reward": { WATER: 15.0, DATA: 25.0 },
-		"news": "Un geyser jaillit d'une fracture d'Europe ! La colonie en recueille : %s." },
-	"enceladus": { "card": "enceladus_webb", "reward": { WATER: 20.0, DATA: 20.0 },
-		"news": "Le panache d'Encelade redouble ! Les collecteurs en recueillent : %s." },
+	"mars": [
+		{ "id": "marsquake", "card": "marsquake", "reward": { DATA: 20.0 },
+			"news": "Séisme martien ! Les sismomètres de la colonie l'ont enregistré : %s." },
+		{ "id": "phobos_eclipse", "card": "phobos_eclipse", "reward": { DATA: 20.0 },
+			"news": "Phobos passe devant le Soleil : une éclipse de quarante secondes ! Les mesures rapportent %s." },
+	],
+	"ceres": [
+		{ "id": "ceres_vapour", "card": "ceres_vapour", "reward": { WATER: 20.0, DATA: 10.0 },
+			"news": "La glace de Cérès se sublime au soleil : un panache de vapeur d'eau. Les pièges froids récupèrent %s." },
+		{ "id": "juling_ice", "card": "juling_ice", "reward": { WATER: 15.0, DATA: 15.0 },
+			"news": "Du givre se redépose sur une paroi froide, comme dans le cratère Juling. Les colons en récupèrent %s." },
+	],
+	"titan": [
+		{ "id": "titan_rain", "card": "titan_rain", "reward": { METHANE: 25.0, DATA: 10.0 },
+			"news": "Averse de méthane sur Titan ! Les collecteurs en récupèrent : %s." },
+		{ "id": "titan_dunes", "card": "titan_dunes", "reward": { MATERIALS: 20.0, DATA: 10.0 },
+			"news": "Le vent de Titan pousse une dune jusqu'aux portes de la colonie : des grains organiques à récolter, %s." },
+	],
+	"europa": [
+		{ "id": "europa_plume", "card": "europa_plume", "reward": { WATER: 15.0, DATA: 25.0 },
+			"news": "Un geyser jaillit d'une fracture d'Europe ! La colonie en recueille : %s." },
+		{ "id": "europa_salt", "card": "europa_salt", "reward": { MATERIALS: 15.0, DATA: 20.0 },
+			"news": "Une plaque de sel jauni affleure près de la colonie, comme à Tara Regio : %s." },
+	],
+	"enceladus": [
+		{ "id": "enceladus_webb", "card": "enceladus_webb", "reward": { WATER: 20.0, DATA: 20.0 },
+			"news": "Le panache d'Encelade redouble ! Les collecteurs en recueillent : %s." },
+		{ "id": "e_ring", "card": "e_ring", "reward": { WATER: 15.0, DATA: 20.0 },
+			"news": "Une bouffée de glace monte vers l'anneau E de Saturne ; les collecteurs en retiennent %s." },
+	],
 }
 ## Routes entre mondes (dans le jeu, un sol de voyage vaut environ un mois réel) : durée du trajet
 ## (orbite de Hohmann), période entre deux fenêtres de tir (période synodique), durée d'ouverture,
@@ -585,10 +618,10 @@ static func research() -> Array[Defs.Research]:
 				"card": "ice", "summary": "Révèle la glace enfouie et débloque l'extracteur." }),
 		Defs.Research.new({ "id": "batteries", "name": "Batteries lithium-ion", "cost": 15.0, "duration": 1.0,
 				"card": "batteries", "summary": "Débloque les batteries pour tenir la nuit." }),
-		Defs.Research.new({ "id": "lab", "name": "Laboratoire", "cost": 12.0, "duration": 1.0,
-				"requires": ["batteries"], "summary": "Débloque le laboratoire : plus de données pour la recherche." }),
-		Defs.Research.new({ "id": "refab", "name": "Recyclage des déchets", "cost": 15.0, "duration": 1.0,
-				"requires": ["batteries"], "summary": "Débloque l'atelier de recyclage : un peu de matériaux bien avant le four." }),
+		Defs.Research.new({ "id": "lab", "name": "Laboratoire", "cost": 8.0, "duration": 1.0,
+				"requires": ["batteries"], "card": "sam_lab", "summary": "Débloque le laboratoire : plus de données pour la recherche." }),
+		Defs.Research.new({ "id": "refab", "name": "Recyclage des déchets", "cost": 10.0, "duration": 1.0,
+				"requires": ["batteries"], "card": "refabricator", "summary": "Débloque l'atelier de recyclage : un peu de matériaux bien avant le four." }),
 		Defs.Research.new({ "id": "greenhouse", "name": "Serre pressurisée", "cost": 20.0, "duration": 1.5,
 				"requires": ["ice"], "card": "greenhouse", "summary": "Débloque la serre : cultiver sur Mars." }),
 		Defs.Research.new({ "id": "electrolysis", "name": "Électrolyse de l'eau", "cost": 25.0, "duration": 1.5,
@@ -614,10 +647,10 @@ static func research() -> Array[Defs.Research]:
 		Defs.Research.new({ "id": "erv", "name": "Mars Direct", "cost": 80.0, "duration": 3.0, "era": 2,
 				"requires": ["sabatier"], "card": "mars_direct",
 				"summary": "Débloque le véhicule de retour, à remplir de méthane fabriqué sur Mars." }),
-		Defs.Research.new({ "id": "medicine", "name": "Médecine spatiale", "cost": 45.0, "duration": 2.0, "era": 2,
-				"requires": ["greenhouse"], "summary": "Débloque l'infirmerie : les colons se remettent bien plus vite." }),
-		Defs.Research.new({ "id": "rtg", "name": "Générateur à radio-isotopes", "cost": 55.0, "duration": 2.0, "era": 2,
-				"requires": ["batteries"], "summary": "Débloque le générateur à radio-isotopes : un peu d'énergie, jour et nuit, même en tempête." }),
+		Defs.Research.new({ "id": "medicine", "name": "Médecine spatiale", "cost": 30.0, "duration": 2.0, "era": 2,
+				"requires": ["greenhouse"], "card": "bone_loss", "summary": "Débloque l'infirmerie : les colons se remettent bien plus vite." }),
+		Defs.Research.new({ "id": "rtg", "name": "Générateur à radio-isotopes", "cost": 35.0, "duration": 2.0, "era": 2,
+				"requires": ["batteries"], "card": "mmrtg", "summary": "Débloque le générateur à radio-isotopes : un peu d'énergie, jour et nuit, même en tempête." }),
 		# Choix exclusifs (un par ère) : lancer l'une des deux recherches écarte l'autre.
 		Defs.Research.new({ "id": "solid_state", "name": "Batteries à électrolyte solide", "cost": 45.0, "duration": 2.0, "era": 2,
 				"requires": ["cleaning"], "rival": "hardened", "effects": { "battery": 1.5 },
@@ -789,6 +822,64 @@ static func objectives() -> Array[Defs.Objective]:
 
 static func cards() -> Array[Defs.Card]:
 	return [
+		Defs.Card.new({ "id": "mmrtg", "figure": "≈ 2 000 W → 110 W", "figure_label": "de chaleur donnent environ 110 W d'électricité en début de mission", "visual": "rtg",
+			"quiz": "D'où vient l'énergie du générateur de Curiosity ?", "choices": ["De la chaleur du plutonium 238", "De la lumière du Soleil", "D'une réaction de fusion"], "answer": 0,
+			"title": "Une pile au plutonium", "status": "En service",
+			"fact": "Le générateur MMRTG des rovers Curiosity et Perseverance contient 4,8 kg de dioxyde de plutonium. Sa désintégration dégage environ 2 000 W de chaleur, dont des thermocouples tirent environ 110 W d'électricité en début de mission. La chaleur restante garde le rover au chaud.",
+			"in_game": "Le générateur à radio-isotopes donne peu d'énergie, mais jour et nuit, sans poussière ni panne.",
+			"sources": [["NASA – fiche du MMRTG", "https://science.nasa.gov/wp-content/uploads/2024/02/mmrtg-factsheet-updated-5-18-20-1.pdf"]] }),
+		Defs.Card.new({ "id": "sam_lab", "figure": "≈ 3 milliards d'années", "figure_label": "l'âge des roches où Curiosity a trouvé des molécules organiques", "visual": "lab",
+			"quiz": "Qu'a trouvé le laboratoire SAM de Curiosity en 2018 ?", "choices": ["Des fossiles de bactéries", "Des molécules organiques anciennes", "Un lac d'eau liquide"], "answer": 1,
+			"title": "Un labo grand comme un four", "status": "Mesuré",
+			"fact": "Le laboratoire SAM du rover Curiosity est grand comme un four à micro-ondes. Il chauffe la poudre de roche à plus de 500 °C pour en libérer les molécules. En 2018, la NASA a annoncé qu'il avait trouvé des molécules organiques (thiophènes, benzène, toluène…) dans des roches vieilles d'environ 3 milliards d'années, au fond du cratère Gale. Leur origine reste inconnue.",
+			"in_game": "Le laboratoire transforme de l'énergie en données : la recherche avance plus vite.",
+			"sources": [["NASA JPL (2018)", "https://www.jpl.nasa.gov/news/nasa-finds-ancient-organic-material-mysterious-methane-on-mars"],
+				["NASA – instruments de Curiosity", "https://science.nasa.gov/mission/msl-curiosity/science-instruments/"]] }),
+		Defs.Card.new({ "id": "refabricator", "figure": "2018", "figure_label": "le Refabricator, recycleur et imprimante 3D, part vers la Station spatiale", "visual": "recycler",
+			"quiz": "Que fabrique le Refabricator à partir de déchets plastiques ?", "choices": ["Du carburant", "Du filament pour imprimer des pièces", "De l'eau potable"], "answer": 1,
+			"title": "Recycler en orbite", "status": "Expérimenté",
+			"fact": "Construit par l'entreprise Tethers Unlimited pour la NASA, le Refabricator réunit un recycleur et une imprimante 3D dans le volume d'un mini-réfrigérateur. Parti vers la Station spatiale en novembre 2018 à bord d'un cargo Cygnus, installé début 2019, il transforme des déchets plastiques en filament pour imprimer de nouvelles pièces.",
+			"in_game": "L'atelier de recyclage donne un peu de matériaux dès le début, bien avant le four à régolithe.",
+			"sources": [["NASA – le Refabricator installé", "https://www.nasa.gov/image-article/refabricator-recycle-reuse-plastic-installed-space-station/"]] }),
+		Defs.Card.new({ "id": "bone_loss", "figure": "1 à 1,5 %", "figure_label": "de densité osseuse perdue chaque mois en impesanteur", "visual": "medbay",
+			"quiz": "Combien de temps de sport font chaque jour les astronautes de la Station ?", "choices": ["Environ 15 minutes", "Environ 2 heures", "Environ 6 heures"], "answer": 1,
+			"title": "Des os qui fondent", "status": "Mesuré",
+			"fact": "Sans pesanteur, les os et les muscles s'affaiblissent. Pendant des missions de quatre à six mois, les os perdent en moyenne 1 à 1,5 % de leur densité chaque mois. Pour limiter la perte, les équipages de la Station spatiale font environ deux heures de sport par jour.",
+			"in_game": "L'infirmerie aide les colons à récupérer. Sur Mars, la pesanteur vaut 38 % de celle de la Terre : on ignore encore si elle suffit à protéger les os.",
+			"sources": [["NASA – risque de perte osseuse", "https://www.nasa.gov/reference/risk-of-spaceflight-induced-bone-changes/"],
+				["NASA – le sport des astronautes", "https://www.nasa.gov/missions/station/iss-research/astronaut-exercise/"]] }),
+		Defs.Card.new({ "id": "phobos_eclipse", "figure": "≈ 40 s", "figure_label": "la durée d'une éclipse de Soleil par Phobos, filmée par Perseverance en 2022", "visual": "lander",
+			"quiz": "Pourquoi Phobos ne cache-t-il jamais tout le Soleil ?", "choices": ["Il est trop petit vu de Mars", "Il est transparent", "Il tourne trop lentement"], "answer": 0,
+			"title": "L'éclipse de Phobos", "status": "Observé",
+			"fact": "Le 2 avril 2022, la caméra Mastcam-Z du rover Perseverance a filmé Phobos, la plus grande lune de Mars, passant devant le Soleil. Trop petite pour le cacher entièrement, cette lune en forme de pomme de terre a fait une éclipse d'un peu plus de 40 secondes, bien plus courte qu'une éclipse de Lune sur Terre.",
+			"in_game": "De temps en temps, Phobos passe devant le Soleil : les mesures des colons rapportent des données.",
+			"sources": [["NASA JPL (2022)", "https://www.jpl.nasa.gov/news/nasas-perseverance-rover-captures-video-of-solar-eclipse-on-mars"]] }),
+		Defs.Card.new({ "id": "juling_ice", "figure": "≈ 9 % → 14 %", "figure_label": "de glace sur une paroi du cratère Juling, en six mois, en 2016", "visual": "brine",
+			"quiz": "Qu'a observé la sonde Dawn sur la paroi du cratère Juling ?", "choices": ["Une coulée de lave", "De plus en plus de glace", "Un nouveau cratère"], "answer": 1,
+			"title": "Le givre de Juling", "status": "Mesuré",
+			"fact": "En 2016, la sonde Dawn a observé la paroi nord du cratère Juling, sur Cérès : en six mois, la part couverte de glace d'eau est passée d'environ 9 % à 14 %, soit environ 2 km² de plus. C'est le premier changement observé directement à la surface de Cérès. Une explication possible : chauffée par le Soleil, la glace se sublime, puis la vapeur gèle à nouveau sur la paroi froide.",
+			"in_game": "De temps en temps, du givre se redépose près de la colonie : un peu d'eau, et des données.",
+			"sources": [["NASA JPL (2018)", "https://www.jpl.nasa.gov/news/nasa-dawn-reveals-recent-changes-in-ceres-surface/"],
+				["Raponi et al., Science Advances (2018)", "https://pmc.ncbi.nlm.nih.gov/articles/PMC5851659"]] }),
+		Defs.Card.new({ "id": "titan_dunes", "figure": "≈ 12,5 %", "figure_label": "de la surface de Titan couverte de dunes, selon le radar de Cassini", "visual": "methane_pump",
+			"quiz": "De quoi seraient faits les grains des dunes de Titan ?", "choices": ["De sable de silice, comme sur Terre", "De matière organique tombée du ciel", "De sel"], "answer": 1,
+			"title": "Les dunes de Titan", "status": "Mesuré",
+			"fact": "Le radar de la sonde Cassini a révélé d'immenses champs de dunes sur Titan : environ 12,5 % de la surface, soit quelque 10 millions de km². Larges de 1 à 2 km, longues de centaines de kilomètres et hautes d'environ 100 m, elles seraient faites de grains organiques tombés de l'atmosphère.",
+			"in_game": "De temps en temps, le vent pousse une dune jusqu'à la colonie : des grains organiques pour les matériaux.",
+			"sources": [["ESA – les deux visages des dunes de Titan", "https://esa.int/Science_Exploration/Space_Science/Cassini-Huygens/The_two_faces_of_Titan_s_dunes"],
+				["USGS – les dunes de Titan vues par Cassini", "https://pubs.usgs.gov/publication/70036210"]] }),
+		Defs.Card.new({ "id": "europa_salt", "figure": "NaCl", "figure_label": "du sel de table, repéré par Hubble à la surface d'Europe", "visual": "cryobot",
+			"quiz": "Quel sel colore en jaune une région d'Europe ?", "choices": ["Le chlorure de sodium, notre sel de table", "Le bicarbonate de soude", "Le sel d'Epsom"], "answer": 0,
+			"title": "Du sel sur Europe", "status": "Observé",
+			"fact": "En 2019, des chercheurs de Caltech et du JPL ont montré avec le télescope Hubble que la couleur jaune de Tara Regio, une région jeune d'Europe, vient de chlorure de sodium, notre sel de table, jauni par les radiations. Ce sel pourrait venir de l'océan caché, qui ressemblerait alors aux océans terrestres, mais ce n'est pas certain.",
+			"in_game": "De temps en temps, une plaque de sel affleure près de la colonie : des matériaux et des données.",
+			"sources": [["NASA – Hubble et le sel d'Europe", "https://science.nasa.gov/missions/hubble/table-salt-compound-spotted-on-europa/"]] }),
+		Defs.Card.new({ "id": "e_ring", "figure": "≈ 400 m/s", "figure_label": "la vitesse des jets d'Encelade", "visual": "plume_trap",
+			"quiz": "Quel anneau de Saturne les jets d'Encelade alimentent-ils ?", "choices": ["L'anneau A", "L'anneau E", "Aucun"], "answer": 1,
+			"title": "La lune qui fait un anneau", "status": "Mesuré",
+			"fact": "Les jets d'Encelade projettent de la vapeur et des grains de glace à environ 400 m/s. Une petite partie échappe à la faible gravité de la lune et alimente l'anneau E de Saturne, un anneau diffus dans lequel Encelade circule.",
+			"in_game": "De temps en temps, les jets redoublent : les collecteurs retiennent de l'eau et des données.",
+			"sources": [["NASA – Encelade", "https://science.nasa.gov/saturn/moons/enceladus/"]] }),
 		Defs.Card.new({ "id": "atmosphere", "figure": "95 %", "figure_label": "de dioxyde de carbone dans l'air martien", "visual": "lander",
 			"quiz": "Quel gaz domine l'air de Mars ?", "choices": ["Le dioxyde de carbone", "L'azote", "L'oxygène"], "answer": 0,
 			"title": "L'air de Mars", "status": "Mesuré",

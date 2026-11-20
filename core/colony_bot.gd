@@ -5,7 +5,7 @@ extends RefCounted
 ## construit ce qui manque le plus, garde une réserve de matériaux, étend ses conduites vers la glace.
 
 const R = preload("res://core/colony_content.gd")
-const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate", "regolith", "sabatier", "rovers", "erv", "solid_state", "shielding", "fission", "soil", "closed_loop", "spaceport", "brines", "cryogenics", "buffer_gas", "cryobot", "plume_sampling", "predictive"]
+const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate", "regolith", "sabatier", "rovers", "erv", "lab", "medicine", "rtg", "solid_state", "shielding", "fission", "soil", "closed_loop", "spaceport", "brines", "cryogenics", "buffer_gas", "cryobot", "plume_sampling", "predictive"]
 
 
 ## Lance la prochaine recherche disponible, dans l'ordre conseillé.
@@ -137,6 +137,18 @@ static func build(engine: ColonyEngine) -> void:
 		want = "erv"
 	elif engine.is_unlocked(engine.building_defs["spaceport"]) and _count(engine, "spaceport") == 0:
 		want = "spaceport"
+	# Modules d'appoint, une fois l'essentiel construit : un laboratoire, un atelier de recyclage en attendant le four, un entrepôt
+	# quand les matériaux débordent, une infirmerie et un générateur à radio-isotopes dès l'ère 2.
+	elif engine.is_unlocked(engine.building_defs["lab"]) and _count(engine, "lab") == 0 and flows[R.ENERGY] > 8.0:
+		want = "lab"
+	elif engine.is_unlocked(engine.building_defs["recycler"]) and _count(engine, "recycler") == 0 			and not engine.is_unlocked(engine.building_defs["kiln"]) and flows[R.ENERGY] > 8.0:
+		want = "recycler"
+	elif _count(engine, "warehouse") < 2 and engine.state.amount(R.MATERIALS) >= engine.capacity(R.MATERIALS) * 0.9:
+		want = "warehouse"
+	elif engine.is_unlocked(engine.building_defs["medbay"]) and _count(engine, "medbay") == 0:
+		want = "medbay"
+	elif engine.is_unlocked(engine.building_defs["rtg"]) and _count(engine, "rtg") == 0:
+		want = "rtg"
 	# Capitale (ère 4) : de grands dômes pour la seconde vague, et un compresseur d'appoint.
 	elif engine.is_unlocked(engine.building_defs["dome"]) and engine.recruits_left() > 0 \
 			and engine.state.colonists.size() >= engine.housing() - 1 and _count(engine, "dome") < 2 and _domes_ready(engine):
@@ -156,7 +168,7 @@ static func build(engine: ColonyEngine) -> void:
 	if not engine.is_unlocked(engine.building_defs[want]):
 		return
 	# Confort (habitat, batteries) : seulement si une réserve reste pour les urgences vitales.
-	if want in ["habitat", "battery", "garage", "erv", "sabatier", "bunker", "reactor", "biodome", "spaceport", "tank", "dome", "n2_compressor"] and engine.state.amount(R.MATERIALS) < engine.building_defs[want].cost + 50.0:
+	if want in ["lab", "recycler", "medbay", "rtg", "habitat", "battery", "garage", "erv", "sabatier", "bunker", "reactor", "biodome", "spaceport", "tank", "dome", "n2_compressor"] and engine.state.amount(R.MATERIALS) < engine.building_defs[want].cost + 50.0:
 		return
 	if want in ["extractor", "brine", "methane_pump", "cryobot", "plume_trap"] and not (want == "extractor" and engine.planet().ice_everywhere):
 		reach_ice(engine, want)

@@ -259,11 +259,11 @@ func _connect_engine() -> void:
 		AudioManager.play("milestone")
 		_news.post(Tr.t("Une aurore verte illumine la nuit martienne ! Les mesures des colons rapportent %d données.")
 				% roundi(ColonyEngine.AURORA_DATA)))
-	_engine.world_event.connect(func(planet: String, gains: Dictionary) -> void:
+	_engine.world_event.connect(func(planet: String, event_id: String, gains: Dictionary) -> void:
 		AudioManager.play("milestone")
 		_world.world_event(planet)
 		var gained := ColonyPage._reward_text(gains) if not gains.is_empty() else Tr.t("rien, faute de place")
-		_news.post(Tr.t(ColonyContent.WORLD_EVENTS[planet].news) % gained))
+		_news.post(Tr.t(ColonyContent.world_event(event_id).news) % gained))
 	_engine.dilemma_raised.connect(func(_id: String) -> void:
 		AudioManager.play("alert")
 		_show_dilemma())

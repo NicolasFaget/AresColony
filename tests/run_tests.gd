@@ -1314,7 +1314,7 @@ func _test_world_events() -> void:
 		var engine := ColonyEngine.new(state)
 		engine.breakdown_rate = 1e-9
 		var seen := []
-		engine.world_event.connect(func(p: String, gains: Dictionary) -> void: seen.append([p, gains]))
+		engine.world_event.connect(func(p: String, id: String, gains: Dictionary) -> void: seen.append([p, gains, id]))
 		engine.advance(0.05)
 		_check(engine.state.next_world_event > engine.state.sol + ColonyEngine.WORLD_EVENT_MIN_SOLS - 0.1
 				and engine.state.next_world_event < engine.state.sol + ColonyEngine.WORLD_EVENT_MAX_SOLS,
@@ -1322,13 +1322,20 @@ func _test_world_events() -> void:
 		engine.state.next_world_event = engine.state.sol + 0.01
 		var data := engine.state.amount(R.DATA)
 		engine.advance(0.05)
-		var event: Dictionary = ColonyContent.WORLD_EVENTS[planet]
 		_check(seen.size() == 1 and seen[0][0] == planet, "événement survenu : %s" % planet)
+		var event := ColonyContent.world_event(seen[0][2] if not seen.is_empty() else "")
+		_check(ColonyContent.WORLD_EVENTS[planet].has(event), "événement du bon monde : %s" % planet)
 		_check(engine.state.amount(R.DATA) > data + 5.0 and seen[0][1].has(R.DATA), "événement : des données (%s)" % planet)
 		_check(engine.state.cards_unlocked.has(event.card), "fiche de l'événement : %s" % planet)
 		_check(engine.state.next_world_event > engine.state.sol + ColonyEngine.WORLD_EVENT_MIN_SOLS - 0.2, "suivant reprogrammé : %s" % planet)
 		var copy := ColonyState.from_dict(engine.state.to_dict())
 		_check(_near(copy.next_world_event, engine.state.next_world_event), "prochain événement sauvegardé : %s" % planet)
+	# Chaque monde a au moins deux événements, chacun avec sa fiche.
+	var cards := ColonyContent.cards().map(func(c: Defs.Card) -> String: return c.id)
+	for planet: String in ColonyContent.PLANET_ORDER:
+		_check(ColonyContent.WORLD_EVENTS[planet].size() >= 2, "deux événements au moins : %s" % planet)
+		for event: Dictionary in ColonyContent.WORLD_EVENTS[planet]:
+			_check(cards.has(event.card) and str(event.news).contains("%s"), "événement complet : %s" % event.id)
 	var early := ColonyEngine.new(ColonyState.new())
 	early.breakdown_rate = 1e-9
 	early.advance(1.0)
