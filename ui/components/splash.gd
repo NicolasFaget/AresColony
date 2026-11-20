@@ -1,6 +1,6 @@
 class_name Splash
 extends Control
-## Écran du studio Code Frontier Games (repris de Dune Hawk) : l'œil se dessine, puis l'iris, trois rayons
+## Écran du studio Code Frontier (repris de Dune Hawk) : l'œil se dessine, puis l'iris, trois rayons
 ## et le nom du studio. Émet `done` après MIN secondes, une fois `ready_to_go` vrai ; un toucher l'abrège.
 
 signal done
@@ -94,10 +94,9 @@ func _draw() -> void:
 	# Le nom du studio monte un peu en apparaissant.
 	var kn := _ease((_t - 0.6) / 0.7)
 	_spaced("CODE FRONTIER", Vector2(cx, oy + 424 + 12 * (1 - kn)), 52, 10, Color(CREAM, fade * kn))
+	# Un trait doré s'étire sous le nom.
 	var ks := _ease((_t - 1.0) / 0.6)
-	_spaced("GAMES", Vector2(cx, oy + 470), 18, 12, Color(AMBER, fade * ks))
-	draw_rect(Rect2(cx - 70 - 120 * ks, oy + 462, 120 * ks, 2), Color(AMBER, fade * ks))
-	draw_rect(Rect2(cx + 70, oy + 462, 120 * ks, 2), Color(AMBER, fade * ks))
+	draw_rect(Rect2(cx - 190 * ks, oy + 458, 380 * ks, 2), Color(AMBER, fade * ks))
 	if not ready_to_go and _t > MIN:
 		var c := Color("c8b898", fade * (0.45 + 0.25 * sin(_t * 4)))
 		draw_string(_font, Vector2(cx - 300, vs.y - 52), Tr.t("CHARGEMENT…"), HORIZONTAL_ALIGNMENT_CENTER, 600, 16, c)
