@@ -97,7 +97,7 @@ func refresh() -> void:
 		return
 	var affordable := engine.state.amount(ColonyContent.MATERIALS) >= def.cost
 	_button.disabled = not affordable
-	_cost.add_theme_color_override("font_color", Palette.ON_MONEY if affordable else Palette.TEXT_DIM)
+	UiFx.font_color(_cost, Palette.ON_MONEY if affordable else Palette.TEXT_DIM)
 
 
 func _effect(resource: String, amount: float, positive: bool, prefix := "") -> Control:

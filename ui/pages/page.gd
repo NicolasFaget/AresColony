@@ -5,6 +5,8 @@ extends VBoxContainer
 var header: VBoxContainer
 var list: VBoxContainer
 var scroll: ScrollContainer
+## Dernier état affiché (voir `unchanged`).
+var _shown_key := ""
 
 
 func _init() -> void:
@@ -41,7 +43,18 @@ func refresh() -> void:
 
 ## Appelé quand l'onglet devient actif.
 func on_shown() -> void:
+	_shown_key = ""
 	refresh()
+
+
+## Vrai si l'état résumé par `key` est déjà affiché. Les pages appellent leur `refresh` 10 fois
+## par seconde : sur un téléphone modeste, tout réordonner et réécrire à chaque fois coûtait la
+## moitié des images (14 images/s sur l'onglet Recherche).
+func unchanged(key: String) -> bool:
+	if key == _shown_key:
+		return true
+	_shown_key = key
+	return false
 
 
 ## Fait défiler jusqu'à une ligne et la fait clignoter (guide, alertes).

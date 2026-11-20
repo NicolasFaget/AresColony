@@ -40,6 +40,12 @@ func highlight(target: String) -> void:
 
 func refresh() -> void:
 	var engine := GameManager.engine
+	var materials := engine.state.amount(ColonyContent.MATERIALS)
+	var parts := PackedStringArray([str(engine.active_synergy_count()), str(engine.state.tutorial_done)])
+	for row in _rows:
+		parts.append("%s%s" % [engine.is_unlocked(row.def), materials >= row.def.cost])
+	if unchanged(",".join(parts)):
+		return
 	# Modules débloqués en premier, dans l'ordre du contenu.
 	var index := 1
 	for unlocked in [true, false]:

@@ -354,6 +354,12 @@ fourchettes ; mettre ce tableau à jour après chaque rééquilibrage.
 
 - Une lambda GDScript capture la *valeur* d'une variable à sa création : une fenêtre ouverte après
   la création de ses boutons se partage via un tableau (`var holder: Array[Modal] = []`).
+- Les pages se rafraîchissent 10 fois par seconde : rien n'y est refait si l'état n'a pas changé
+  (`Page.unchanged`), et les couleurs passent par `UiFx.font_color`. Redéfinir une couleur ou
+  réordonner des lignes à chaque fois faisait tomber le Mali à 14 images/s sur l'onglet Recherche.
+- Les repères de jeu dorés (niveaux, synergies) sont dans le groupe `info_marker`, caché en mode
+  photo : de près, ils flottaient comme des losanges lumineux.
+- `build/` (captures de débogage) est exclu de l'export Android : sinon l'APK passe de 34 à 123 Mo.
 - `trait` est un mot réservé de GDScript (ne pas l'utiliser comme nom de variable).
 - `is_connected` est une méthode native de `Object` : d'où `is_linked`.
 - Un script lancé par `-s` ne doit pas typer une classe qui utilise un autoload (`GameManager`).

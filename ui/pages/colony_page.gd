@@ -155,7 +155,7 @@ func refresh() -> void:
 		_crew_summary.text = Tr.t("Santé moyenne : %d %%") % roundi(health / engine.state.colonists.size() * 100.0)
 		if tired > 0:
 			_crew_summary.text += Tr.t(" · %d en mauvaise forme") % tired
-	_crew_summary.add_theme_color_override("font_color", Palette.WARNING if tired > 0 else Palette.TEXT_MUTED)
+	UiFx.font_color(_crew_summary, Palette.WARNING if tired > 0 else Palette.TEXT_MUTED)
 	for i in engine.state.colonists.size():
 		var colonist: Dictionary = engine.state.colonists[i]
 		var line := _crew.get_child(i)
@@ -227,7 +227,7 @@ func _rating_panel() -> Control:
 func _refresh_rating() -> void:
 	var rating := GameManager.engine.colony_rating()
 	_grade.text = rating.grade
-	_grade.add_theme_color_override("font_color", { "A": Palette.SUCCESS, "B": Palette.ACCENT, "C": Palette.MONEY,
+	UiFx.font_color(_grade, { "A": Palette.SUCCESS, "B": Palette.ACCENT, "C": Palette.MONEY,
 			"D": Palette.WARNING, "E": Palette.DANGER }[rating.grade])
 	_score.text = Tr.t("%d / 100") % roundi(rating.score)
 	for i in rating.parts.size():

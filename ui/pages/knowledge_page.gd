@@ -29,6 +29,8 @@ func _ready() -> void:
 
 func refresh() -> void:
 	var engine := GameManager.engine
+	if unchanged("%s|%s|%s|%d" % [engine.state.cards_unlocked, engine.state.cards_read, engine.state.quiz_answers, engine.state.research_done.size()]):
+		return
 	# Fiches débloquées d'abord, non lues en tête.
 	var index := 0
 	for rank in [0, 1, 2]:

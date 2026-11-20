@@ -61,16 +61,16 @@ func refresh() -> void:
 	_mystery.visible = not unlocked
 	_title.text = card.title if unlocked else Tr.t("Fiche à découvrir")
 	_status.text = card.status if unlocked else _unlock_hint()
-	_status.add_theme_color_override("font_color", Palette.STATUS_COLORS.get(card.status, Palette.TEXT_DIM) if unlocked else Palette.TEXT_DIM)
+	UiFx.font_color(_status, Palette.STATUS_COLORS.get(card.status, Palette.TEXT_DIM) if unlocked else Palette.TEXT_DIM)
 	_new_badge.visible = unlocked and not state.cards_read.has(card.id)
 	_quiz_badge.visible = unlocked and not card.quiz.is_empty()
 	if state.quiz_answers.has(card.id):
 		var good: bool = state.quiz_answers[card.id]
 		_quiz_badge.text = Tr.t("Quiz réussi ✓") if good else Tr.t("Quiz manqué")
-		_quiz_badge.add_theme_color_override("font_color", Palette.SUCCESS if good else Palette.TEXT_DIM)
+		UiFx.font_color(_quiz_badge, Palette.SUCCESS if good else Palette.TEXT_DIM)
 	else:
 		_quiz_badge.text = Tr.t("Quiz · +%d données") % int(ColonyEngine.QUIZ_REWARD)
-		_quiz_badge.add_theme_color_override("font_color", Palette.ACCENT)
+		UiFx.font_color(_quiz_badge, Palette.ACCENT)
 
 
 func _unlock_hint() -> String:

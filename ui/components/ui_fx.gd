@@ -25,6 +25,13 @@ static func building_icon(building_id: String, side: Vector2) -> TextureRect:
 	return node
 
 
+## Couleur du texte, appliquée seulement si elle change : redéfinir une couleur relance le
+## thème et la mise en page du contrôle, coûteux quand on le fait 10 fois par seconde.
+static func font_color(control: Control, color: Color) -> void:
+	if not control.has_theme_color_override("font_color") or control.get_theme_color("font_color") != color:
+		control.add_theme_color_override("font_color", color)
+
+
 static func label(text: String, variation := "", align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var node := Label.new()
 	node.text = text

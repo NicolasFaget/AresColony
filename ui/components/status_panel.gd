@@ -88,10 +88,10 @@ func refresh() -> void:
 		var flow: float = flows[r]
 		var trend: Label = _trends[r]
 		trend.text = "▲" if flow > 0.05 else ("▼" if flow < -0.05 else "")
-		trend.add_theme_color_override("font_color", Palette.SUCCESS if flow > 0.0 else Palette.DANGER)
+		UiFx.font_color(trend, Palette.SUCCESS if flow > 0.0 else Palette.DANGER)
 		# Réserve vitale qui s'épuise bientôt : la valeur passe en rouge.
 		var low: bool = days.get(r, INF) < ColonyAdvisor.WARNING_SOLS
-		_values[r].add_theme_color_override("font_color", Palette.DANGER if low else Palette.TEXT)
+		UiFx.font_color(_values[r], Palette.DANGER if low else Palette.TEXT)
 
 
 func _icon_button(icon_name: String, action: Callable) -> Button:

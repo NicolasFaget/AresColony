@@ -22,6 +22,15 @@ func _ready() -> void:
 
 func refresh() -> void:
 	var engine := GameManager.engine
+	var parts := PackedStringArray([str(engine.research_era()), str(_open), str(engine.state.research_done.size())])
+	var data := engine.state.amount(ColonyContent.DATA)
+	var idle := engine.state.research_active.is_empty()
+	for row in _rows:
+		var state := engine.research_state(row.research.id)
+		parts.append(state + ("+" if idle and data >= row.research.cost else "-"))
+	parts.append(str(roundi(engine.state.research_progress * 100.0)))
+	if unchanged(",".join(parts)):
+		return
 	var order := { "active": 0, "available": 1, "locked": 2, "done": 3, "excluded": 4 }
 	var sorted := _rows.duplicate()
 	sorted.sort_custom(func(a: ResearchRow, b: ResearchRow) -> bool:

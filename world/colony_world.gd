@@ -262,6 +262,7 @@ func _rebuild_buildings() -> void:
 			var mark := ModelBuilder.box(node, Vector3(-def.size.x * 0.32 + k * 0.16, _model_height(node) + 0.1, def.size.y * 0.32),
 					Vector3(0.09, 0.09, 0.09), SYNERGY_GOLD, Vector3(45, 45, 0), 1.6)
 			mark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			_info_marker(mark)
 		node.set_meta("top", _model_height(node))
 	_life.rebuild(_building_nodes)
 	_rebuild_connectors()
@@ -636,6 +637,7 @@ func set_photo_mode(on: bool) -> void:
 	else:
 		rig.exit_photo()
 	_scenery.set_photo(on)
+	get_tree().call_group("info_marker", "set_visible", not on)
 
 
 func focus_cell(cell: Vector2i) -> void:
@@ -1266,7 +1268,15 @@ func _joint(parent: Node3D, dir: Vector2i, flow: Material, synergy := false) -> 
 		# Synergie active : bague dorée lumineuse au milieu de la gaine.
 		var ring := ModelBuilder.cylinder(parent, Vector3(0, 0.12, 0), 0.15, 0.2, SYNERGY_GOLD, rot, -1.0, 14)
 		ring.material_override = ModelBuilder.material(SYNERGY_GOLD, 2.2)
-		ModelBuilder.box(parent, Vector3(0, 0.33, 0), Vector3(0.13, 0.13, 0.13), SYNERGY_GOLD, Vector3(45, 45, 0), 2.5)
+		_info_marker(ring)
+		_info_marker(ModelBuilder.box(parent, Vector3(0, 0.33, 0), Vector3(0.13, 0.13, 0.13), SYNERGY_GOLD, Vector3(45, 45, 0), 2.5))
+
+
+## Repère de jeu (losange doré de niveau, bague et losange de synergie) : utile en jouant, mais vu de près en
+## mode photo il flotte et brille comme un défaut. Caché pendant les photos.
+func _info_marker(node: Node3D) -> void:
+	node.add_to_group("info_marker")
+	node.visible = rig == null or not rig.photo
 
 
 ## Vrai si les modules i et j se touchent et que l'un tire une synergie de l'autre.

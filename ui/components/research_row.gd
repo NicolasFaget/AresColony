@@ -59,31 +59,31 @@ func refresh() -> void:
 	match state:
 		"done":
 			_status.text = Tr.t("✓ Terminée")
-			_status.add_theme_color_override("font_color", Palette.SUCCESS)
+			UiFx.font_color(_status, Palette.SUCCESS)
 		"active":
 			_status.text = Tr.t("En cours… (%d %%)") % roundi(engine.state.research_progress * 100.0)
-			_status.add_theme_color_override("font_color", Palette.FAME)
+			UiFx.font_color(_status, Palette.FAME)
 			_bar.value = engine.state.research_progress * 100.0
 		"excluded":
 			_status.text = Tr.t("Écartée : vous avez choisi « %s ».") % Tr.t(engine.research_defs[research.rival].name)
-			_status.add_theme_color_override("font_color", Palette.TEXT_DIM)
+			UiFx.font_color(_status, Palette.TEXT_DIM)
 		"locked" when research.era > engine.research_era():
 			_status.text = Tr.t("Ère %d : accomplissez d'abord l'ère en cours.") % research.era
-			_status.add_theme_color_override("font_color", Palette.TEXT_DIM)
+			UiFx.font_color(_status, Palette.TEXT_DIM)
 		"locked":
 			var names: Array[String] = []
 			for req: String in research.requires:
 				names.append(Tr.t(engine.research_defs[req].name))
 			_status.text = Tr.t("Nécessite : %s") % ", ".join(names)
-			_status.add_theme_color_override("font_color", Palette.TEXT_DIM)
+			UiFx.font_color(_status, Palette.TEXT_DIM)
 		_ when not research.rival.is_empty():
 			_status.text = Tr.t("Choix exclusif : écarte « %s ».") % Tr.t(engine.research_defs[research.rival].name)
-			_status.add_theme_color_override("font_color", Palette.FAME)
+			UiFx.font_color(_status, Palette.FAME)
 			var can := engine.state.research_active.is_empty() and engine.state.amount(ColonyContent.DATA) >= research.cost
 			_button.disabled = not can
 		_:
 			_status.text = Tr.t("Durée : %s sol") % NumberFormatter.format(research.duration)
-			_status.add_theme_color_override("font_color", Palette.TEXT_MUTED)
+			UiFx.font_color(_status, Palette.TEXT_MUTED)
 			var can := engine.state.research_active.is_empty() and engine.state.amount(ColonyContent.DATA) >= research.cost
 			_button.disabled = not can
 
