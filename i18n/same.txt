@@ -76,7 +76,7 @@ QUIZ ✗
 QUIZ · +%d
 GUIDE %d/%d
 Langue / Language : %s
-KASSÁNDRA
+CODE FRONTIER
 Sol %d · %02d:%02d
 ×%d
 %s, %s
