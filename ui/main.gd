@@ -218,7 +218,7 @@ func _connect_engine() -> void:
 		AudioManager.play("alert")
 		_news.post(Tr.t("Les satellites annoncent une tempête de poussière : remplissez les batteries !")))
 	_engine.storm_started.connect(func() -> void:
-		AudioManager.play("alert")
+		AudioManager.play("storm")
 		_news.post(Tr.t("Tempête de poussière ! Les panneaux solaires ne reçoivent plus que 20 % de la lumière.")))
 	_engine.storm_ended.connect(func() -> void: _news.post(Tr.t("La tempête est passée. Le ciel redevient caramel.")))
 	_engine.resupply_arrived.connect(_on_resupply)
@@ -229,7 +229,7 @@ func _connect_engine() -> void:
 		_news.post(Tr.t("Alerte : plus %s ! Les colons puisent dans leurs réserves de secours.") % Tr.t(ColonyContent.RESOURCE_PARTITIVE[r])))
 	_engine.building_placed.connect(func(_i: int) -> void: _world.sync_with_game())
 	_engine.breakdown.connect(func(i: int) -> void:
-		AudioManager.play("alert")
+		AudioManager.play("breakdown")
 		_news.post(Tr.t("Panne ! ") + Tr.t(ColonyContent.BREAKDOWN_LINES.get(_engine.state.buildings[i].id, Tr.t("Une machine s'est arrêtée.")))))
 	_engine.era_started.connect(_on_era_started)
 	var campaign := GameManager.campaign
@@ -240,14 +240,14 @@ func _connect_engine() -> void:
 		AudioManager.play("alert")
 		_news.post(Tr.t("Les satellites détectent une éruption solaire : les particules arrivent dans quelques heures. Tout le monde aux abris !")))
 	_engine.flare_started.connect(func() -> void:
-		AudioManager.play("alert")
+		AudioManager.play("flare")
 		_news.post(Tr.t("Éruption solaire en cours. Les compteurs Geiger crépitent.")))
 	_engine.flare_ended.connect(func() -> void: _news.post(Tr.t("L'éruption solaire est passée. On peut ressortir.")))
 	_engine.expedition_returned.connect(func(site: Dictionary) -> void:
 		AudioManager.play("milestone")
 		_news.post(Tr.t("Le rover est rentré : %s. Butin : %s.") % [Tr.t(site.name), ColonyPage._reward_text(site.reward)]))
 	_engine.meteor_impact.connect(func(i: int) -> void:
-		AudioManager.play("alert")
+		AudioManager.play("meteor")
 		_world.impact(i)
 		if i >= 0:
 			_news.post(Tr.t("Impact de météorite sur le module « %s » : réparez-le. Les éclats de métal récupérés font %d matériaux.")
@@ -256,16 +256,16 @@ func _connect_engine() -> void:
 			_news.post(Tr.t("Une petite météorite est tombée près de la colonie. Les éclats de métal récupérés font %d matériaux.")
 					% roundi(ColonyEngine.METEOR_SALVAGE)))
 	_engine.aurora_started.connect(func() -> void:
-		AudioManager.play("milestone")
+		AudioManager.play("aurora")
 		_news.post(Tr.t("Une aurore verte illumine la nuit martienne ! Les mesures des colons rapportent %d données.")
 				% roundi(ColonyEngine.AURORA_DATA)))
 	_engine.world_event.connect(func(planet: String, event_id: String, gains: Dictionary) -> void:
-		AudioManager.play("milestone")
+		AudioManager.play(ColonyContent.world_event(event_id).sound)
 		_world.world_event(planet)
 		var gained := ColonyPage._reward_text(gains) if not gains.is_empty() else Tr.t("rien, faute de place")
 		_news.post(Tr.t(ColonyContent.world_event(event_id).news) % gained))
 	_engine.dilemma_raised.connect(func(_id: String) -> void:
-		AudioManager.play("alert")
+		AudioManager.play("dilemma")
 		_show_dilemma())
 	_engine.dilemma_resolved.connect(func(report: Dictionary) -> void:
 		if report.auto:

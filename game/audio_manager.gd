@@ -4,7 +4,10 @@ extends Node
 ## La bande son tourne en boucle ; un filtre la rend plus feutrée la nuit et pendant les tempêtes.
 
 const SOUNDS := ["click", "tab", "fail", "upgrade", "milestone", "whoosh", "build", "alert",
-		"landing", "evacuation"]
+		"landing", "evacuation",
+		# Événements naturels et dangers.
+		"quake", "eclipse", "geyser", "rain", "frost", "dune", "aurora",
+		"storm", "flare", "meteor", "breakdown", "dilemma"]
 const SFX_VOICES := 10
 
 ## Bande son du jeu, jouée en boucle.

@@ -1,6 +1,8 @@
 """Générateur des sons d'Ares Colony (synthèse, bibliothèque standard uniquement).
 
 - Effets : clic, construction, échec, alerte, recherche, objectif, ravitaillement, évacuation...
+- Événements et dangers : séisme, éclipse, geyser, pluie, givre, dune, aurore, tempête, éruption,
+  météorite, panne, décision.
 - Instruments de la musique (une note chacun, transposée par le jeu) : kalimba, nappe, basse.
 - Ambiance : boucle de vent martien sans couture.
 
@@ -198,6 +200,148 @@ def effects():
     return sounds
 
 
+# ---------------------------------------------------------------- Événements et dangers
+
+def highpass(samples, cutoff):
+    low = lowpass(samples, cutoff)
+    return [x - y for x, y in zip(samples, low)]
+
+
+def shape(samples, envelope):
+    """Applique une enveloppe : envelope(t, durée) -> gain."""
+    seconds = len(samples) / RATE
+    return [v * envelope(i / RATE, seconds) for i, v in enumerate(samples)]
+
+
+def swell(t, seconds):
+    return math.sin(math.pi * t / seconds) ** 2
+
+
+def glide(f_of_t, seconds, vibrato=0.0, rate=5.0):
+    """Sinus dont la fréquence suit f_of_t(t)."""
+    out = []
+    phase = 0.0
+    for i in range(int(seconds * RATE)):
+        t = i / RATE
+        phase += f_of_t(t) * (1.0 + vibrato * math.sin(TAU * rate * t)) / RATE
+        out.append(math.sin(TAU * phase))
+    return out
+
+
+def events():
+    """Un son par événement naturel et par danger (les petits haut-parleurs des téléphones
+    ne rendent presque rien sous 250 Hz : chaque son garde de la matière dans le médium)."""
+    sounds = {}
+
+    # Séisme : grondement qui tremble, monte puis retombe, et quelques objets qui s'entrechoquent.
+    rumble = highpass(noise(2.0, 1000.0), 180.0)
+    rumble = shape(rumble, lambda t, s: min(1.0, t / 0.6) * min(1.0, (s - t) / 0.9) * (0.65 + 0.35 * math.sin(TAU * 13.0 * t)))
+    quake = mix(silence(2.1), rumble, 0.0, 1.0)
+    mix(quake, shape(glide(lambda t: 62.0 + 10.0 * math.sin(TAU * 1.5 * t), 2.0), swell), 0.0, 0.12)
+    for k in range(9):
+        mix(quake, sweep(rng.uniform(900, 1500), 700, 0.03, decay=90.0), 0.35 + k * 0.14 + rng.uniform(0.0, 0.05), 0.12)
+    sounds["quake"] = fade(quake, 0.01, 0.2)
+
+    # Éclipse : un accord doux qui s'assombrit (la hauteur fléchit), puis revient, et une clochette.
+    dip = lambda t: 1.0 - 0.2 * math.sin(math.pi * min(1.0, t / 1.7)) ** 2
+    eclipse = silence(2.3)
+    for f, gain in [(freq(67), 0.5), (freq(74), 0.35), (freq(79), 0.25)]:
+        mix(eclipse, shape(glide(lambda t, f=f: f * dip(t), 2.0), swell), 0.0, gain)
+    mix(eclipse, bell(freq(91), 0.7, decay=4.0, index=1.0), 1.55, 0.25)
+    sounds["eclipse"] = fade(eclipse, 0.02, 0.1)
+
+    # Geyser : un choc sourd, puis un jet de vapeur sous pression qui retombe.
+    jet = highpass(noise(1.5, 5000.0), 700.0)
+    jet = shape(jet, lambda t, s: min(1.0, t / 0.05) * math.exp(-t * 2.3) * (0.8 + 0.2 * math.sin(TAU * 21.0 * t)))
+    geyser = mix(silence(1.6), jet, 0.0, 1.0)
+    mix(geyser, sweep(220, 90, 0.25, decay=10.0, shape="triangle"), 0.0, 0.6)
+    sounds["geyser"] = fade(geyser, 0.004, 0.2)
+
+    # Averse de méthane : de grosses gouttes lentes et graves sur un fond de pluie.
+    bed = shape(noise(2.0, 1300.0), swell)
+    rain = mix(silence(2.1), bed, 0.0, 0.35)
+    for k in range(34):
+        f = rng.uniform(420, 1100)
+        mix(rain, sweep(f, f * 0.55, 0.05, decay=45.0), rng.uniform(0.05, 1.8), rng.uniform(0.25, 0.6))
+    sounds["rain"] = fade(rain, 0.01, 0.15)
+
+    # Givre, sel : de petits craquements de glace de plus en plus serrés, et un tintement.
+    frost = silence(1.1)
+    at = 0.0
+    for k in range(13):
+        f = rng.uniform(3800, 6500)
+        mix(frost, sweep(f, f * 0.5, 0.014, decay=220.0), at, rng.uniform(0.4, 0.8))
+        at += 0.11 * (0.86 ** k) + rng.uniform(0.0, 0.03)
+    mix(frost, bell(freq(96), 0.5, decay=7.0, index=0.8), 0.45, 0.3)
+    mix(frost, bell(freq(103), 0.4, decay=9.0, index=0.8), 0.55, 0.18)
+    sounds["frost"] = frost
+
+    # Dune : du sable qui glisse, un souffle grave qui enfle et retombe.
+    sand = highpass(noise(1.5, 1600.0), 280.0)
+    sand = shape(sand, lambda t, s: swell(t, s) * (0.75 + 0.25 * math.sin(TAU * 3.0 * t)))
+    dune = mix(silence(1.6), sand, 0.0, 1.0)
+    mix(dune, shape(glide(lambda t: 150.0 - 30.0 * t, 1.5), swell), 0.0, 0.25)
+    sounds["dune"] = fade(dune, 0.02, 0.15)
+
+    # Aurore : un scintillement aérien, des clochettes aiguës sur une note tenue qui tremble.
+    aurora = silence(2.4)
+    hold = shape(glide(lambda t: freq(79), 2.2, vibrato=0.004, rate=5.5), lambda t, s: swell(t, s) * (0.7 + 0.3 * math.sin(TAU * 6.0 * t)))
+    mix(aurora, hold, 0.0, 0.3)
+    for k, note in enumerate([86, 91, 88, 95, 93, 98, 91]):
+        mix(aurora, bell(freq(note), 0.9, decay=3.5, index=1.2), 0.1 + k * 0.2, 0.3)
+    sounds["aurora"] = fade(aurora, 0.02, 0.2)
+
+    # Tempête : une rafale qui enfle, avec un sifflement, puis retombe vite.
+    rise = lambda t, s: (min(1.0, t / 1.5) ** 2) * min(1.0, (s - t) / 0.45)
+    gust = shape(highpass(noise(2.0, 1100.0), 200.0), rise)
+    storm = mix(silence(2.1), gust, 0.0, 1.0)
+    whistle = glide(lambda t: 520.0 + 260.0 * (t / 2.0) ** 2, 2.0, vibrato=0.03, rate=3.0)
+    mix(storm, shape(whistle, rise), 0.0, 0.12)
+    sounds["storm"] = fade(storm, 0.02, 0.1)
+
+    # Éruption solaire : deux coups de sirène, puis la radio qui grésille.
+    flare = silence(1.6)
+    for k in range(2):
+        tone = glide(lambda t: 620.0 + 380.0 * math.sin(math.pi * t / 0.36), 0.36)
+        mix(flare, fade(tone, 0.01, 0.04), k * 0.4, 0.55)
+    crackle = highpass(noise(0.75, 6000.0), 1500.0)
+    gate = 1.0
+    for i in range(len(crackle)):
+        if i % 220 == 0:
+            gate = 1.0 if rng.random() < 0.45 else 0.08
+        crackle[i] *= gate * min(1.0, (len(crackle) - i) / (0.3 * RATE))
+    mix(flare, crackle, 0.82, 0.5)
+    sounds["flare"] = fade(flare, 0.004, 0.05)
+
+    # Météorite : un sifflement qui tombe, puis le choc et les gravats.
+    fall = glide(lambda t: 2300.0 * (0.25 ** (t / 0.45)), 0.45)
+    meteor = mix(silence(1.1), shape(fall, lambda t, s: (t / s) ** 1.5), 0.0, 0.5)
+    mix(meteor, noise(0.6, 900.0, decay=8.0), 0.45, 1.0)
+    mix(meteor, sweep(190, 60, 0.4, decay=9.0, shape="triangle"), 0.45, 0.8)
+    for k in range(5):
+        mix(meteor, sweep(rng.uniform(700, 1300), 500, 0.03, decay=90.0), 0.58 + k * 0.07 + rng.uniform(0.0, 0.03), 0.18)
+    sounds["meteor"] = meteor
+
+    # Panne : une machine qui ralentit et s'arrête, puis trois étincelles.
+    motor = sweep(340, 70, 0.6, decay=2.5, shape="triangle")
+    motor = shape(motor, lambda t, s: 0.7 + 0.3 * math.sin(TAU * (28.0 - 30.0 * t) * t))
+    breakdown = mix(silence(0.85), lowpass(motor, 1800.0), 0.0, 0.8)
+    for at in [0.5, 0.59, 0.64]:
+        mix(breakdown, highpass(noise(0.04, 7000.0, decay=60.0), 2000.0), at, 0.6)
+    sounds["breakdown"] = fade(breakdown, 0.004, 0.05)
+
+    # Décision à prendre : deux notes qui montent, comme une question.
+    dilemma = silence(0.75)
+    mix(dilemma, kalimba(freq(69), 0.5), 0.0, 0.7)
+    mix(dilemma, kalimba(freq(74), 0.6), 0.16, 0.7)
+    sounds["dilemma"] = dilemma
+    return sounds
+
+
+# Volume de crête des sons d'événements (0,9 par défaut) : les plus doux restent discrets.
+PEAKS = {"flare": 0.5, "eclipse": 0.6, "aurora": 0.6, "frost": 0.6, "dune": 0.7, "rain": 0.7, "dilemma": 0.7, "quake": 0.85}
+
+
 # ---------------------------------------------------------------- Ambiance
 
 def wind(seconds=12.0, overlap=1.5):
@@ -225,6 +369,10 @@ def main():
         write(name, samples)
     # Musique : bande son « Cradle of the Red Horizon » (art/audio/music_red_horizon.mp3).
     write("ambience_wind", wind(), 0.8)
+    # Après le vent, avec sa propre graine : les sons déjà écrits ne changent pas.
+    rng.seed(11)
+    for name, samples in events().items():
+        write(name, samples, PEAKS.get(name, 0.9))
     print("Sons écrits dans %s" % OUT)
 
 

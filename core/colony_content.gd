@@ -316,36 +316,36 @@ static func world_event(event_id: String) -> Dictionary:
 				return event
 	return {}
 ## Événements naturels propres à chaque monde (fiche sourcée), de temps en temps : un petit gain.
-## news : texte de la nouvelle, %s reçoit les gains.
+## news : texte de la nouvelle, %s reçoit les gains ; sound : son joué (AudioManager.SOUNDS).
 const WORLD_EVENTS := {
 	"mars": [
-		{ "id": "marsquake", "card": "marsquake", "reward": { DATA: 20.0 },
+		{ "id": "marsquake", "card": "marsquake", "sound": "quake", "reward": { DATA: 20.0 },
 			"news": "Séisme martien ! Les sismomètres de la colonie l'ont enregistré : %s." },
-		{ "id": "phobos_eclipse", "card": "phobos_eclipse", "reward": { DATA: 20.0 },
+		{ "id": "phobos_eclipse", "card": "phobos_eclipse", "sound": "eclipse", "reward": { DATA: 20.0 },
 			"news": "Phobos passe devant le Soleil : une éclipse de quarante secondes ! Les mesures rapportent %s." },
 	],
 	"ceres": [
-		{ "id": "ceres_vapour", "card": "ceres_vapour", "reward": { WATER: 20.0, DATA: 10.0 },
+		{ "id": "ceres_vapour", "card": "ceres_vapour", "sound": "geyser", "reward": { WATER: 20.0, DATA: 10.0 },
 			"news": "La glace de Cérès se sublime au soleil : un panache de vapeur d'eau. Les pièges froids récupèrent %s." },
-		{ "id": "juling_ice", "card": "juling_ice", "reward": { WATER: 15.0, DATA: 15.0 },
+		{ "id": "juling_ice", "card": "juling_ice", "sound": "frost", "reward": { WATER: 15.0, DATA: 15.0 },
 			"news": "Du givre se redépose sur une paroi froide, comme dans le cratère Juling. Les colons en récupèrent %s." },
 	],
 	"titan": [
-		{ "id": "titan_rain", "card": "titan_rain", "reward": { METHANE: 25.0, DATA: 10.0 },
+		{ "id": "titan_rain", "card": "titan_rain", "sound": "rain", "reward": { METHANE: 25.0, DATA: 10.0 },
 			"news": "Averse de méthane sur Titan ! Les collecteurs en récupèrent : %s." },
-		{ "id": "titan_dunes", "card": "titan_dunes", "reward": { MATERIALS: 20.0, DATA: 10.0 },
+		{ "id": "titan_dunes", "card": "titan_dunes", "sound": "dune", "reward": { MATERIALS: 20.0, DATA: 10.0 },
 			"news": "Le vent de Titan pousse une dune jusqu'aux portes de la colonie : des grains organiques à récolter, %s." },
 	],
 	"europa": [
-		{ "id": "europa_plume", "card": "europa_plume", "reward": { WATER: 15.0, DATA: 25.0 },
+		{ "id": "europa_plume", "card": "europa_plume", "sound": "geyser", "reward": { WATER: 15.0, DATA: 25.0 },
 			"news": "Un geyser jaillit d'une fracture d'Europe ! La colonie en recueille : %s." },
-		{ "id": "europa_salt", "card": "europa_salt", "reward": { MATERIALS: 15.0, DATA: 20.0 },
+		{ "id": "europa_salt", "card": "europa_salt", "sound": "frost", "reward": { MATERIALS: 15.0, DATA: 20.0 },
 			"news": "Une plaque de sel jauni affleure près de la colonie, comme à Tara Regio : %s." },
 	],
 	"enceladus": [
-		{ "id": "enceladus_webb", "card": "enceladus_webb", "reward": { WATER: 20.0, DATA: 20.0 },
+		{ "id": "enceladus_webb", "card": "enceladus_webb", "sound": "geyser", "reward": { WATER: 20.0, DATA: 20.0 },
 			"news": "Le panache d'Encelade redouble ! Les collecteurs en recueillent : %s." },
-		{ "id": "e_ring", "card": "e_ring", "reward": { WATER: 15.0, DATA: 20.0 },
+		{ "id": "e_ring", "card": "e_ring", "sound": "geyser", "reward": { WATER: 15.0, DATA: 20.0 },
 			"news": "Une bouffée de glace monte vers l'anneau E de Saturne ; les collecteurs en retiennent %s." },
 	],
 }

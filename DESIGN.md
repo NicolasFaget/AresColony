@@ -133,6 +133,10 @@ de vie de l'application.
   +20 données ; Hubble 2019), anneau E d'Encelade (+15 eau, +20 données). Chacun débloque sa fiche
   et s'accompagne d'un nuage dans la scène. Le signal `world_event` porte l'identifiant de
   l'événement ; `ColonyContent.world_event(id)` le retrouve.
+- Sons : tous synthétisés par `tools/make_sounds.py` (aucun enregistrement). Chaque événement
+  naturel (`WORLD_EVENTS[...].sound`) et chaque danger a le sien : séisme, éclipse, geyser, pluie,
+  givre, dune, aurore, tempête, éruption, météorite, panne, décision. Les téléphones ne rendent
+  presque rien sous 250 Hz : garder l'essentiel de chaque son au-dessus.
 - Nouvelles : une annonce plus longue que la ligne défile jusqu'à sa fin après une pause
   (`NewsTicker.SCROLL_PAUSE`, `SCROLL_SPEED`) ; avant, la fin (les gains) était coupée.
   `Tr.t` rend insécable l'espace des milliers (« 2 000 W » ne se coupe plus en fin de ligne).

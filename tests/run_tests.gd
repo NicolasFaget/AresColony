@@ -1336,6 +1336,7 @@ func _test_world_events() -> void:
 		_check(ColonyContent.WORLD_EVENTS[planet].size() >= 2, "deux événements au moins : %s" % planet)
 		for event: Dictionary in ColonyContent.WORLD_EVENTS[planet]:
 			_check(cards.has(event.card) and str(event.news).contains("%s"), "événement complet : %s" % event.id)
+			_check(FileAccess.file_exists("res://art/audio/%s.wav" % event.sound), "son de l'événement : %s" % event.id)
 	var early := ColonyEngine.new(ColonyState.new())
 	early.breakdown_rate = 1e-9
 	early.advance(1.0)
