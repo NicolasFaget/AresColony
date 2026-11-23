@@ -216,6 +216,12 @@ de 62, retour au sol 119 au lieu de 121). Construits trop tôt, avant le garage 
 la ralentissaient d'une dizaine de sols. Fiches liées : SAM de Curiosity (laboratoire), Refabricator (recyclage), perte
 osseuse (infirmerie), MMRTG (générateur).
 
+Ère 4, joueur simulé : une fois l'astroport posé, Mars monte à 6 réacteurs Sabatier et 900 kg de
+réservoirs (le réseau vit de son méthane) ; un avant-poste complet, à partir de 300 matériaux,
+ajoute laboratoire, infirmerie, générateur à radio-isotopes, puis un entrepôt si les matériaux
+débordent. Les cinq mondes sont terminés au sol 588 au lieu de 669 (Capitale 366 au lieu de 404),
+sans évacuation. Les tests affichent pour chaque colonie santé, bilans et modules.
+
 Réacteur à fission : 60 kWh/sol jour et nuit, mais 1 matériau/sol d'entretien (moteurs Stirling,
 radiateurs). Sans matériaux, il ralentit, et une alerte « Réacteur à l'arrêt » le signale.
 

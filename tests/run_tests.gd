@@ -1581,6 +1581,12 @@ func _simulate_campaign() -> void:
 		var colony := campaign.engines[i]
 		print("  %s : matériaux %.0f/%.0f, méthane %.0f/%.0f, astroport %s" % [colony.state.region, colony.state.amount(R.MATERIALS), colony.capacity(R.MATERIALS),
 				colony.state.amount(R.METHANE), colony.capacity(R.METHANE), colony.has_spaceport()])
+		var counts := {}
+		for building in colony.state.buildings:
+			counts[building.id] = counts.get(building.id, 0) + 1
+		var flows := colony.average_flows()
+		print("    santé %.2f · énergie %+.1f · eau %+.1f · O₂ %+.1f · vivres %+.1f · données %.0f · %s" % [colony.average_health(),
+				flows[R.ENERGY], flows[R.WATER], flows[R.OXYGEN], flows[R.FOOD], colony.state.amount(R.DATA), counts])
 	for id in network_goals:
 		_check(reached.has(id), "ère 4 jouée : objectif %s" % id)
 	_check(reached.get("titan_fuel", INF) < 600.0, "Cérès et Titan complètes avant le sol 600")

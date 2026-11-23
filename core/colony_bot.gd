@@ -110,6 +110,9 @@ static func build(engine: ColonyEngine) -> void:
 		want = "n2_compressor"
 	elif outpost and engine.capacity(R.ENERGY) < 150.0 and engine.is_unlocked(engine.building_defs["battery"]):
 		want = "battery"
+	# Avant-poste complet : les modules d'appoint, avec les matériaux en trop.
+	elif outpost and engine.state.amount(R.MATERIALS) >= 300.0 and not _support(engine).is_empty():
+		want = _support(engine)
 	elif outpost:
 		want = ""
 	elif engine.is_unlocked(engine.building_defs["kiln"]) and engine.resupplies_left() <= 2 \
@@ -157,6 +160,11 @@ static func build(engine: ColonyEngine) -> void:
 		want = "n2_compressor"
 	# Ère 4 : de quoi remplir les vols vers Cérès et Titan.
 	elif engine.has_spaceport() and engine.capacity(R.METHANE) < 500.0 and engine.is_unlocked(engine.building_defs["tank"]):
+		want = "tank"
+	# Le réseau vit du méthane de Mars : davantage de réacteurs Sabatier et de réservoirs, tant que l'eau et l'énergie suivent.
+	elif engine.has_spaceport() and _count(engine, "sabatier") < 6 and flows[R.WATER] > 8.0 and flows[R.ENERGY] > 30.0:
+		want = "sabatier"
+	elif engine.has_spaceport() and engine.capacity(R.METHANE) < 900.0 and engine.state.amount(R.METHANE) >= engine.capacity(R.METHANE) * 0.8:
 		want = "tank"
 	elif engine.capacity(R.ENERGY) < 150.0 and engine.is_unlocked(engine.building_defs["battery"]):
 		want = "battery"
@@ -288,6 +296,17 @@ static func _by_free_space(campaign: Campaign, resource: String, from: int) -> A
 static func _needs_nitrogen(mars: ColonyEngine) -> bool:
 	var room := mars.capacity(R.NITROGEN)
 	return room > 0.0 and mars.state.amount(R.NITROGEN) + mars.incoming.get(R.NITROGEN, 0.0) < room * 0.5
+
+
+## Module d'appoint qui manque encore à un avant-poste ("" : aucun) : laboratoire, infirmerie,
+## générateur à radio-isotopes, puis un entrepôt si les matériaux débordent.
+static func _support(engine: ColonyEngine) -> String:
+	for id: String in ["lab", "medbay", "rtg"]:
+		if engine.is_unlocked(engine.building_defs[id]) and _count(engine, id) == 0:
+			return id
+	if _count(engine, "warehouse") == 0 and engine.state.amount(R.MATERIALS) >= engine.capacity(R.MATERIALS) * 0.9:
+		return "warehouse"
+	return ""
 
 
 ## Les dômes déjà posés sont pressurisés (on n'en ajoute pas un vide de plus).
