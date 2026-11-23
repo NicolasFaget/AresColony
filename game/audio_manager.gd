@@ -7,7 +7,13 @@ const SOUNDS := ["click", "tab", "fail", "upgrade", "milestone", "whoosh", "buil
 		"landing", "evacuation",
 		# Événements naturels et dangers.
 		"quake", "eclipse", "geyser", "rain", "frost", "dune", "aurora",
-		"storm", "flare", "meteor", "breakdown", "dilemma"]
+		"storm", "flare", "meteor", "breakdown", "dilemma",
+		# Récompenses et actions du joueur.
+		"objective", "era", "discovery", "quiz_right", "quiz_wrong", "research_done", "challenge",
+		"repair", "clean", "rover", "rover_back", "launch", "recruit"]
+## Ambiances en boucle : vent de Mars, vent épais de Titan, ronron de la base (mondes sans air).
+const AMBIENCES := ["wind", "titan", "base"]
+const BASE_HUM_DB := -6.0
 const SFX_VOICES := 10
 
 ## Bande son du jeu, jouée en boucle.
@@ -24,11 +30,13 @@ const MOODS := {
 var _streams := {}
 var _sfx: Array[AudioStreamPlayer] = []
 var _ambience: AudioStreamPlayer
+var _ambiences := {}
+var _ambience_id := "wind"
 var _music: AudioStreamPlayer
 var _music_filter: AudioEffectLowPassFilter
 var _last_play := {}
 var _mood := "day"
-## Cérès n'a pas d'air : pas de vent. Titan : un vent grave, sourd, dans l'air épais.
+## Cérès n'a pas d'air : pas de vent, on entend la base. Titan : un vent grave, sourd, dans l'air épais.
 var _airless := false
 
 
@@ -46,11 +54,13 @@ func _ready() -> void:
 	_music.volume_db = MUSIC_VOLUME_DB
 	_music.play()
 
-	var wind: AudioStreamWAV = load("res://art/audio/ambience_wind.wav")
-	wind.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	wind.loop_end = int(wind.get_length() * wind.mix_rate)
+	for id: String in AMBIENCES:
+		var loop: AudioStreamWAV = load("res://art/audio/ambience_%s.wav" % id)
+		loop.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		loop.loop_end = int(loop.get_length() * loop.mix_rate)
+		_ambiences[id] = loop
 	_ambience = _player("Ambience")
-	_ambience.stream = wind
+	_ambience.stream = _ambiences["wind"]
 	_ambience.volume_db = -6.0
 	_ambience.play()
 	apply_settings()
@@ -81,14 +91,17 @@ func set_mood(mood_id: String) -> void:
 ## Vent plus fort pendant les tempêtes.
 func set_wind(strength: float) -> void:
 	if _ambience != null:
-		_ambience.volume_db = -80.0 if _airless else lerpf(-8.0, 4.0, clampf(strength, 0.0, 1.0))
+		_ambience.volume_db = BASE_HUM_DB if _airless else lerpf(-8.0, 4.0, clampf(strength, 0.0, 1.0))
 
 
 ## Ambiance du monde affiché : air (vent) ou vide, timbre du vent.
 func set_world(planet: String) -> void:
 	_airless = not ColonyContent.PLANETS[planet].atmosphere
-	if _ambience != null:
-		_ambience.pitch_scale = 0.55 if planet == "titan" else 1.0
+	var id := "base" if _airless else ("titan" if planet == "titan" else "wind")
+	if _ambience != null and id != _ambience_id:
+		_ambience_id = id
+		_ambience.stream = _ambiences[id]
+		_ambience.play()
 	set_wind(0.0)
 
 

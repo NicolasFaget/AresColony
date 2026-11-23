@@ -223,7 +223,9 @@ func _connect_engine() -> void:
 	_engine.storm_ended.connect(func() -> void: _news.post(Tr.t("La tempête est passée. Le ciel redevient caramel.")))
 	_engine.resupply_arrived.connect(_on_resupply)
 	_engine.colonist_evacuated.connect(_on_evacuation)
-	_engine.colonist_arrived.connect(func(n: String) -> void: _news.post(Tr.t("%s rejoint la colonie. Bienvenue !") % n))
+	_engine.colonist_arrived.connect(func(n: String) -> void:
+		AudioManager.play("recruit", 0.0, 1.0, 1.5)
+		_news.post(Tr.t("%s rejoint la colonie. Bienvenue !") % n))
 	_engine.shortage.connect(func(r: String) -> void:
 		AudioManager.play("alert")
 		_news.post(Tr.t("Alerte : plus %s ! Les colons puisent dans leurs réserves de secours.") % Tr.t(ColonyContent.RESOURCE_PARTITIVE[r])))
@@ -244,7 +246,7 @@ func _connect_engine() -> void:
 		_news.post(Tr.t("Éruption solaire en cours. Les compteurs Geiger crépitent.")))
 	_engine.flare_ended.connect(func() -> void: _news.post(Tr.t("L'éruption solaire est passée. On peut ressortir.")))
 	_engine.expedition_returned.connect(func(site: Dictionary) -> void:
-		AudioManager.play("milestone")
+		AudioManager.play("rover_back")
 		_news.post(Tr.t("Le rover est rentré : %s. Butin : %s.") % [Tr.t(site.name), ColonyPage._reward_text(site.reward)]))
 	_engine.meteor_impact.connect(func(i: int) -> void:
 		AudioManager.play("meteor")
@@ -276,7 +278,7 @@ func _connect_engine() -> void:
 		_news.post(Tr.t("Nouveau défi : %s. %s") % [Tr.t(ColonyContent.CHALLENGES[id].title), Tr.t(ColonyContent.CHALLENGES[id].text)]))
 	_engine.challenge_completed.connect(func(id: String) -> void:
 		var def: Dictionary = ColonyContent.CHALLENGES[id]
-		AudioManager.play("milestone")
+		AudioManager.play("challenge")
 		UiFx.float_text(Tr.t("Défi réussi ! %s") % ColonyPage._reward_text(def.reward), Vector2(size.x / 2.0, size.y * 0.4), Palette.MONEY)
 		_news.post(Tr.t("Défi réussi : %s. Récompense : %s.") % [Tr.t(def.title), ColonyPage._reward_text(def.reward)]))
 	_engine.challenge_expired.connect(func(id: String) -> void:
@@ -523,7 +525,7 @@ func _on_cell_tapped(cell: Vector2i, index: int) -> void:
 
 func _on_research_completed(research_id: String) -> void:
 	var r: Defs.Research = _engine.research_defs[research_id]
-	AudioManager.play("upgrade")
+	AudioManager.play("research_done")
 	_news.post(Tr.t("Recherche terminée : %s") % Tr.t(r.name))
 	if research_id == "ice":
 		_news.post(Tr.t("Les relevés révèlent de la glace sous la poussière : regardez la carte !"))
@@ -532,7 +534,7 @@ func _on_research_completed(research_id: String) -> void:
 func _on_objective_completed(objective_id: String) -> void:
 	for o in _engine.objectives:
 		if o.id == objective_id:
-			AudioManager.play("milestone")
+			AudioManager.play("objective")
 			_news.post(Tr.t("Objectif atteint : %s ! Récompense : %s") % [Tr.t(o.title), ColonyPage._reward_text(o.reward)])
 			if objective_id == "rooted":
 				Modal.open(_modal_layer, {
@@ -954,7 +956,7 @@ func _show_founding() -> void:
 func _found_colony(origin: int, region: String) -> bool:
 	if not GameManager.campaign.found_colony(origin, region):
 		return false
-	AudioManager.play("whoosh")
+	AudioManager.play("launch")
 	_world.launch_from_spaceport()
 	_news.post(Tr.t("Le vaisseau de fondation décolle vers %s !") % Tr.t(ColonyContent.REGIONS[region].name))
 	return true
@@ -1084,7 +1086,7 @@ func _show_cargo() -> void:
 	launch.focus_mode = Control.FOCUS_NONE
 	launch.pressed.connect(func() -> void:
 		if campaign.send_cargo(origin, destination[0], amounts, crew[0]):
-			AudioManager.play("whoosh")
+			AudioManager.play("launch")
 			_world.launch_from_spaceport()
 			_news.post(Tr.t("Cargaison en route vers %s.") % campaign.colony_name(destination[0]))
 			holder[0].close())
@@ -1120,7 +1122,7 @@ func _show_finale() -> void:
 
 ## Début d'une nouvelle ère : ce qui change et ce qu'il faut viser.
 func _on_era_started(era: int) -> void:
-	AudioManager.play("milestone")
+	AudioManager.play("era")
 	if era == 4:
 		Modal.open(_modal_layer, {
 			"icon": "planet", "title": Tr.t("Ère 4 · Interplanétaire"),
@@ -1200,7 +1202,7 @@ func _show_expeditions() -> void:
 		go.disabled = not problem.is_empty()
 		go.pressed.connect(func() -> void:
 			if _engine.start_expedition():
-				AudioManager.play("whoosh")
+				AudioManager.play("rover")
 				_news.post(Tr.t("Le rover quitte la colonie. Les colons font coucou par le hublot."))
 				holder[0].close())
 		box.add_child(go)
@@ -1236,7 +1238,7 @@ func _show_maintenance() -> void:
 	clean.disabled = not problem.is_empty()
 	clean.pressed.connect(func() -> void:
 		if _engine.clean_panels():
-			AudioManager.play("whoosh")
+			AudioManager.play("clean")
 			_news.post(Tr.t("Sortie réussie : les panneaux brillent à nouveau. Les colons, eux, sont couverts de poussière."))
 			reopen.call())
 	box.add_child(clean)
@@ -1286,7 +1288,7 @@ func _show_maintenance() -> void:
 		fix.disabled = not _engine.repair_problem(i).is_empty()
 		fix.pressed.connect(func() -> void:
 			if _engine.repair(i):
-				AudioManager.play("build")
+				AudioManager.play("repair")
 				var fixer := _repairer()
 				if not fixer.is_empty():
 					_news.post(Tr.t(ColonyContent.REPAIR_LINE) % [fixer, Tr.t(_engine.def_of(i).name)])
@@ -1536,7 +1538,7 @@ func _quiz_block(card: Defs.Card) -> Control:
 		for i in buttons.size():
 			buttons[i].pressed.connect(func() -> void:
 				var good := _engine.answer_quiz(card.id, i)
-				AudioManager.play("milestone" if good else "fail")
+				AudioManager.play("quiz_right" if good else "quiz_wrong")
 				show_result.call(i)
 				if good:
 					UiFx.float_text(Tr.t("+%d données") % int(ColonyEngine.QUIZ_REWARD), buttons[i].get_global_rect().get_center(),

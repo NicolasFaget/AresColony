@@ -3,6 +3,9 @@
 - Effets : clic, construction, échec, alerte, recherche, objectif, ravitaillement, évacuation...
 - Événements et dangers : séisme, éclipse, geyser, pluie, givre, dune, aurore, tempête, éruption,
   météorite, panne, décision.
+- Récompenses et actions : objectif, ère, fiche, quiz, recherche, défi, réparation, nettoyage,
+  rover, fusée, arrivée de colons.
+- Ambiances en boucle : vent de Mars, vent de Titan, ronron de la base (mondes sans air).
 - Instruments de la musique (une note chacun, transposée par le jeu) : kalimba, nappe, basse.
 - Ambiance : boucle de vent martien sans couture.
 
@@ -342,7 +345,160 @@ def events():
 PEAKS = {"flare": 0.5, "eclipse": 0.6, "aurora": 0.6, "frost": 0.6, "dune": 0.7, "rain": 0.7, "dilemma": 0.7, "quake": 0.85}
 
 
+# ---------------------------------------------------------------- Récompenses et actions
+
+def rewards():
+    sounds = {}
+
+    # Objectif atteint : trois notes qui montent, puis un accord tenu (ré majeur).
+    objective = silence(1.3)
+    for k, note in enumerate([74, 78, 81]):
+        mix(objective, bell(freq(note), 0.35, decay=8.0), k * 0.09, 0.7)
+    for note in [86, 90]:
+        mix(objective, bell(freq(note), 0.95, decay=3.2), 0.28, 0.5)
+    sounds["objective"] = objective
+
+    # Nouvelle ère : une nappe qui s'ouvre, un grand arpège et une cloche finale.
+    era = silence(2.7)
+    for note in [60, 67, 72, 76]:
+        mix(era, pad(freq(note), 2.6), 0.0, 0.3)
+    for k, note in enumerate([72, 79, 84, 88, 91]):
+        mix(era, bell(freq(note), 1.2, decay=2.6), 0.15 + k * 0.16, 0.5)
+    mix(era, bell(freq(96), 1.5, decay=2.0, index=1.4), 0.95, 0.45)
+    sounds["era"] = fade(era, 0.02, 0.3)
+
+    # Nouvelle fiche : un carillon vif, avec un peu de brillance.
+    discovery = silence(1.1)
+    for k, note in enumerate([84, 91, 88, 96]):
+        mix(discovery, bell(freq(note), 0.6, decay=5.0, index=1.3), k * 0.08, 0.6)
+    mix(discovery, highpass(noise(0.5, 8000.0, decay=8.0), 3000.0), 0.1, 0.1)
+    sounds["discovery"] = discovery
+
+    # Quiz : deux notes joyeuses qui montent, ou une note douce qui descend.
+    right = silence(0.55)
+    mix(right, kalimba(freq(79), 0.3), 0.0, 0.7)
+    mix(right, kalimba(freq(86), 0.45), 0.1, 0.8)
+    sounds["quiz_right"] = right
+    wrong = silence(0.55)
+    mix(wrong, kalimba(freq(64), 0.3), 0.0, 0.6)
+    mix(wrong, kalimba(freq(60), 0.4), 0.14, 0.6)
+    sounds["quiz_wrong"] = lowpass(wrong, 2200.0)
+
+    # Recherche terminée : trois bips de laboratoire, le dernier plus haut.
+    research = silence(0.75)
+    for k, f in enumerate([1320.0, 1320.0, 1760.0]):
+        beep = fade(glide(lambda t, f=f: f, 0.07), 0.005, 0.015)
+        mix(research, beep, k * 0.11, 0.5)
+    mix(research, bell(1760.0, 0.45, decay=7.0, index=0.6), 0.22, 0.35)
+    sounds["research_done"] = research
+
+    # Défi réussi : le tintement d'une médaille.
+    challenge = silence(0.9)
+    mix(challenge, bell(freq(91), 0.8, decay=4.5, index=3.0, ratio=5.4), 0.0, 0.6)
+    mix(challenge, bell(freq(98), 0.7, decay=5.5, index=2.5, ratio=5.4), 0.09, 0.45)
+    sounds["challenge"] = challenge
+
+    # Réparation : deux tours de clé à cliquet, puis un tintement de métal.
+    repair = silence(0.65)
+    for turn in range(2):
+        for k in range(6):
+            mix(repair, sweep(2600 + 150 * k, 1700, 0.012, decay=260.0), turn * 0.24 + k * 0.03, 0.6)
+    mix(repair, bell(freq(88), 0.25, decay=14.0, index=2.6, ratio=4.2), 0.47, 0.4)
+    sounds["repair"] = repair
+
+    # Nettoyage des panneaux : deux coups de brosse.
+    clean = silence(0.65)
+    for k in range(2):
+        stroke = shape(highpass(noise(0.24, 6000.0), 1400.0), swell)
+        mix(clean, stroke, k * 0.28, 0.8 if k == 0 else 0.65)
+    sounds["clean"] = clean
+
+    def motor(f_of_t, seconds):
+        """Moteur électrique : un ronflement et son sifflement aigu."""
+        out = []
+        phase = 0.0
+        for i in range(int(seconds * RATE)):
+            t = i / RATE
+            phase += f_of_t(t) / RATE
+            out.append(math.sin(TAU * phase) + 0.4 * math.sin(TAU * 2.0 * phase) + 0.18 * math.sin(TAU * 7.0 * phase))
+        return out
+
+    # Départ du rover : un bip, puis le moteur électrique qui monte en régime et s'éloigne.
+    rover = silence(1.3)
+    mix(rover, fade(glide(lambda t: 1480.0, 0.06), 0.005, 0.015), 0.0, 0.35)
+    start = motor(lambda t: 110.0 + 330.0 * min(1.0, t / 0.7) ** 0.7, 1.1)
+    mix(rover, shape(start, lambda t, s: min(1.0, t / 0.15) * min(1.0, (s - t) / 0.5)), 0.12, 0.6)
+    mix(rover, shape(highpass(noise(1.1, 2500.0), 600.0), lambda t, s: 0.5 * min(1.0, t / 0.4) * min(1.0, (s - t) / 0.5)), 0.12, 0.25)
+    sounds["rover"] = fade(rover, 0.004, 0.08)
+
+    # Retour du rover : le moteur ralentit et s'arrête, puis deux bips.
+    back = silence(1.1)
+    stop = motor(lambda t: 420.0 - 320.0 * min(1.0, t / 0.6) ** 1.3, 0.7)
+    mix(back, shape(stop, lambda t, s: min(1.0, t / 0.08) * min(1.0, (s - t) / 0.25)), 0.0, 0.6)
+    for k in range(2):
+        mix(back, fade(glide(lambda t: 1760.0, 0.07), 0.005, 0.015), 0.76 + k * 0.12, 0.4)
+    sounds["rover_back"] = fade(back, 0.004, 0.05)
+
+    # Départ d'une fusée : l'allumage, une poussée qui gronde, puis elle s'éloigne.
+    thrust = highpass(noise(2.5, 1500.0), 170.0)
+    thrust = shape(thrust, lambda t, s: min(1.0, t / 0.18) * math.exp(-t * 0.95) * (0.75 + 0.25 * math.sin(TAU * 27.0 * t)))
+    launch = mix(silence(2.6), thrust, 0.0, 1.0)
+    mix(launch, highpass(noise(0.3, 6000.0, decay=14.0), 1500.0), 0.0, 0.35)
+    mix(launch, shape(glide(lambda t: 260.0 + 180.0 * t, 2.2), lambda t, s: 0.5 * min(1.0, t / 0.3) * math.exp(-t * 1.3)), 0.05, 0.25)
+    sounds["launch"] = fade(launch, 0.004, 0.4)
+
+    # Arrivée de colons : le sas siffle, se verrouille, et deux notes d'accueil.
+    recruit = silence(1.1)
+    mix(recruit, shape(highpass(noise(0.5, 7000.0), 2200.0), lambda t, s: min(1.0, t / 0.03) * math.exp(-t * 6.0)), 0.0, 0.5)
+    mix(recruit, sweep(210, 90, 0.16, decay=16.0, shape="triangle"), 0.46, 0.8)
+    mix(recruit, sweep(1900, 1300, 0.02, decay=120.0), 0.46, 0.4)
+    mix(recruit, kalimba(freq(76), 0.35), 0.6, 0.5)
+    mix(recruit, kalimba(freq(81), 0.45), 0.72, 0.5)
+    sounds["recruit"] = recruit
+    return sounds
+
+
+PEAKS.update({"quiz_wrong": 0.6, "quiz_right": 0.7, "research_done": 0.6, "clean": 0.6, "repair": 0.7,
+        "discovery": 0.75, "challenge": 0.7, "rover": 0.5, "rover_back": 0.5, "recruit": 0.7})
+
+
 # ---------------------------------------------------------------- Ambiance
+
+def seamless(out, seconds, overlap):
+    """Raccorde en boucle par fondu enchaîné (out dure seconds + overlap)."""
+    n = int(seconds * RATE)
+    o = int(overlap * RATE)
+    loop = out[:n]
+    for i in range(o):
+        w = i / o
+        loop[i] = loop[i] * w + out[n + i] * (1.0 - w)
+    return loop
+
+
+def titan_wind(seconds=12.0, overlap=1.5):
+    """Vent de Titan : plus lent et plus sourd que celui de Mars, dans un air quatre fois plus dense."""
+    out = []
+    brown = 0.0
+    for i in range(int((seconds + overlap) * RATE)):
+        t = i / RATE
+        brown = 0.9985 * brown + rng.uniform(-1.0, 1.0) * 0.03
+        gust = 0.5 + 0.4 * math.sin(math.pi * t / 12.0) ** 2 + 0.2 * math.sin(math.pi * t / 4.0 + 0.4) ** 2
+        out.append(brown * gust)
+    return seamless(highpass(lowpass(out, 380.0), 90.0), seconds, overlap)
+
+
+def base_hum(seconds=12.0, overlap=1.5):
+    """Monde sans air : dehors, le silence ; on entend la base, sa ventilation et ses pompes.
+    Fréquences entières : le ronron se raccorde tout seul sur une boucle de durée entière."""
+    air = highpass(noise(seconds + overlap, 1800.0), 400.0)
+    out = []
+    for i in range(int((seconds + overlap) * RATE)):
+        t = i / RATE
+        hum = 0.5 * math.sin(TAU * 120.0 * t) + 0.35 * math.sin(TAU * 240.0 * t) + 0.2 * math.sin(TAU * 360.0 * t) + 0.08 * math.sin(TAU * 480.0 * t)
+        breath = 0.7 + 0.3 * math.sin(TAU * t / 6.0)
+        out.append(hum * 0.35 * (0.9 + 0.1 * math.sin(TAU * t / 4.0)) + air[i] * 0.55 * breath)
+    return seamless(out, seconds, overlap)
+
 
 def wind(seconds=12.0, overlap=1.5):
     """Vent martien : souffle grave et rafales lentes, raccordé en boucle par fondu enchaîné."""
@@ -373,6 +529,12 @@ def main():
     rng.seed(11)
     for name, samples in events().items():
         write(name, samples, PEAKS.get(name, 0.9))
+    rng.seed(23)
+    for name, samples in rewards().items():
+        write(name, samples, PEAKS.get(name, 0.9))
+    rng.seed(31)
+    write("ambience_titan", titan_wind(), 0.8)
+    write("ambience_base", base_hum(), 0.5)
     print("Sons écrits dans %s" % OUT)
 
 
