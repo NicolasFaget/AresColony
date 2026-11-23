@@ -386,6 +386,6 @@ func _show_about() -> void:
 				+ Tr.t("Conception : Nicolas Faget.\n")
 				+ Tr.t("Faits scientifiques : NASA (JPL, Perseverance, Phoenix, Curiosity), université de Wageningen, ")
 				+ Tr.t("université d'Arizona, Station spatiale internationale. Chaque fiche de l'encyclopédie cite ses sources.\n\n")
-				+ Tr.t("Moteur : Godot Engine. Modèles et sons générés par programme. Musique : « Cradle of the Red Horizon »."),
+				+ Tr.t("Moteur : Godot Engine. Modèles et sons générés par programme. Musiques : « Cradle of the Red Horizon », « The Red Horizon », « First Dome at Dawn », « Apex of Discovery »."),
 		"confirm_text": Tr.t("Fermer"),
 	})

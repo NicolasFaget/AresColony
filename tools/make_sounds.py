@@ -523,7 +523,7 @@ def wind(seconds=12.0, overlap=1.5):
 def main():
     for name, samples in effects().items():
         write(name, samples)
-    # Musique : bande son « Cradle of the Red Horizon » (art/audio/music_red_horizon.mp3).
+    # Musique : quatre morceaux enregistrés (art/audio/music_*.mp3), voir AudioManager.MUSIC.
     write("ambience_wind", wind(), 0.8)
     # Après le vent, avec sa propre graine : les sons déjà écrits ne changent pas.
     rng.seed(11)

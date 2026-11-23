@@ -1,7 +1,7 @@
 extends Node
 ## Autoload « AudioManager » : effets sonores, vent et bande son.
 ##
-## La bande son tourne en boucle ; un filtre la rend plus feutrée la nuit et pendant les tempêtes.
+## Les morceaux de la bande son s'enchaînent ; un filtre la rend plus feutrée la nuit et pendant les tempêtes.
 
 const SOUNDS := ["click", "tab", "fail", "upgrade", "milestone", "whoosh", "build", "alert",
 		"landing", "evacuation",
@@ -16,8 +16,10 @@ const AMBIENCES := ["wind", "titan", "base"]
 const BASE_HUM_DB := -6.0
 const SFX_VOICES := 10
 
-## Bande son du jeu, jouée en boucle.
-const MUSIC := "res://art/audio/music_red_horizon.mp3"
+## Bande son du jeu : les morceaux s'enchaînent dans un ordre tiré au hasard, sans redite immédiate.
+const MUSIC := ["red_horizon", "the_red_horizon", "first_dome_at_dawn", "apex_of_discovery"]
+## Silence entre deux morceaux (secondes).
+const MUSIC_GAP := 3.0
 const MUSIC_VOLUME_DB := -6.0
 
 ## Ambiance selon l'état de la colonie : la musique est plus ou moins feutrée (filtre passe-bas, Hz).
@@ -33,6 +35,8 @@ var _ambience: AudioStreamPlayer
 var _ambiences := {}
 var _ambience_id := "wind"
 var _music: AudioStreamPlayer
+var _playlist: Array = []
+var _track := ""
 var _music_filter: AudioEffectLowPassFilter
 var _last_play := {}
 var _mood := "day"
@@ -47,12 +51,10 @@ func _ready() -> void:
 		_streams[sound_name] = load("res://art/audio/%s.wav" % sound_name)
 	for i in SFX_VOICES:
 		_sfx.append(_player("SFX"))
-	var track: AudioStreamMP3 = load(MUSIC)
-	track.loop = true
 	_music = _player("Music")
-	_music.stream = track
 	_music.volume_db = MUSIC_VOLUME_DB
-	_music.play()
+	_music.finished.connect(func() -> void: get_tree().create_timer(MUSIC_GAP).timeout.connect(_next_track))
+	_next_track()
 
 	for id: String in AMBIENCES:
 		var loop: AudioStreamWAV = load("res://art/audio/ambience_%s.wav" % id)
@@ -77,6 +79,20 @@ func play(sound_name: String, volume_db := 0.0, pitch := 1.0, min_interval := 0.
 	player.volume_db = volume_db
 	player.pitch_scale = pitch
 	player.play()
+
+
+## Lance le morceau suivant. La liste est mélangée à chaque tour, sans rejouer le dernier entendu.
+func _next_track() -> void:
+	if _playlist.is_empty():
+		_playlist = MUSIC.duplicate()
+		_playlist.shuffle()
+		if _playlist.size() > 1 and _playlist[0] == _track:
+			_playlist.push_back(_playlist.pop_front())
+	_track = _playlist.pop_front()
+	var stream: AudioStreamMP3 = load("res://art/audio/music_%s.mp3" % _track)
+	stream.loop = false
+	_music.stream = stream
+	_music.play()
 
 
 ## Change l'ambiance musicale : la bande son devient progressivement plus ou moins feutrée.

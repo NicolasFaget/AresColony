@@ -140,6 +140,9 @@ de vie de l'application.
   retour), fusée, arrivée de colons. Trois ambiances en boucle (`AudioManager.AMBIENCES`) : vent de
   Mars, vent de Titan, ronron de la base sur les mondes sans air. Les téléphones ne rendent presque
   rien sous 250 Hz : garder l'essentiel de chaque son au-dessus.
+- Musique : quatre morceaux enregistrés (`AudioManager.MUSIC`, `art/audio/music_*.mp3`), enchaînés
+  dans un ordre tiré au hasard, sans redite immédiate, avec 3 s de silence entre deux. Chacun pèse
+  environ 4 Mo dans l'APK.
 - Nouvelles : une annonce plus longue que la ligne défile jusqu'à sa fin après une pause
   (`NewsTicker.SCROLL_PAUSE`, `SCROLL_SPEED`) ; avant, la fin (les gains) était coupée.
   `Tr.t` rend insécable l'espace des milliers (« 2 000 W » ne se coupe plus en fin de ligne).
