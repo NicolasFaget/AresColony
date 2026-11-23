@@ -7,12 +7,16 @@ signal showing_changed(on: bool)
 
 const DISPLAY_SECONDS := 4.0
 const MAX_QUEUE := 4
+## Défilement d'un message trop long : pause avant et après, vitesse en pixels par seconde.
+const SCROLL_PAUSE := 1.5
+const SCROLL_SPEED := 90.0
 
 var _label: Label
 var _clip: Control
 var _queue: Array[String] = []
 var _timer := 0.0
 var _showing := false
+var _tween: Tween
 ## Vrai pendant une alerte rouge : elle garde la ligne, les nouvelles attendent leur tour.
 var _hold := false
 
@@ -86,5 +90,14 @@ func _next() -> void:
 	_showing = true
 	_timer = DISPLAY_SECONDS
 	_label.position.x = _clip.size.x
-	var tween := _label.create_tween()
-	tween.tween_property(_label, "position:x", 0.0, 0.45).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	if _tween != null:
+		_tween.kill()
+	_tween = _label.create_tween()
+	_tween.tween_property(_label, "position:x", 0.0, 0.45).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	# Message plus long que la ligne : après une pause, il défile jusqu'à sa fin (les gains y sont).
+	var overflow := _label.size.x - _clip.size.x
+	if overflow > 0.0:
+		var slide := overflow / SCROLL_SPEED
+		_tween.tween_interval(SCROLL_PAUSE)
+		_tween.tween_property(_label, "position:x", -overflow, slide)
+		_timer = 0.45 + SCROLL_PAUSE + slide + SCROLL_PAUSE

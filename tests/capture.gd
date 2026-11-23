@@ -205,6 +205,38 @@ func _run() -> void:
 			scroll = main._modal_layer.get_child(-1).find_children("*", "ScrollContainer", true, false)[0]
 			scroll.scroll_vertical = 420
 			await _shot("43_quiz_repondu")
+		"nouveautes":
+			# Fiches des nouveaux modules et des seconds événements, et leurs annonces.
+			ColonyBot.play(engine, 9.0)
+			engine.state.speed = 0
+			main = await _open_main()
+			_close_modals(main)
+			var n := 0
+			for id: String in ["mmrtg", "sam_lab", "refabricator", "bone_loss", "phobos_eclipse", "juling_ice", "titan_dunes", "europa_salt", "e_ring"]:
+				main._queue_discovery(id)
+				engine.unlock_card(id)
+				await _frames(40)
+				await _shot("N%d_a_decouverte_%s" % [n, id])
+				_close_modals(main)
+				main._discovery = null
+				main._discoveries.clear()
+				main._show_card(id)
+				await _frames(10)
+				await _shot("N%d_b_fiche_%s" % [n, id])
+				var card_scroll: ScrollContainer = main._modal_layer.get_child(-1).find_children("*", "ScrollContainer", true, false)[0]
+				card_scroll.scroll_vertical = 2000
+				await _frames(4)
+				await _shot("N%d_c_quiz_%s" % [n, id])
+				_close_modals(main)
+				n += 1
+			for id: String in ["phobos_eclipse", "juling_ice", "titan_dunes", "europa_salt", "e_ring"]:
+				var event := ColonyContent.world_event(id)
+				main._news.post_now(Tr.t(event.news) % load("res://ui/pages/colony_page.gd")._reward_text(event.reward))
+				await _frames(20)
+				await _shot("N%d_news_%s" % [n, id])
+				await _frames(215)
+				await _shot("N%d_news_fin_%s" % [n, id])
+				n += 1
 		"ameliorations":
 			ColonyBot.play(engine, 30.0)
 			engine.state.speed = 0
