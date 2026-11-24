@@ -19,6 +19,7 @@ var _alert: AlertBanner
 var _coach: CoachCard
 var _window: GameWindow
 var _news: NewsTicker
+var _intro: StoryIntro
 var _message_slot: Control
 var _safe_area: MarginContainer
 var _pages: Array[Page] = []
@@ -85,7 +86,16 @@ func _ready() -> void:
 	if not report.is_empty():
 		_show_offline_report(report)
 	elif _engine.state.sol < 0.35:
-		_show_welcome()
+		if GameManager.campaign.story_seen.has(Story.INTRO_ID):
+			_show_welcome()
+		else:
+			_show_intro()
+	# Le récit : un message de la Terre quand son moment est venu et que l'écran est libre.
+	var story_timer := Timer.new()
+	story_timer.wait_time = 1.5
+	story_timer.timeout.connect(_check_story)
+	add_child(story_timer)
+	story_timer.start()
 	if GameManager.campaign.is_complete() and not GameManager.campaign.finale_shown:
 		_show_finale()
 
@@ -618,6 +628,38 @@ func _on_evacuation(colonist_name: String, cause: String) -> void:
 				if _engine.planet_id() == "mars" else Tr.t("Sa santé ne permettait plus de rester ici. Le vaisseau de secours l'a ramené vers Mars.\n\n"))
 				+ Tr.t("Cause : ") + Tr.t(cause),
 		"confirm_text": Tr.t("Compris"),
+	})
+
+
+# ---------- Récit ----------
+
+## Introduction d'une nouvelle partie, puis l'atterrissage et l'accueil.
+func _show_intro() -> void:
+	_intro = StoryIntro.open(self)
+	_intro.done.connect(func() -> void:
+		_intro = null
+		GameManager.campaign.story_seen.append(Story.INTRO_ID)
+		GameManager.save()
+		_world.land_capsule()
+		AudioManager.play("landing")
+		_show_welcome())
+
+
+## Montre le prochain message de la Terre, s'il y en a un et si rien d'autre n'occupe l'écran.
+func _check_story() -> void:
+	if _intro != null or _discovery != null or _modal_layer.get_child_count() > 0 or is_instance_valid(_solar):
+		return
+	var campaign := GameManager.campaign
+	var id := Story.next(campaign)
+	if id.is_empty():
+		return
+	campaign.story_seen.append(id)
+	GameManager.save()
+	AudioManager.play("research_done")
+	Modal.open(_modal_layer, {
+		"icon": "news", "title": Tr.t("Message de la Terre"),
+		"body": Tr.t(Story.text(id)),
+		"confirm_text": Tr.t("Fermer"),
 	})
 
 

@@ -31,6 +31,11 @@ func _run() -> void:
 	manager.engine = engine
 	manager.campaign = Campaign.from_engine(engine)
 	var main: Control
+	# Le récit (introduction, messages de la Terre) ne s'invite que dans son propre scénario.
+	if scenario != "recit":
+		manager.campaign.story_seen.append(Story.INTRO_ID)
+		for message: Dictionary in Story.MESSAGES:
+			manager.campaign.story_seen.append(message.id)
 
 	match scenario:
 		"menu":
@@ -257,6 +262,35 @@ func _run() -> void:
 				await _shot("G%d_b_fiche_%s" % [n, id])
 				_close_modals(main)
 				n += 1
+		"recit":
+			# Introduction : les quatre plans, puis l'accueil ; ensuite un message de la Terre.
+			main = await _open_main()
+			for k in Story.INTRO.size():
+				main._intro._start_shot(k)
+				for moment in [0.25, 0.8]:
+					main._intro._t = 7.0 * moment
+					await _frames(6)
+					main._intro._t = 7.0 * moment
+					await _frames(2)
+					await _shot("R%d_plan_%d" % [k, roundi(moment * 100.0)])
+			main._intro._leave()
+			await _frames(70)
+			await _shot("R4_accueil")
+			_close_modals(main)
+			await _frames(4)
+			engine.state.objectives_done.append("first_breath")
+			main._check_story()
+			await _frames(30)
+			await _shot("R5_message")
+			_close_modals(main)
+			manager.campaign.story_seen.erase("farewell")
+			for message: Dictionary in Story.MESSAGES:
+				if message.id != "farewell" and not manager.campaign.story_seen.has(message.id):
+					manager.campaign.story_seen.append(message.id)
+			await _frames(4)
+			load("res://ui/components/modal.gd").open(main._modal_layer, { "icon": "news", "title": Tr.t("Message de la Terre"), "body": Tr.t(Story.text("farewell")), "confirm_text": Tr.t("Fermer") })
+			await _frames(30)
+			await _shot("R6_adieu")
 		"ameliorations":
 			ColonyBot.play(engine, 30.0)
 			engine.state.speed = 0

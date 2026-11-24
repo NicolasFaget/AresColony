@@ -44,6 +44,8 @@ var next_shipment_id := 1
 var deliveries := 0
 ## Le bilan de fin de campagne a été montré (une seule fois).
 var finale_shown := false
+## Récit : introduction et messages de la Terre déjà montrés (voir Story).
+var story_seen: Array[String] = []
 
 ## Colonies en veille sécurisée (index -> ressource vitale trop basse).
 var standby := {}
@@ -56,6 +58,12 @@ static func from_state(state: ColonyState) -> Campaign:
 	campaign._add_colony(state)
 	campaign.time = state.sol
 	return campaign
+
+
+## Partie commencée avant le récit : ce qui est déjà arrivé ne sera pas raconté après coup.
+func skip_past_story() -> void:
+	story_seen = Story.due(self)
+	story_seen.append(Story.INTRO_ID)
 
 
 ## Campagne autour d'une colonie déjà simulée (outils, captures d'écran).
@@ -533,14 +541,16 @@ func to_dict() -> Dictionary:
 	return {
 		"version": FORMAT_VERSION, "colonies": list, "active": active, "time": time,
 		"shipments": shipments.duplicate(true), "next_shipment_id": next_shipment_id, "deliveries": deliveries,
-		"finale_shown": finale_shown,
+		"finale_shown": finale_shown, "story_seen": story_seen.duplicate(),
 	}
 
 
 ## Relit une campagne ; une sauvegarde d'avant les campagnes (une seule colonie) est convertie.
 static func from_dict(data: Dictionary) -> Campaign:
 	if not data.get("colonies") is Array:
-		return from_state(ColonyState.from_dict(data))
+		var converted := from_state(ColonyState.from_dict(data))
+		converted.skip_past_story()
+		return converted
 	var campaign := Campaign.new()
 	for item: Variant in data.colonies:
 		if item is Dictionary:
@@ -558,6 +568,13 @@ static func from_dict(data: Dictionary) -> Campaign:
 			var shipment := _valid_shipment(item, campaign.colonies.size())
 			if not shipment.is_empty():
 				campaign.shipments.append(shipment)
+	var seen: Variant = data.get("story_seen")
+	if seen is Array:
+		for id: Variant in seen:
+			if id is String and not campaign.story_seen.has(id):
+				campaign.story_seen.append(id)
+	else:
+		campaign.skip_past_story()
 	campaign._update_info()
 	campaign.sync_knowledge()
 	return campaign

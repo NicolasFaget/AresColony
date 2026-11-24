@@ -24,6 +24,12 @@ Reste avant publication : fiche Google Play, signature, politique de confidentia
   deux fois, avec sa fiche et un objectif (`<monde>_wonder`) — Grande antenne (Mars), Catapulte électromagnétique
   (Cérès), Base du sous-marin (Titan), Grand radar à glace (Europe), Institut d'astrobiologie (Encelade).
   Ils donnent un emploi aux matériaux de fin de partie (1 500 à 1 800 par monde). Champ `planet` de `Defs.Building`.
+- Récit (`core/story.gd`) : une Terre à bout de souffle finance une dernière mission ; il s'agit de prouver qu'on
+  peut vivre ailleurs (pas de « sauver l'humanité » : la Terre ravitaille, et le retour reste possible).
+  Introduction en quatre plans 3D (`StoryIntro`, qu'on peut passer), puis quatorze messages de Claire, directrice
+  de vol, dus selon l'état de la campagne (premier oxygène, dernier cargo, ères, mondes fondés, adieu final) et
+  montrés un par un quand l'écran est libre. `Campaign.story_seen` retient ce qui a été vu ; une sauvegarde
+  d'avant le récit ne rattrape pas le passé. Capture : scénario `recit`.
 - Base déserte : sans colon, les machines à entrées s'arrêtent et aucun objectif ne s'accomplit, jusqu'à
   l'arrivée de nouveaux colons (`ColonyEngine.deserted_stops`, coupé par les tests de production pure).
 - Captures d'écran (avec fenêtre) :

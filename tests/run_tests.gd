@@ -46,6 +46,7 @@ func _init() -> void:
 	_test_meteors_and_aurora()
 	_test_world_events()
 	_test_wonders()
+	_test_story()
 	_test_europa()
 	_test_enceladus()
 	_test_number_formatter()
@@ -1375,6 +1376,45 @@ func _test_wonders() -> void:
 	empty.state.colonists.append(crew[0])
 	empty.advance(0.2)
 	_check(empty.state.amount(R.OXYGEN) > 5.0 - 0.84 * 0.2, "un colon revient : la production repart")
+
+
+## Récit : chaque message de la Terre arrive une fois, à son moment, et survit à la sauvegarde.
+func _test_story() -> void:
+	var campaign := Campaign.from_state(ColonyState.new())
+	var mars := campaign.engine()
+	_check(Story.due(campaign).is_empty() and Story.next(campaign).is_empty(), "nouvelle partie : aucun message")
+	_check(not campaign.story_seen.has(Story.INTRO_ID), "nouvelle partie : l'introduction reste à montrer")
+	mars.state.objectives_done.append("first_breath")
+	mars.state.objectives_done.append("water")
+	_check(Story.next(campaign) == "oxygen", "premier oxygène : Claire écrit")
+	campaign.story_seen.append("oxygen")
+	_check(Story.next(campaign) == "water", "les messages se suivent dans l'ordre du récit")
+	campaign.story_seen.append("water")
+	_check(Story.next(campaign).is_empty(), "un message ne revient pas")
+	mars.state.resupply_count = ColonyEngine.RESUPPLY_LIMIT - 1
+	_check(Story.next(campaign) == "last_but_one", "avant-dernier ravitaillement annoncé")
+	mars.state.resupply_count = ColonyEngine.RESUPPLY_LIMIT
+	campaign.story_seen.append("last_but_one")
+	_check(Story.next(campaign) == "last_cargo", "dernier cargo annoncé")
+	mars.state.evacuated = 1
+	campaign.story_seen.append("last_cargo")
+	_check(Story.next(campaign) == "evacuation", "première évacuation : Claire écrit")
+	var ids := {}
+	for message: Dictionary in Story.MESSAGES:
+		_check(not ids.has(message.id) and not str(message.text).is_empty(), "message %s : unique, avec un texte" % message.id)
+		ids[message.id] = true
+		_check(Story.text(message.id) == message.text, "message %s retrouvé par son identifiant" % message.id)
+	_check(Story.INTRO.size() == 4, "introduction en quatre plans")
+
+	# Sauvegarde : les messages vus sont gardés ; une partie d'avant le récit ne les rattrape pas.
+	var saved := campaign.to_dict()
+	var loaded := Campaign.from_dict(saved)
+	_check(loaded.story_seen == campaign.story_seen, "messages vus sauvegardés")
+	saved.erase("story_seen")
+	var old := Campaign.from_dict(saved)
+	_check(Story.next(old).is_empty() and old.story_seen.has(Story.INTRO_ID), "ancienne sauvegarde : le passé n'est pas raconté après coup")
+	old.engines[0].state.era = 2
+	_check(Story.next(old) == "era2", "ancienne sauvegarde : la suite du récit arrive")
 
 
 func _test_world_events() -> void:
