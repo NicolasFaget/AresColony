@@ -10,13 +10,15 @@ signal done
 const SHOT_SECONDS := 7.0
 const FADE_SECONDS := 0.6
 const EARTH := Vector3.ZERO
+## Rotation de départ de la Terre : l'Europe et l'Afrique face à la caméra du premier plan.
+const EARTH_TURN := -3.35
 const MARS := Vector3(60.0, 0.0, 0.0)
 
 var _viewport: SubViewport
 var _camera: Camera3D
 var _sun: DirectionalLight3D
 ## Orientation du soleil pour chaque plan : la planète montrée est éclairée presque de face.
-const SUN_ANGLES := [Vector3(-20, -25, 0), Vector3(-25, 55, 0), Vector3(-20, -65, 0), Vector3(-25, 55, 0)]
+const SUN_ANGLES := [Vector3(-20, -25, 0), Vector3(-25, 55, 0), Vector3(-20, -65, 0), Vector3(-30, 15, 0)]
 var _earth: MeshInstance3D
 var _mars: MeshInstance3D
 var _rocket: Node3D
@@ -158,6 +160,9 @@ func _start_shot(index: int) -> void:
 	_text.modulate.a = 0.0
 	_sun.rotation_degrees = SUN_ANGLES[index]
 	_rocket.visible = index == 1
+	# Au dernier plan, Mars est toute proche : on la grossit, et on la penche pour cacher son pôle.
+	_mars.scale = Vector3.ONE * (3.0 if index == 3 else 1.0)
+	_mars.rotation.x = 0.9 if index == 3 else 0.0
 	_capsule.visible = index >= 2
 	_animate()
 
@@ -165,7 +170,7 @@ func _start_shot(index: int) -> void:
 ## Place la caméra et les vaisseaux selon le plan et le temps écoulé.
 func _animate() -> void:
 	var k := clampf(_t / SHOT_SECONDS, 0.0, 1.0)
-	_earth.rotation.y = 0.6 + _t * 0.03
+	_earth.rotation.y = EARTH_TURN + _t * 0.03
 	_mars.rotation.y = 1.0 + _t * 0.02
 	match _shot:
 		0:
@@ -181,14 +186,14 @@ func _animate() -> void:
 			# Le voyage : la capsule au premier plan, Mars grossit au loin.
 			var from := MARS + Vector3(-34.0 + k * 14.0, 1.5, 6.0)
 			_look(from, MARS + Vector3(0, 0.6, 0))
-			_capsule.position = _camera.to_global(Vector3(-0.9 + k * 0.5, -0.2, -5.0))
+			_capsule.position = _camera.to_global(Vector3(-0.35 + k * 0.4, -0.2, -5.0))
 			_capsule.basis = _camera.global_basis * Basis.from_euler(Vector3(0.5, _t * 0.12, 1.25)) * Basis.from_scale(Vector3.ONE * 0.9)
 		3:
-			# L'arrivée : Mars emplit le bas de l'image, la capsule descend vers elle.
-			var above := MARS + Vector3(-1.5, 5.4, 4.5)
-			_capsule.position = above + Vector3(0.9, -1.2 - k * 1.3, -2.6 - k * 0.6)
-			_capsule.basis = Basis.from_euler(Vector3(0.5, 0.4, 0.15)) * Basis.from_scale(Vector3.ONE * 0.55)
-			_look(above, MARS + Vector3(0.4, 2.4, 0))
+			# L'arrivée : Mars, immense, emplit le bas de l'image ; la capsule s'éloigne vers elle, bouclier en avant,
+			# sans jamais atteindre le sol (le fondu enchaîne sur l'atterrissage dans le jeu).
+			_look(MARS + Vector3(-3.0 + k * 0.6, 4.0, 17.0), MARS + Vector3(2.0, 11.0, 0.0))
+			_capsule.position = _camera.to_global(Vector3(0.3, -0.2 - k * 0.5, -2.5 - k * 4.0))
+			_capsule.basis = _camera.global_basis * Basis.from_euler(Vector3(1.25, 0.3 + _t * 0.05, 0.2)) * Basis.from_scale(Vector3.ONE * 0.7)
 
 
 func _look(from: Vector3, target: Vector3) -> void:
@@ -213,7 +218,7 @@ func _build_scene() -> void:
 	root.add_child(world_env)
 	_sun = DirectionalLight3D.new()
 	_sun.rotation_degrees = SUN_ANGLES[0]
-	_sun.light_energy = 1.5
+	_sun.light_energy = 1.25
 	root.add_child(_sun)
 	_camera = Camera3D.new()
 	_camera.fov = 50.0
@@ -242,9 +247,8 @@ func _build_scene() -> void:
 	stars.material_override = star_material
 	root.add_child(stars)
 
-	# Une Terre ternie : océans gris-bleu, continents roussis, peu de blanc.
-	_earth = _planet(root, EARTH, 3.0, Color(0.2, 0.3, 0.42), Color(0.55, 0.42, 0.3), 3.0, 0.75, 21.0)
-	_mars = _planet(root, MARS, 4.0, Color(0.82, 0.4, 0.2), Color(0.55, 0.25, 0.14), 2.0, 0.35, 5.0)
+	_earth = _build_earth(root)
+	_mars = _planet(root, MARS, 4.0, Color(0.82, 0.4, 0.2), Color(0.5, 0.22, 0.12), 2.0, 0.6, 5.0)
 	_rocket = ModelBuilder.rocket()
 	root.add_child(_rocket)
 	_capsule = ModelBuilder.capsule()
@@ -255,13 +259,64 @@ func _build_scene() -> void:
 	root.add_child(_capsule)
 
 
+## La Terre : la carte Blue Marble de la NASA (un peu ternie), des nuages qui dérivent et un liseré d'atmosphère.
+func _build_earth(root: Node3D) -> MeshInstance3D:
+	var node := MeshInstance3D.new()
+	var mesh := SphereMesh.new()
+	mesh.radius = 3.0
+	mesh.height = 6.0
+	mesh.radial_segments = 128
+	mesh.rings = 64
+	node.mesh = mesh
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	noise.frequency = 0.012
+	noise.fractal_octaves = 5
+	noise.seed = 4
+	var clouds := NoiseTexture2D.new()
+	clouds.width = 512
+	clouds.height = 256
+	clouds.seamless = true
+	clouds.noise = noise
+	var shader := Shader.new()
+	shader.code = EARTH_SHADER
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter("map", preload("res://art/textures/earth.jpg"))
+	material.set_shader_parameter("clouds", clouds)
+	node.material_override = material
+	node.position = EARTH
+	root.add_child(node)
+	return node
+
+
+const EARTH_SHADER := """
+shader_type spatial;
+uniform sampler2D map : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D clouds : filter_linear, repeat_enable;
+
+void fragment() {
+	vec3 ground = texture(map, UV).rgb;
+	// Les océans de la carte sont presque noirs : on les éclaircit un peu.
+	ground = max(ground, vec3(0.03, 0.07, 0.16));
+	float cover = texture(clouds, UV * vec2(4.0, 2.0) + vec2(TIME * 0.004, 0.0)).r;
+	cover = smoothstep(0.6, 0.85, cover) * 0.7;
+	ALBEDO = mix(ground, vec3(0.93, 0.94, 0.95), cover);
+	ROUGHNESS = 0.8;
+	// Liseré bleuté de l'atmosphère, sur le bord du disque.
+	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
+	EMISSION = vec3(0.25, 0.5, 1.0) * rim * 0.5;
+}
+"""
+
+
 func _planet(root: Node3D, at: Vector3, radius: float, base: Color, band: Color, bands: float, strength: float, seed_value: float) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
 	var mesh := SphereMesh.new()
 	mesh.radius = radius
 	mesh.height = radius * 2.0
-	mesh.radial_segments = 48
-	mesh.rings = 24
+	mesh.radial_segments = 128
+	mesh.rings = 64
 	node.mesh = mesh
 	var shader := Shader.new()
 	shader.code = SolarSystem.PLANET_SHADER

@@ -85,11 +85,11 @@ func _ready() -> void:
 	var report := GameManager.take_startup_report()
 	if not report.is_empty():
 		_show_offline_report(report)
+	elif not GameManager.campaign.story_seen.has(Story.INTRO_ID) and GameManager.campaign.colonies.size() == 1 and _engine.state.sol < 2.0:
+		# Tant qu'elle n'a pas été vue en entier (ou passée), l'introduction revient au lancement.
+		_show_intro()
 	elif _engine.state.sol < 0.35:
-		if GameManager.campaign.story_seen.has(Story.INTRO_ID):
-			_show_welcome()
-		else:
-			_show_intro()
+		_show_welcome()
 	# Le récit : un message de la Terre quand son moment est venu et que l'écran est libre.
 	var story_timer := Timer.new()
 	story_timer.wait_time = 1.5
@@ -635,9 +635,13 @@ func _on_evacuation(colonist_name: String, cause: String) -> void:
 
 ## Introduction d'une nouvelle partie, puis l'atterrissage et l'accueil.
 func _show_intro() -> void:
+	# Le temps ne s'écoule pas pendant l'introduction.
+	var speed := maxi(1, _engine.state.speed)
+	_engine.state.speed = 0
 	_intro = StoryIntro.open(self)
 	_intro.done.connect(func() -> void:
 		_intro = null
+		_engine.set_speed(speed)
 		GameManager.campaign.story_seen.append(Story.INTRO_ID)
 		GameManager.save()
 		_world.land_capsule()
