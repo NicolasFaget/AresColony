@@ -252,6 +252,11 @@ static func building(building_id: String) -> Node3D:
 		"recycler": _recycler(root)
 		"medbay": _medbay(root)
 		"rtg": _rtg(root)
+		"antenna": _antenna(root)
+		"mass_driver": _mass_driver(root)
+		"sub_dock": _sub_dock(root)
+		"ice_radar": _ice_radar(root)
+		"astro_lab": _astro_lab(root)
 	return root
 
 
@@ -852,6 +857,120 @@ static func _rtg(r: Node3D) -> void:
 	core.material_override = material(ORANGE, 1.4)
 	strut(r, Vector3(0.12, 0.2, 0.12), Vector3(0.36, 0.08, 0.36), 0.02, ORANGE)
 	box(r, Vector3(-0.32, 0.12, 0.3), Vector3(0.14, 0.1, 0.1), Color("#e0c341"))
+
+
+# ---------- Grands chantiers (un par monde, 3 × 3 cases) ----------
+
+## Grande antenne (Mars) : une parabole inclinée sur son pylône, comme celles du Deep Space Network.
+static func _antenna(r: Node3D) -> void:
+	_pad(r, 2.9)
+	cylinder(r, Vector3(0, 0.25, 0), 0.75, 0.4, CONCRETE, Vector3.ZERO, 0.6, 24)
+	cylinder(r, Vector3(0, 0.85, 0), 0.22, 0.9, WHITE, Vector3.ZERO, 0.16, 16)
+	box(r, Vector3(0, 1.35, 0), Vector3(0.5, 0.3, 0.4), GREY)
+	# Le réflecteur : un tronc de cône très évasé, incliné vers le ciel.
+	var tilt := Vector3(32, 0, 0)
+	var axis := Basis.from_euler(Vector3(deg_to_rad(32.0), 0, 0)) * Vector3.UP
+	var hub := Vector3(0, 1.5, 0)
+	cylinder(r, hub + axis * 0.25, 0.18, 0.4, WHITE, tilt, 1.25, 32)
+	cylinder(r, hub + axis * 0.46, 1.22, 0.02, Color("#d9dde0"), tilt, -1.0, 32)
+	# Le récepteur, tenu au foyer par quatre bras.
+	var focus := hub + axis * 1.25
+	for k in 4:
+		var a := k * TAU / 4.0 + PI / 4.0
+		var rim := hub + axis * 0.47 + Basis.from_euler(Vector3(deg_to_rad(32.0), 0, 0)) * Vector3(cos(a) * 1.0, 0, sin(a) * 1.0)
+		strut(r, rim, focus, 0.02, GREY)
+	box(r, focus, Vector3(0.16, 0.16, 0.16), GOLD)
+	box(r, Vector3(-1.0, 0.25, -1.0), Vector3(0.6, 0.4, 0.5), WHITE)
+	box(r, Vector3(1.0, 0.2, -1.0), Vector3(0.4, 0.3, 0.4), GREY)
+	light(r, focus + axis * 0.12, RED, 0.035, 2.5)
+	light(r, Vector3(-1.0, 0.5, -0.74), LIGHT, 0.04, 2.0)
+
+
+## Catapulte électromagnétique (Cérès) : un rail incliné cerclé de bobines.
+static func _mass_driver(r: Node3D) -> void:
+	_pad(r, 2.9)
+	var low := Vector3(-1.2, 0.2, 1.1)
+	var high := Vector3(1.15, 1.45, -1.1)
+	var dir := (high - low).normalized()
+	for side in [-0.09, 0.09]:
+		var off: Vector3 = dir.cross(Vector3.UP).normalized() * side
+		strut(r, low + off, high + off, 0.035, GREY)
+	# Les bobines, de plus en plus hautes, chacune sur son chevalet.
+	for k in 7:
+		var at := low.lerp(high, (k + 0.5) / 7.0)
+		var ring := cylinder(r, at, 0.2, 0.09, ORANGE if k % 2 == 0 else DARK, Vector3.ZERO, -1.0, 16)
+		ring.basis = Basis(Quaternion(Vector3.UP, dir))
+		strut(r, Vector3(at.x, 0.07, at.z), at - Vector3(0, 0.18, 0), 0.03, GREY)
+	# La charge prête à partir, et le poste de commande.
+	box(r, low + dir * 0.15, Vector3(0.16, 0.16, 0.16), GOLD)
+	box(r, Vector3(-0.95, 0.3, -0.9), Vector3(0.7, 0.5, 0.6), WHITE)
+	for k in 3:
+		cylinder(r, Vector3(0.6 + k * 0.3, 0.25, 1.05), 0.12, 0.4, BLUE, Vector3.ZERO, -1.0, 12)
+	light(r, high, RED, 0.035, 2.5)
+	light(r, Vector3(-0.95, 0.6, -0.58), LIGHT, 0.04, 2.0)
+
+
+## Base du sous-marin (Titan) : un bassin sombre, un quai, une grue et le sous-marin à moitié émergé.
+static func _sub_dock(r: Node3D) -> void:
+	_pad(r, 2.9)
+	box(r, Vector3(0.25, 0.085, 0.3), Vector3(2.0, 0.03, 1.5), Color("#1c1a14"))
+	box(r, Vector3(-1.1, 0.16, 0), Vector3(0.5, 0.18, 2.5), CONCRETE)
+	# La coque orange, le kiosque et les gouvernes.
+	cylinder(r, Vector3(0.25, 0.2, 0.3), 0.2, 1.3, ORANGE, Vector3(0, 0, 90), -1.0, 16)
+	sphere(r, Vector3(0.9, 0.2, 0.3), 0.2, ORANGE, Vector3.ONE, 0.0, false, 12)
+	sphere(r, Vector3(-0.4, 0.2, 0.3), 0.2, ORANGE, Vector3(1.4, 1.0, 1.0), 0.0, false, 12)
+	box(r, Vector3(0.35, 0.45, 0.3), Vector3(0.3, 0.2, 0.12), WHITE)
+	strut(r, Vector3(0.35, 0.55, 0.3), Vector3(0.35, 0.85, 0.3), 0.012, GREY)
+	box(r, Vector3(-0.55, 0.2, 0.3), Vector3(0.04, 0.4, 0.4), DARK)
+	# La grue du quai.
+	strut(r, Vector3(-1.1, 0.25, -0.5), Vector3(-1.1, 1.3, -0.5), 0.05, GOLD)
+	strut(r, Vector3(-1.1, 1.3, -0.5), Vector3(0.1, 1.15, 0.1), 0.035, GOLD)
+	strut(r, Vector3(0.1, 1.15, 0.1), Vector3(0.1, 0.6, 0.1), 0.008, DARK)
+	box(r, Vector3(-1.1, 0.5, 0.8), Vector3(0.4, 0.5, 0.6), WHITE)
+	cylinder(r, Vector3(1.05, 0.28, -1.0), 0.22, 0.45, GREY, Vector3.ZERO, -1.0, 14)
+	light(r, Vector3(0.35, 0.87, 0.3), LIGHT, 0.03, 2.5)
+	light(r, Vector3(-1.1, 1.36, -0.5), RED, 0.035, 2.0)
+
+
+## Grand radar à glace (Europe) : un champ de mâts reliés par des fils, pointé vers le sol.
+static func _ice_radar(r: Node3D) -> void:
+	_pad(r, 2.9)
+	for row in 3:
+		for col in 3:
+			var at := Vector3(-0.95 + col * 0.95, 0.07, -0.95 + row * 0.95)
+			if row == 1 and col == 1:
+				continue
+			strut(r, at, at + Vector3(0, 1.1, 0), 0.025, GREY)
+			box(r, at + Vector3(0, 1.1, 0), Vector3(0.5, 0.02, 0.02), WHITE)
+			box(r, at + Vector3(0, 0.9, 0), Vector3(0.02, 0.02, 0.5), WHITE)
+	for row in 3:
+		strut(r, Vector3(-0.95, 1.17, -0.95 + row * 0.95), Vector3(0.95, 1.17, -0.95 + row * 0.95), 0.008, DARK)
+	# Au centre : l'émetteur, sous son abri contre les radiations.
+	box(r, Vector3(0, 0.3, 0), Vector3(0.6, 0.45, 0.6), WHITE)
+	box(r, Vector3(0, 0.56, 0), Vector3(0.7, 0.08, 0.7), CONCRETE)
+	cylinder(r, Vector3(0, 0.75, 0), 0.05, 0.3, GOLD, Vector3.ZERO, -1.0, 10)
+	light(r, Vector3(0, 0.93, 0), LIGHT, 0.045, 3.0)
+	light(r, Vector3(-0.95, 1.2, -0.95), RED, 0.03, 2.0)
+	light(r, Vector3(0.95, 1.2, 0.95), RED, 0.03, 2.0)
+
+
+## Institut d'astrobiologie (Encelade) : un dôme stérile entouré de laboratoires cylindriques.
+static func _astro_lab(r: Node3D) -> void:
+	_pad(r, 2.9)
+	cylinder(r, Vector3(0, 0.2, 0), 0.8, 0.28, WHITE, Vector3.ZERO, -1.0, 28)
+	sphere(r, Vector3(0, 0.34, 0), 0.74, Color(0.78, 0.9, 0.95), Vector3(1.0, 0.8, 1.0), 0.0, true, 24)
+	for k in 3:
+		var a := k * TAU / 3.0 + PI / 6.0
+		var at := Vector3(cos(a) * 1.05, 0.24, sin(a) * 1.05)
+		cylinder(r, at, 0.26, 0.36, WHITE, Vector3.ZERO, -1.0, 16)
+		cylinder(r, at + Vector3(0, 0.2, 0), 0.27, 0.04, BLUE, Vector3.ZERO, -1.0, 16)
+		strut(r, at * 0.55 + Vector3(0, 0.0, 0), at * 0.8, 0.07, GREY)
+	# Le mât d'échantillonnage, qui recueille les grains tombés des geysers.
+	strut(r, Vector3(0, 0.9, 0), Vector3(0, 1.7, 0), 0.02, GREY)
+	cylinder(r, Vector3(0, 1.72, 0), 0.02, 0.06, GOLD, Vector3.ZERO, 0.2, 14)
+	box(r, Vector3(-1.1, 0.2, 1.05), Vector3(0.4, 0.3, 0.4), GREY)
+	light(r, Vector3(0, 0.95, 0), LIGHT, 0.04, 3.0)
+	light(r, Vector3(0, 1.8, 0), RED, 0.03, 2.0)
 
 
 # ---------- Personnages et véhicules ----------

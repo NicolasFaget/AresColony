@@ -190,6 +190,8 @@ var _idle: Array[bool] = []
 var _storm_calm_at := -INF
 var _occupied := {}
 var _rng := RandomNumberGenerator.new()
+## Sans colon, les machines s'arrêtent et aucun objectif ne s'accomplit (les tests de production pure le coupent).
+var deserted_stops := true
 var _storm_warned := false
 var _flare_warned := false
 var _shortage_flags := {}
@@ -449,7 +451,7 @@ func is_unlocked(def: Defs.Building) -> bool:
 func buildable_defs() -> Array[Defs.Building]:
 	var list: Array[Defs.Building] = []
 	for def: Defs.Building in building_defs.values():
-		if not def.fixed and not planet().forbidden.has(def.id):
+		if not def.fixed and not planet().forbidden.has(def.id) and (def.planet.is_empty() or def.planet == planet_id()):
 			list.append(def)
 	return list
 
@@ -497,6 +499,22 @@ func average_flows(real := false) -> Dictionary:
 	return flows
 
 
+## Grand chantier de ce monde ("" s'il n'y en a pas).
+func wonder_id() -> String:
+	for def: Defs.Building in building_defs.values():
+		if def.planet == planet_id():
+			return def.id
+	return ""
+
+
+## Avancement du grand chantier : 0 (pas construit ou pas raccordé), puis son niveau (3 : achevé).
+func wonder_level() -> int:
+	for i in state.buildings.size():
+		if _connected[i] and not def_of(i).planet.is_empty():
+			return level_of(i)
+	return 0
+
+
 ## État d'un module, pour l'affichage : { "ok": bool, "text": String }.
 func building_status(index: int) -> Dictionary:
 	var def := def_of(index)
@@ -504,6 +522,8 @@ func building_status(index: int) -> Dictionary:
 		return { "ok": false, "text": Tr.t("Non raccordé : collez-le à un module relié à l'atterrisseur.") }
 	if is_broken(index):
 		return { "ok": false, "text": Tr.t("En panne : réparez-le (%s matériaux).") % NumberFormatter.format(repair_cost(index)[ColonyContent.MATERIALS]) }
+	if deserted_stops and state.colonists.is_empty() and not def.inputs.is_empty():
+		return { "ok": false, "text": Tr.t("À l'arrêt : plus personne pour le faire tourner.") }
 	if _idle[index]:
 		return { "ok": true, "text": Tr.t("En veille : stockage plein, il ne consomme rien.") }
 	if not def.inputs.is_empty():
@@ -731,6 +751,11 @@ func placement_problem(def_id: String, cell: Vector2i) -> String:
 		return Tr.t("À poser sur une plaque de glace (au moins 2 cases).")
 	if planet().forbidden.has(def.id):
 		return Tr.t(planet().forbidden[def.id])
+	if not def.planet.is_empty():
+		if def.planet != planet_id():
+			return Tr.t("Ce grand chantier se construit sur un autre monde.")
+		if _count_of(def.id) > 0:
+			return Tr.t("Un seul grand chantier par colonie.")
 	if def.id == "erv" and _count_of("erv") > 0:
 		return Tr.t("Un seul véhicule de retour suffit.")
 	if state.amount(ColonyContent.MATERIALS) < def.cost:
@@ -759,6 +784,9 @@ func place(def_id: String, cell: Vector2i) -> bool:
 	state.buildings.append({ "id": def_id, "x": cell.x, "y": cell.y, "level": 1 })
 	_rebuild()
 	building_placed.emit(state.buildings.size() - 1)
+	# Un grand chantier ne dépend d'aucune recherche propre : sa fiche arrive avec le premier coup de pioche.
+	if not def.planet.is_empty():
+		unlock_card(def.card)
 	_check_objectives()
 	changed.emit()
 	return true
@@ -881,12 +909,14 @@ func _step(ds: float) -> void:
 	var demand := {}
 	var passive := {}
 	var full := {}
+	# Base déserte : sans colon, les machines s'arrêtent (seuls panneaux et générateurs continuent).
+	var deserted := deserted_stops and state.colonists.is_empty()
 	for i in n:
 		_idle[i] = false
 		if not _connected[i] or is_broken(i):
 			continue
 		var def := _defs[i]
-		if not def.inputs.is_empty() and _outputs_full(def, full):
+		if not def.inputs.is_empty() and (deserted or _outputs_full(def, full)):
 			_idle[i] = true
 			continue
 		if def.inputs.is_empty():
@@ -1807,6 +1837,9 @@ func _update_autonomy(ds: float) -> void:
 
 
 func _check_objectives() -> void:
+	# Une base déserte n'accomplit rien.
+	if deserted_stops and state.colonists.is_empty():
+		return
 	for objective in objectives:
 		if objective.era > state.era or state.objectives_done.has(objective.id) or not _objective_met(objective.id):
 			continue
@@ -1828,6 +1861,8 @@ func _check_objectives() -> void:
 
 
 func _objective_met(objective_id: String) -> bool:
+	if objective_id.ends_with("_wonder"):
+		return wonder_level() >= 3
 	match objective_id:
 		"first_breath":
 			for i in state.buildings.size():
@@ -1924,6 +1959,8 @@ func _objective_met(objective_id: String) -> bool:
 func objective_progress(objective_id: String) -> float:
 	if state.objectives_done.has(objective_id):
 		return 1.0
+	if objective_id.ends_with("_wonder"):
+		return clampf(wonder_level() / 3.0, 0.0, 1.0)
 	match objective_id:
 		"nights":
 			return clampf(capacity(ColonyContent.ENERGY) / 150.0, 0.0, 1.0)

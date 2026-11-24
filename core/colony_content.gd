@@ -225,6 +225,32 @@ static func buildings() -> Array[Defs.Building]:
 			"requires_tile": ColonyMap.Tile.ICE, "inputs": { ENERGY: 15.0 }, "outputs": { WATER: 6.0, DATA: 8.0 }, "card": "enceladus_ocean",
 			"description": "Une grande voile froide dressée au-dessus d'une rayure du tigre : les grains de glace du panache s'y collent. De l'eau, et des échantillons de l'océan sans avoir à forer. À poser sur une rayure bleutée.",
 		}),
+		# Grands chantiers : un par monde, très chers, qui s'améliorent deux fois (de quoi employer les matériaux de fin de partie).
+		Defs.Building.new({
+			"id": "antenna", "name": "Grande antenne", "size": Vector2i(3, 3), "cost": 600.0, "research": "megaprojects", "planet": "mars",
+			"inputs": { ENERGY: 25.0 }, "outputs": { DATA: 8.0 }, "card": "dsn",
+			"description": "Le grand chantier de Mars : une parabole géante tournée vers la Terre et vers les autres colonies. Elle produit des données. Un seul par colonie ; il s'améliore deux fois.",
+		}),
+		Defs.Building.new({
+			"id": "mass_driver", "name": "Catapulte électromagnétique", "size": Vector2i(3, 3), "cost": 500.0, "research": "megaprojects", "planet": "ceres",
+			"inputs": { ENERGY: 20.0 }, "outputs": { DATA: 8.0 }, "card": "mass_driver",
+			"description": "Le grand chantier de Cérès : un rail électrique qui lance des charges sans fusée, tant la gravité est faible. Ses essais produisent des données. Un seul par colonie ; il s'améliore deux fois.",
+		}),
+		Defs.Building.new({
+			"id": "sub_dock", "name": "Base du sous-marin", "size": Vector2i(3, 3), "cost": 500.0, "research": "megaprojects", "planet": "titan",
+			"inputs": { ENERGY: 20.0 }, "outputs": { DATA: 8.0 }, "card": "titan_sub",
+			"description": "Le grand chantier de Titan : un quai et un sous-marin robot qui explore les mers de méthane. Il produit des données. Un seul par colonie ; il s'améliore deux fois.",
+		}),
+		Defs.Building.new({
+			"id": "ice_radar", "name": "Grand radar à glace", "size": Vector2i(3, 3), "cost": 500.0, "research": "megaprojects", "planet": "europa",
+			"inputs": { ENERGY: 20.0 }, "outputs": { DATA: 8.0 }, "card": "ice_radar",
+			"description": "Le grand chantier d'Europe : un champ d'antennes qui sonde la banquise jusqu'à l'océan. Il produit des données. Un seul par colonie ; il s'améliore deux fois.",
+		}),
+		Defs.Building.new({
+			"id": "astro_lab", "name": "Institut d'astrobiologie", "size": Vector2i(3, 3), "cost": 500.0, "research": "megaprojects", "planet": "enceladus",
+			"inputs": { ENERGY: 20.0 }, "outputs": { DATA: 8.0 }, "card": "orbilander",
+			"description": "Le grand chantier d'Encelade : des laboratoires stériles où l'on cherche des traces de vie dans les grains des geysers. Il produit des données. Un seul par colonie ; il s'améliore deux fois.",
+		}),
 	]
 
 
@@ -449,6 +475,46 @@ const PROSPECTION := { "id": "prospect", "name": "Prospection de minerais", "car
 ## Améliorations de chaque module : niveau 2 puis niveau 3, chacune fondée sur une vraie technologie.
 ## Multiplicateurs (outputs, inputs, storage) et places supplémentaires (housing), cumulés par niveau.
 const UPGRADES := {
+	"antenna": [
+		{ "name": "Parabole de 70 mètres", "effect": "+30 % de données",
+			"outputs": { DATA: 1.3 },
+			"why": "Les plus grandes antennes du réseau de la NASA mesurent 70 mètres de diamètre : assez pour capter le signal de Voyager 1, à plus de 24 milliards de kilomètres." },
+		{ "name": "Liaison laser", "effect": "+25 % de données",
+			"outputs": { DATA: 1.25 },
+			"why": "En 2023, l'expérience DSOC de la sonde Psyche a transmis des données par laser depuis 31 millions de kilomètres, bien plus vite que par radio." },
+	],
+	"mass_driver": [
+		{ "name": "Bobines supraconductrices", "effect": "+30 % de données",
+			"outputs": { DATA: 1.3 },
+			"why": "Un supraconducteur conduit le courant sans perte, à condition d'être très froid. Dans les cratères toujours à l'ombre de Cérès, il fait environ −160 °C." },
+		{ "name": "Rail allongé", "effect": "+25 % de données",
+			"outputs": { DATA: 1.25 },
+			"why": "Plus le rail est long, plus l'accélération peut être douce : la charge atteint la même vitesse sans être écrasée." },
+	],
+	"sub_dock": [
+		{ "name": "Sonar", "effect": "+30 % de données",
+			"outputs": { DATA: 1.3 },
+			"why": "Le radar de Cassini a sondé le fond de Ligeia Mare : environ 160 mètres. Un sonar ferait la même mesure de l'intérieur, bien plus finement." },
+		{ "name": "Laboratoire de bord", "effect": "+25 % de données",
+			"outputs": { DATA: 1.25 },
+			"why": "Les mers de Titan mêlent du méthane, de l'éthane et de l'azote dissous : en mesurer les proportions raconte le climat de la lune." },
+	],
+	"ice_radar": [
+		{ "name": "Double fréquence", "effect": "+30 % de données",
+			"outputs": { DATA: 1.3 },
+			"why": "Le radar REASON d'Europa Clipper émet sur deux fréquences : l'une voit les détails près de la surface, l'autre pénètre plus profond." },
+		{ "name": "Réseau sismique", "effect": "+25 % de données",
+			"outputs": { DATA: 1.25 },
+			"why": "La glace d'Europe craque sous les marées de Jupiter. Écouter ces craquements renseigne aussi sur l'épaisseur de la banquise." },
+	],
+	"astro_lab": [
+		{ "name": "Spectromètre de masse", "effect": "+30 % de données",
+			"outputs": { DATA: 1.3 },
+			"why": "L'instrument de Cassini a reconnu des molécules organiques dans les grains d'Encelade en les pesant. Un instrument moderne distinguerait des molécules bien plus lourdes." },
+		{ "name": "Microscope", "effect": "+25 % de données",
+			"outputs": { DATA: 1.25 },
+			"why": "Un microscope pourrait chercher directement des cellules dans les grains de glace : c'est l'un des instruments proposés pour la mission Orbilander." },
+	],
 	"lab": [
 		{ "name": "Spectromètre laser", "effect": "+30 % de données",
 			"outputs": { DATA: 1.3 },
@@ -697,6 +763,9 @@ static func research() -> Array[Defs.Research]:
 		Defs.Research.new({ "id": "plume_sampling", "name": "Chimie des panaches", "cost": 140.0, "duration": 3.0, "era": 4,
 				"requires": ["spaceport"], "card": "enceladus_ocean",
 				"summary": "Débloque le collecteur de panache, pour la colonie d'Encelade : goûter l'océan sans forer." }),
+		Defs.Research.new({ "id": "megaprojects", "name": "Grands chantiers", "cost": 160.0, "duration": 4.0, "era": 4,
+				"requires": ["spaceport"],
+				"summary": "Un chantier hors norme par monde : une grande antenne sur Mars, une catapulte sur Cérès, un sous-marin sur Titan, un radar sur Europe, un institut sur Encelade." }),
 	]
 
 
@@ -817,11 +886,56 @@ static func objectives() -> Array[Defs.Objective]:
 		Defs.Objective.new({ "id": "enceladus_life", "title": "Les briques de la vie", "era": 1, "planet": "enceladus",
 				"description": "Analyser les grains de glace de l'anneau E, venus de l'océan d'Encelade.",
 				"reward": { DATA: 150.0 } }),
+		Defs.Objective.new({ "id": "mars_wonder", "title": "La voix de Mars", "era": 4,
+				"description": "Achever la Grande antenne : construire ce grand chantier, puis l'améliorer deux fois.",
+				"reward": { DATA: 150.0 } }),
+		Defs.Objective.new({ "id": "ceres_wonder", "title": "Le rail de Cérès", "era": 1, "planet": "ceres",
+				"description": "Achever la Catapulte électromagnétique : construire ce grand chantier, puis l'améliorer deux fois.",
+				"reward": { DATA: 150.0 } }),
+		Defs.Objective.new({ "id": "titan_wonder", "title": "Plongée dans Kraken Mare", "era": 1, "planet": "titan",
+				"description": "Achever la Base du sous-marin : construire ce grand chantier, puis l'améliorer deux fois.",
+				"reward": { DATA: 150.0 } }),
+		Defs.Objective.new({ "id": "europa_wonder", "title": "À travers la banquise", "era": 1, "planet": "europa",
+				"description": "Achever le Grand radar à glace : construire ce grand chantier, puis l'améliorer deux fois.",
+				"reward": { DATA: 150.0 } }),
+		Defs.Objective.new({ "id": "enceladus_wonder", "title": "La grande question", "era": 1, "planet": "enceladus",
+				"description": "Achever l'Institut d'astrobiologie : construire ce grand chantier, puis l'améliorer deux fois.",
+				"reward": { DATA: 150.0 } }),
 	]
 
 
 static func cards() -> Array[Defs.Card]:
 	return [
+		Defs.Card.new({ "id": "dsn", "figure": "70 m", "figure_label": "le diamètre des plus grandes antennes du réseau de la NASA", "visual": "antenna",
+			"quiz": "Pourquoi le réseau d'antennes de la NASA a-t-il trois sites autour de la Terre ?", "choices": ["Pour garder le contact pendant que la Terre tourne", "Pour économiser l'électricité", "Par tradition"], "answer": 0,
+			"title": "Appeler à travers le Système solaire", "status": "Mesuré",
+			"fact": "Le Deep Space Network de la NASA relie la Terre à ses sondes par trois sites, en Californie, en Espagne et en Australie : la Terre tourne, mais l'un d'eux reste toujours en vue. Ses plus grandes antennes mesurent 70 mètres. Entre Mars et la Terre, un signal met de 3 à 22 minutes.",
+			"in_game": "La Grande antenne est le grand chantier de Mars : elle produit des données et s'améliore deux fois.",
+			"sources": [["NASA – Deep Space Network", "https://www.nasa.gov/communicating-with-missions/dsn/"]] }),
+		Defs.Card.new({ "id": "mass_driver", "figure": "0,51 km/s", "figure_label": "la vitesse à atteindre pour quitter Cérès, contre 11,2 km/s pour la Terre", "visual": "mass_driver",
+			"quiz": "Pourquoi une catapulte serait-elle plus facile à construire sur Cérès que sur Terre ?", "choices": ["La gravité y est très faible et il n'y a pas d'air", "Il y fait plus chaud", "Le sol y est en métal"], "answer": 0,
+			"title": "Lancer sans fusée", "status": "Hypothèse",
+			"fact": "En 1974, le physicien Gerard O'Neill a proposé de lancer des matériaux depuis la Lune avec un rail électromagnétique, sans carburant. L'idée n'a jamais été construite en grand. Sur Cérès, elle serait plus facile encore : il suffit d'atteindre 0,51 km/s pour quitter la planète naine.",
+			"in_game": "La Catapulte électromagnétique est le grand chantier de Cérès : ses essais produisent des données.",
+			"sources": [["O'Neill, Physics Today (1974)", "https://doi.org/10.1063/1.3128863"], ["NASA – Cérès", "https://science.nasa.gov/dwarf-planets/ceres/"]] }),
+		Defs.Card.new({ "id": "titan_sub", "figure": "≈ 1 000 km", "figure_label": "la longueur de Kraken Mare, la plus grande mer de Titan", "visual": "sub_dock",
+			"quiz": "De quoi sont faites les mers de Titan ?", "choices": ["D'eau salée", "De méthane et d'éthane liquides", "De lave"], "answer": 1,
+			"title": "Un sous-marin pour Titan", "status": "Hypothèse",
+			"fact": "En 2015, une équipe de la NASA a étudié un sous-marin robot pour Kraken Mare, la plus grande mer de Titan, longue d'environ 1 000 km. Elle n'est pas faite d'eau, mais de méthane et d'éthane liquides, vers −180 °C. Le projet est resté une étude.",
+			"in_game": "La Base du sous-marin est le grand chantier de Titan : ses plongées produisent des données.",
+			"sources": [["NASA – Titan Submarine (rapport d'étude, 2015)", "https://ntrs.nasa.gov/citations/20150014581"]] }),
+		Defs.Card.new({ "id": "ice_radar", "figure": "30 km", "figure_label": "la profondeur que le radar d'Europa Clipper peut sonder dans la glace", "visual": "ice_radar",
+			"quiz": "Sur quoi les ondes du radar rebondissent-elles sous la glace ?", "choices": ["Sur l'eau liquide", "Sur les nuages", "Sur Jupiter"], "answer": 0,
+			"title": "Voir à travers la banquise", "status": "Valeur de planification",
+			"fact": "La sonde Europa Clipper, lancée en octobre 2024, emporte le radar REASON. Ses ondes radio traversent la glace et rebondissent sur l'eau liquide : il est conçu pour sonder jusqu'à 30 km de profondeur, à la recherche de lacs dans la banquise et peut-être de l'océan.",
+			"in_game": "Le Grand radar à glace est le grand chantier d'Europe : il produit des données.",
+			"sources": [["NASA – Europa Clipper, radar REASON", "https://science.nasa.gov/mission/europa-clipper/spacecraft-instruments-reason/"]] }),
+		Defs.Card.new({ "id": "orbilander", "figure": "n° 2", "figure_label": "le rang d'Orbilander parmi les grandes missions américaines à lancer, selon le rapport de 2022", "visual": "astro_lab",
+			"quiz": "Que ferait la mission Orbilander ?", "choices": ["Tourner autour d'Encelade, puis s'y poser", "Rapporter des roches sur Terre", "Forer jusqu'à l'océan"], "answer": 0,
+			"title": "Chercher la vie sur Encelade", "status": "Valeur de planification",
+			"fact": "Le rapport décennal américain de 2022 classe la mission Enceladus Orbilander deuxième des grandes missions à lancer, après une sonde vers Uranus. Elle tournerait autour d'Encelade en traversant ses geysers, puis s'y poserait pour chercher des traces de vie dans les grains de glace.",
+			"in_game": "L'Institut d'astrobiologie est le grand chantier d'Encelade : il produit des données.",
+			"sources": [["Académies des sciences des États-Unis – Origins, Worlds, and Life (2022)", "https://nap.nationalacademies.org/catalog/26522/"], ["MacKenzie et al., Planetary Science Journal (2021)", "https://doi.org/10.3847/PSJ/abe4da"]] }),
 		Defs.Card.new({ "id": "mmrtg", "figure": "≈ 2 000 W → 110 W", "figure_label": "de chaleur donnent environ 110 W d'électricité en début de mission", "visual": "rtg",
 			"quiz": "D'où vient l'énergie du générateur de Curiosity ?", "choices": ["De la chaleur du plutonium 238", "De la lumière du Soleil", "D'une réaction de fusion"], "answer": 0,
 			"title": "Une pile au plutonium", "status": "En service",

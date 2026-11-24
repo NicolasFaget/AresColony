@@ -2,7 +2,8 @@ extends SceneTree
 ## Étude d'équilibrage : des joueurs fictifs jouent la campagne comme sur un téléphone, par séances
 ## de quelques minutes, avec des absences entre deux (pilote automatique hors ligne).
 ## Trois profils : « expert » (le joueur simulé, sans erreur), « moyen » et « occasionnel ».
-## Usage : godot --headless --path . -s tools/average_player.gd [-- --players=6 --days=45 --profile=moyen]
+## Usage : godot --headless --path . -s tools/average_player.gd [-- --players=6 --days=45 --profile=moyen --first=0]
+## (--first : numéro du premier joueur, pour rejouer une partie précise.)
 ## Le rapport s'affiche et s'écrit dans build/average_player.txt (average_player_<profil>.txt avec --profile).
 
 const R = preload("res://core/colony_content.gd")
@@ -31,11 +32,14 @@ func _initialize() -> void:
 	var players := 6
 	var days := 45
 	var only := ""
+	var first_player := 0
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--players="):
 			players = int(arg.trim_prefix("--players="))
 		elif arg.begins_with("--days="):
 			days = int(arg.trim_prefix("--days="))
+		elif arg.begins_with("--first="):
+			first_player = int(arg.trim_prefix("--first="))
 		elif arg.begins_with("--profile="):
 			only = arg.trim_prefix("--profile=")
 	for profile: String in PROFILES:
@@ -45,7 +49,7 @@ func _initialize() -> void:
 		var runs := []
 		for k in count:
 			var started := Time.get_ticks_msec()
-			var run := _play(profile, 100 + k * 37, days)
+			var run := _play(profile, 100 + (first_player + k) * 37, days)
 			runs.append(run)
 			print("  %s n°%d : %s (%.0f s de calcul)" % [profile, k + 1,
 					"terminé au jour %.1f" % run.milestones["fin"].day if run.milestones.has("fin") else "non terminé", (Time.get_ticks_msec() - started) / 1000.0])
@@ -136,9 +140,10 @@ func _play(profile_id: String, seed_value: int, max_days: int) -> Dictionary:
 				if not colony.state.objectives_done.has(objective.id):
 					left.append(objective.id)
 			var flows := colony.average_flows()
-			run.missing.append("%s : manque %s · %d colons · santé %.2f · matériaux %.0f/%.0f · méthane %.0f/%.0f · énergie %+.0f · eau %+.0f · O₂ %+.0f · vivres %+.0f · veille %s" % [
+			run.missing.append("%s : manque %s · %d colons · santé %.2f · matériaux %.0f/%.0f · méthane %.0f/%.0f · énergie %+.0f · eau %+.0f · O₂ %+.0f · vivres %+.0f · veille %s · chantier %s niveau %d, place libre %s" % [
 					colony.planet_id(), left, colony.state.colonists.size(), colony.average_health(), colony.state.amount(R.MATERIALS), colony.capacity(R.MATERIALS),
-					colony.state.amount(R.METHANE), colony.capacity(R.METHANE), flows[R.ENERGY], flows[R.WATER], flows[R.OXYGEN], flows[R.FOOD], campaign.standby.get(i, "non")])
+					colony.state.amount(R.METHANE), colony.capacity(R.METHANE), flows[R.ENERGY], flows[R.WATER], flows[R.OXYGEN], flows[R.FOOD], campaign.standby.get(i, "non"), colony.wonder_id(), colony.wonder_level(),
+					"-" if colony.wonder_id().is_empty() else str(ColonyBot.connected_spot(colony, colony.wonder_id()).x >= 0)])
 		for region in ["ceres", "titan", "europa", "enceladus"]:
 			var found := false
 			for i in campaign.engines.size():

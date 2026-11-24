@@ -161,6 +161,10 @@ static func forecast(engine: ColonyEngine) -> Dictionary:
 static func alerts(engine: ColonyEngine) -> Array[Dictionary]:
 	var list: Array[Dictionary] = []
 	if engine.state.colonists.is_empty():
+		list.append({ "level": "danger", "resource": ColonyContent.OXYGEN, "sols": 0.0,
+			"title": Tr.t("Base déserte : les machines sont à l'arrêt"),
+			"advice": Tr.t("Plus personne à bord. Il faut de nouveaux colons : un vaisseau de la Terre, ou une cargaison envoyée par une autre colonie."),
+			"tab": TAB_COLONY, "target": "" })
 		return list
 	var days := forecast(engine)
 	for r in ColonyContent.VITAL:

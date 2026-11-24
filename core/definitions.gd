@@ -35,6 +35,8 @@ class Building:
 	var shelter: int
 	## Infirmerie : soigne les colons (voir ColonyEngine.CARE_RECOVERY).
 	var care: bool
+	## Grand chantier : le seul monde où il se construit ("" : module ordinaire). Un seul par colonie.
+	var planet: String
 
 	func _init(p: Dictionary) -> void:
 		id = p.id
@@ -53,6 +55,7 @@ class Building:
 		fixed = p.get("fixed", false)
 		shelter = p.get("shelter", 0)
 		care = p.get("care", false)
+		planet = p.get("planet", "")
 
 
 ## Recherche : coûte des données scientifiques et prend un peu de temps.

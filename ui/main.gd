@@ -128,6 +128,9 @@ func _build_layout() -> void:
 		_update_message_slot())
 	_message_slot.add_child(_news)
 	_news.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	# Colonie retrouvée en veille (voir Campaign.switch_to) : le joueur doit savoir que le temps est arrêté.
+	if _engine.state.speed == 0 and not _engine.vital_low().is_empty():
+		_news.post(Tr.t("Colonie en veille : le temps est en pause. Construisez ce qui manque, puis relancez-le."))
 	var spacer := UiFx.spacer()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(spacer)

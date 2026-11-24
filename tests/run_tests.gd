@@ -45,6 +45,7 @@ func _init() -> void:
 	_test_choices()
 	_test_meteors_and_aurora()
 	_test_world_events()
+	_test_wonders()
 	_test_europa()
 	_test_enceladus()
 	_test_number_formatter()
@@ -234,6 +235,7 @@ func _test_ceres() -> void:
 	_check(reactor, "l'avant-poste arrive avec un petit réacteur")
 	_check(ceres.current_objective().planet == "ceres", "objectifs propres à Cérès")
 	_check(ceres.era_title().begins_with("Cérès"), "ère propre à Cérès")
+	mars.deserted_stops = false
 	mars._check_objectives()
 	_check("ceres" in mars.state.objectives_done, "objectif « Ceinture d'astéroïdes »")
 	var sol := ceres.state.sol
@@ -522,6 +524,7 @@ func _test_titan() -> void:
 	_check(dry.x >= 0 and titan.map.tile_at(dry) != ColonyMap.Tile.ICE, "extracteur posé sur la glace du sol")
 	_check(titan.placement_problem("methane_pump", dry).begins_with("À poser sur une plaque"), "pompe à méthane : il faut un lac")
 	_check(titan.current_objective().planet == "titan" and titan.era_title().begins_with("Titan"), "objectifs et ère propres à Titan")
+	mars.deserted_stops = false
 	mars._check_objectives()
 	_check("titan" in mars.state.objectives_done, "objectif « Aux confins »")
 	# Exporter du méthane depuis Titan.
@@ -957,6 +960,7 @@ func _test_sunlight() -> void:
 
 func _test_production() -> void:
 	var engine := _rich_engine()
+	engine.deserted_stops = false
 	engine.state.colonists.clear()
 	engine.state.sol = 20.4
 	var spot := ColonyBot.connected_spot(engine, "moxie")
@@ -985,6 +989,7 @@ func _test_production() -> void:
 
 func _test_night_and_batteries() -> void:
 	var engine := _rich_engine()
+	engine.deserted_stops = false
 	engine.state.colonists.clear()
 	engine.state.sol = 30.8
 	engine.place("moxie", ColonyBot.connected_spot(engine, "moxie"))
@@ -1316,6 +1321,62 @@ func _test_meteors_and_aurora() -> void:
 
 
 ## Un événement propre à chaque monde : programmé, sans dégâts, un gain et une fiche.
+## Grands chantiers : un par monde, unique, achevé au niveau 3 ; une base déserte s'arrête.
+func _test_wonders() -> void:
+	var engine := _rich_engine()
+	engine.state.era = 4
+	engine.state.research_done.append("megaprojects")
+	engine.state.resources[R.MATERIALS] = 400.0
+	_check(engine.wonder_id() == "antenna", "le grand chantier de Mars est l'antenne")
+	var ids := []
+	for def: Defs.Building in engine.buildable_defs():
+		if not def.planet.is_empty():
+			ids.append(def.id)
+	_check(ids == ["antenna"], "Mars ne propose que son propre grand chantier : %s" % [ids])
+	var spot := ColonyBot.connected_spot(engine, "biodome")
+	_check(engine.placement_problem("mass_driver", spot).contains("autre monde"), "la catapulte ne se construit pas sur Mars")
+	for k in 6:
+		engine.state.resources[R.MATERIALS] = 400.0
+		engine.place("warehouse", ColonyBot.connected_spot(engine, "warehouse"))
+	engine.state.resources[R.MATERIALS] = engine.capacity(R.MATERIALS)
+	engine.state.resources[R.DATA] = 500.0
+	_check(engine.capacity(R.MATERIALS) >= 800.0, "assez d'entrepôts pour le chantier")
+	_check(engine.place("antenna", ColonyBot.connected_spot(engine, "antenna")), "grande antenne posée")
+	_check(engine.wonder_level() == 1 and not engine.state.objectives_done.has("mars_wonder"), "chantier commencé, pas achevé")
+	_check(_near(engine.objective_progress("mars_wonder"), 1.0 / 3.0), "avancement du chantier : un tiers")
+	engine.state.resources[R.MATERIALS] = engine.capacity(R.MATERIALS)
+	_check(ColonyBot.connected_spot(engine, "antenna").x < 0, "un seul grand chantier par colonie")
+	var index := engine.state.buildings.size() - 1
+	for k in 2:
+		engine.state.resources[R.MATERIALS] = engine.capacity(R.MATERIALS)
+		_check(engine.upgrade(index), "amélioration %d du chantier" % (k + 1))
+	_check(engine.wonder_level() == 3 and engine.state.objectives_done.has("mars_wonder"), "chantier achevé : objectif atteint")
+	_check(engine.state.cards_unlocked.has("dsn"), "la fiche du chantier est débloquée")
+	for planet: String in R.PLANETS:
+		var found := 0
+		for def: Defs.Building in engine.building_defs.values():
+			if def.planet == planet:
+				found += 1
+				_check(engine.cards.has(def.card) and R.UPGRADES.get(def.id, []).size() == 2, "chantier %s : fiche et deux améliorations" % def.id)
+		_check(found == 1, "un grand chantier pour %s" % planet)
+
+	# Base déserte : les machines s'arrêtent, rien ne s'accomplit ; tout repart avec un colon.
+	var empty := _rich_engine()
+	empty.state.sol = 20.4
+	empty.place("moxie", ColonyBot.connected_spot(empty, "moxie"))
+	var crew := empty.state.colonists.duplicate()
+	empty.state.colonists.clear()
+	var o2 := empty.state.amount(R.OXYGEN)
+	empty.advance(0.2)
+	_check(_near(empty.state.amount(R.OXYGEN), o2), "base déserte : l'électrolyseur est à l'arrêt")
+	_check(empty.building_status(1).text.contains("personne"), "base déserte : le module le dit")
+	_check(ColonyAdvisor.alerts(empty).size() == 1 and ColonyAdvisor.alerts(empty)[0].level == "danger", "base déserte : alerte")
+	empty.state.resources[R.OXYGEN] = 5.0
+	empty.state.colonists.append(crew[0])
+	empty.advance(0.2)
+	_check(empty.state.amount(R.OXYGEN) > 5.0 - 0.84 * 0.2, "un colon revient : la production repart")
+
+
 func _test_world_events() -> void:
 	for planet: String in ColonyContent.PLANET_ORDER:
 		var state := ColonyState.new()
@@ -1565,7 +1626,8 @@ func _simulate_campaign() -> void:
 	var network_goals := ["spaceport", "outpost", "cargo", "ceres", "titan", "capital", "europa",
 			"ceres_breath", "ceres_brine", "ceres_ahuna", "ceres_export", "titan_breath", "titan_pump", "titan_selk", "titan_fuel",
 			"europa_breath", "europa_shelter", "europa_ocean", "europa_thera",
-			"enceladus", "enceladus_breath", "enceladus_plume", "enceladus_tiger", "enceladus_life"]
+			"enceladus", "enceladus_breath", "enceladus_plume", "enceladus_tiger", "enceladus_life",
+			"mars_wonder", "ceres_wonder", "titan_wonder", "europa_wonder", "enceladus_wonder"]
 	var reached := {}
 	var nitrogen_in := [0.0]
 	campaign.shipment_arrived.connect(func(shipment: Dictionary) -> void:

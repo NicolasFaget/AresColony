@@ -5,7 +5,7 @@ extends RefCounted
 ## construit ce qui manque le plus, garde une réserve de matériaux, étend ses conduites vers la glace.
 
 const R = preload("res://core/colony_content.gd")
-const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate", "regolith", "sabatier", "rovers", "erv", "lab", "medicine", "rtg", "solid_state", "shielding", "fission", "soil", "closed_loop", "spaceport", "brines", "cryogenics", "buffer_gas", "cryobot", "plume_sampling", "predictive"]
+const RESEARCH_ORDER := ["moxie", "ice", "batteries", "greenhouse", "electrolysis", "recycling", "cleaning", "perchlorate", "regolith", "sabatier", "rovers", "erv", "lab", "medicine", "rtg", "solid_state", "shielding", "fission", "soil", "closed_loop", "spaceport", "brines", "cryogenics", "buffer_gas", "cryobot", "plume_sampling", "predictive", "megaprojects"]
 
 
 ## Lance la prochaine recherche disponible, dans l'ordre conseillé.
@@ -113,6 +113,8 @@ static func build(engine: ColonyEngine) -> void:
 	# Avant-poste complet : les modules d'appoint, avec les matériaux en trop.
 	elif outpost and engine.state.amount(R.MATERIALS) >= 300.0 and not _support(engine).is_empty():
 		want = _support(engine)
+	elif outpost and not _wonder_step(engine).is_empty():
+		want = _wonder_step(engine)
 	elif outpost:
 		want = ""
 	elif engine.is_unlocked(engine.building_defs["kiln"]) and engine.resupplies_left() <= 2 \
@@ -168,6 +170,8 @@ static func build(engine: ColonyEngine) -> void:
 		want = "tank"
 	elif engine.capacity(R.ENERGY) < 150.0 and engine.is_unlocked(engine.building_defs["battery"]):
 		want = "battery"
+	elif not _wonder_step(engine).is_empty():
+		want = _wonder_step(engine)
 	if want.is_empty():
 		# Un avant-poste garde ses matériaux pour l'essentiel avant d'améliorer.
 		if not outpost or engine.state.amount(R.MATERIALS) >= 200.0:
@@ -176,10 +180,12 @@ static func build(engine: ColonyEngine) -> void:
 	if not engine.is_unlocked(engine.building_defs[want]):
 		return
 	# Confort (habitat, batteries) : seulement si une réserve reste pour les urgences vitales.
-	if want in ["lab", "recycler", "medbay", "rtg", "habitat", "battery", "garage", "erv", "sabatier", "bunker", "reactor", "biodome", "spaceport", "tank", "dome", "n2_compressor"] and engine.state.amount(R.MATERIALS) < engine.building_defs[want].cost + 50.0:
+	if want in ["lab", "recycler", "medbay", "rtg", "habitat", "battery", "garage", "erv", "sabatier", "bunker", "reactor", "biodome", "spaceport", "tank", "dome", "n2_compressor", "antenna", "mass_driver", "sub_dock", "ice_radar", "astro_lab"] and engine.state.amount(R.MATERIALS) < engine.building_defs[want].cost + 50.0:
 		return
 	if want in ["extractor", "brine", "methane_pump", "cryobot", "plume_trap"] and not (want == "extractor" and engine.planet().ice_everywhere):
-		reach_ice(engine, want)
+		# Plus de glace à portée : autant améliorer ce qui existe.
+		if not reach_ice(engine, want) and want == "extractor":
+			upgrade(engine)
 		return
 	var spot := connected_spot(engine, want)
 	if spot.x >= 0:
@@ -235,10 +241,20 @@ static func logistics(campaign: Campaign) -> void:
 			break
 	for i in range(1, campaign.engines.size()):
 		var colony := campaign.engines[i]
+		# Avant-poste désert : Mars lui renvoie un équipage.
+		if colony.state.colonists.is_empty() and mars.state.colonists.size() > 12:
+			var on_way := false
+			for shipment in campaign.shipments:
+				on_way = on_way or (shipment.kind == "cargo" and shipment.to == i and not shipment.colonists.is_empty())
+			if not on_way and campaign.shipment_problem(0, i, {}, 4).is_empty():
+				campaign.send_cargo(0, i, {}, 4)
 		match campaign.planet_of(i):
 			"ceres":
 				# Une seule fusée pour les matériaux et l'azote : le vol coûte du méthane, rare ici.
-				var spare := colony.state.amount(R.MATERIALS) - 120.0
+				var keep := 120.0
+				if colony.state.objectives_done.has("ceres_export"):
+					keep = maxf(keep, _wonder_reserve(colony))
+				var spare := colony.state.amount(R.MATERIALS) - keep
 				var nitrogen := colony.state.amount(R.NITROGEN) - 5.0
 				var send_nitrogen := nitrogen >= 30.0 and _needs_nitrogen(mars)
 				var shipped := false
@@ -324,6 +340,26 @@ static func _support(engine: ColonyEngine) -> String:
 	return ""
 
 
+## Grand chantier : ce qu'il faut poser maintenant ("" : rien). D'abord assez d'entrepôts pour payer
+## le chantier et ses deux améliorations, puis le chantier lui-même.
+static func _wonder_step(engine: ColonyEngine) -> String:
+	var id := engine.wonder_id()
+	if id.is_empty() or not engine.is_unlocked(engine.building_defs[id]) or engine.wonder_level() >= 3:
+		return ""
+	var cost: float = engine.building_defs[id].cost
+	if engine.capacity(R.MATERIALS) < cost * ColonyEngine.UPGRADE_MATERIALS[1] + 100.0:
+		return "warehouse"
+	return id if _count(engine, id) == 0 else ""
+
+
+## Matériaux qu'une colonie garde pour son grand chantier, tant qu'il n'est pas achevé.
+static func _wonder_reserve(engine: ColonyEngine) -> float:
+	var id := engine.wonder_id()
+	if id.is_empty() or not engine.is_unlocked(engine.building_defs[id]) or engine.wonder_level() >= 3:
+		return 0.0
+	return minf(engine.capacity(R.MATERIALS) - 50.0, engine.building_defs[id].cost * ColonyEngine.UPGRADE_MATERIALS[1] + 100.0)
+
+
 ## Les dômes déjà posés sont pressurisés (on n'en ajoute pas un vide de plus).
 static func _domes_ready(engine: ColonyEngine) -> bool:
 	for i in engine.state.buildings.size():
@@ -392,20 +428,19 @@ static func _is_outpost(engine: ColonyEngine) -> bool:
 	return engine.planet_id() != "mars" and engine.state.recruits_sent >= R.RECRUITS.size()
 
 
-static func reach_ice(engine: ColonyEngine, def_id := "extractor") -> void:
+## Retourne faux s'il n'y avait rien à faire.
+static func reach_ice(engine: ColonyEngine, def_id := "extractor") -> bool:
 	var ice := engine.map.ice_cells()
 	var lander := Vector2(engine.map.lander_cell)
 	ice.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return Vector2(a).distance_to(lander) < Vector2(b).distance_to(lander))
 	for cell in ice:
 		if engine.placement_problem(def_id, cell).is_empty() and engine.would_connect(def_id, cell):
-			engine.place(def_id, cell)
-			return
+			return engine.place(def_id, cell)
 	# Conduites vers la plaque de glace libre la plus proche (et pas de réseau sans fin).
 	if _count(engine, "link") >= 30:
-		return
+		return false
 	for cell in ice:
 		if engine.placement_problem(def_id, cell).is_empty():
 			var spot := connected_spot(engine, "link", cell)
-			if spot.x >= 0:
-				engine.place("link", spot)
-			return
+			return spot.x >= 0 and engine.place("link", spot)
+	return false

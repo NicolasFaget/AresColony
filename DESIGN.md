@@ -20,6 +20,12 @@ Reste avant publication : fiche Google Play, signature, politique de confidentia
   Repères : le joueur moyen finit Mars seule en 2 jours et la campagne en 11 à 28 jours (environ 6 h de jeu).
   Deux règles en viennent : une cargaison part même si l'arrivée est pleine (surplus perdu, mais compté
   comme exporté), et une colonie retrouvée en veille attend le joueur en pause.
+- Grands chantiers (recherche « Grands chantiers », ère 4) : un module 3 × 3 unique par monde, cher, à améliorer
+  deux fois, avec sa fiche et un objectif (`<monde>_wonder`) — Grande antenne (Mars), Catapulte électromagnétique
+  (Cérès), Base du sous-marin (Titan), Grand radar à glace (Europe), Institut d'astrobiologie (Encelade).
+  Ils donnent un emploi aux matériaux de fin de partie (1 500 à 1 800 par monde). Champ `planet` de `Defs.Building`.
+- Base déserte : sans colon, les machines à entrées s'arrêtent et aucun objectif ne s'accomplit, jusqu'à
+  l'arrivée de nouveaux colons (`ColonyEngine.deserted_stops`, coupé par les tests de production pure).
 - Captures d'écran (avec fenêtre) :
   `godot --path . --resolution 720x1400 -s tests/capture.gd -- --save=capture --out=<dossier> --scenario=<nom>`
   avec `menu`, `debut`, `milieu`, `synergies`, `fiches`, `ameliorations`, `entretien`, `ere2`, `ere3`,

@@ -237,6 +237,26 @@ func _run() -> void:
 				await _frames(215)
 				await _shot("N%d_news_fin_%s" % [n, id])
 				n += 1
+		"chantiers":
+			# Fiches des cinq grands chantiers : découverte (avec le modèle) et fiche.
+			ColonyBot.play(engine, 9.0)
+			engine.state.speed = 0
+			main = await _open_main()
+			_close_modals(main)
+			var n := 0
+			for id: String in ["dsn", "mass_driver", "titan_sub", "ice_radar", "orbilander"]:
+				main._queue_discovery(id)
+				engine.unlock_card(id)
+				await _frames(40)
+				await _shot("G%d_a_decouverte_%s" % [n, id])
+				_close_modals(main)
+				main._discovery = null
+				main._discoveries.clear()
+				main._show_card(id)
+				await _frames(10)
+				await _shot("G%d_b_fiche_%s" % [n, id])
+				_close_modals(main)
+				n += 1
 		"ameliorations":
 			ColonyBot.play(engine, 30.0)
 			engine.state.speed = 0
