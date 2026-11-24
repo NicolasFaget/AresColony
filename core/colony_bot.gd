@@ -212,6 +212,11 @@ static func network(campaign: Campaign) -> void:
 		research(colony)
 		maintain(colony)
 		build(colony)
+	logistics(campaign)
+
+
+## Le réseau seul : fondations (Cérès, Titan, puis Europe et Encelade) et cargaisons entre les colonies.
+static func logistics(campaign: Campaign) -> void:
 	if not campaign.interplanetary_unlocked():
 		return
 	var planets := []
