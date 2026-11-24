@@ -1,4 +1,5 @@
 {
+"\n\nLe temps est en pause : construisez ce qui manque, puis relancez-le.": "\n\nTime is paused: build what is missing, then resume.",
 "\n\nVeille sécurisée déclenchée : la réserve %s allait s'épuiser. %s": "\n\nSafe standby triggered: the %s reserve was about to run out. %s",
 "\nRécompense : ": "\nReward: ",
 " · %d en mauvaise forme": " · %d in poor shape",
@@ -1392,7 +1393,7 @@
 "Tri optique": "Optical sorting",
 "Trois couches de semi-conducteurs captent chacune une partie du spectre solaire. Les rovers Spirit et Opportunity utilisaient ce type de cellules.": "Three layers of semiconductors each capture part of the solar spectrum. The Spirit and Opportunity rovers used this type of cell.",
 "Trois fois moins de soleil que sur Mars, −120 °C": "Three times less sunlight than Mars, −120 °C",
-"Trop %s : la colonie d'arrivée n'a de place que pour %s.": "Too much %s: the destination colony only has room for %s.",
+"Trop %s : l'arrivée n'a de place que pour %s, le surplus sera perdu.": "Too much %s: the destination only has room for %s, the surplus will be lost.",
 "Trop lourd : %d unités au plus.": "Too heavy: %d units at most.",
 "USGS – les dunes de Titan vues par Cassini": "USGS – Titan's dunes seen by Cassini",
 "Un ancien lac, au bord du grand bassin d'Isidis.": "An ancient lake, on the edge of the great Isidis basin.",

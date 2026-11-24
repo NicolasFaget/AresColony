@@ -130,6 +130,9 @@ func apply_offline_seconds(elapsed: float) -> Dictionary:
 		var colony_report := engines[i].apply_offline_seconds(elapsed)
 		if i == active:
 			report = colony_report
+			# Veille sécurisée : la colonie affichée attend le joueur en pause.
+			if not str(colony_report.get("standby", "")).is_empty():
+				colonies[i].speed = 0
 	# L'horloge de la campagne suit le temps écoulé, comme en jeu : une colonie en veille
 	# s'arrête, mais les fusées continuent leur route.
 	var sols := clampf(elapsed, 0.0, ColonyEngine.OFFLINE_CAP_SECONDS) / ColonyEngine.OFFLINE_SECONDS_PER_SOL
@@ -143,6 +146,9 @@ func apply_offline_seconds(elapsed: float) -> Dictionary:
 func switch_to(index: int) -> void:
 	if index >= 0 and index < engines.size():
 		active = index
+		# Colonie en veille : on y arrive en pause, le temps de construire ce qui manque.
+		if standby.has(index) or not engines[index].vital_low().is_empty():
+			colonies[index].speed = 0
 		standby.erase(index)
 		if _knowledge_dirty:
 			sync_knowledge()
@@ -281,8 +287,8 @@ func shipment_problem(from: int, to: int, cargo: Dictionary, colonists: int) -> 
 	return ""
 
 
-## Ce que la colonie d'arrivée ne pourra pas accueillir (logement, stockage), en comptant
-## les cargaisons déjà en route vers elle. "" si tout tiendra.
+## Ce que la colonie d'arrivée ne peut pas accueillir du tout : colons sans logement, ressource sans
+## aucun stockage. Un stockage trop plein n'empêche pas le vol (voir shipment_warning).
 func _arrival_problem(to: int, cargo: Dictionary, colonists: int) -> String:
 	var target := engines[to]
 	var incoming := {}
@@ -303,9 +309,27 @@ func _arrival_problem(to: int, cargo: Dictionary, colonists: int) -> String:
 		if room <= 0.0:
 			return Tr.t("Aucun stockage %s à l'arrivée : construisez-y d'abord un réservoir.") % name if r == ColonyContent.METHANE \
 					else Tr.t("Aucun stockage %s à l'arrivée.") % name
-		var free := maxf(0.0, room - target.state.amount(r) - incoming.get(r, 0.0))
+	return ""
+
+
+## Avertissement (le vol reste permis) : la colonie d'arrivée n'aura pas la place pour tout,
+## en comptant les cargaisons déjà en route ; le surplus sera perdu. "" si tout tiendra.
+func shipment_warning(to: int, cargo: Dictionary) -> String:
+	if to < 0 or to >= engines.size():
+		return ""
+	var target := engines[to]
+	var incoming := {}
+	for shipment in shipments:
+		if shipment.kind == "cargo" and shipment.to == to:
+			for r: String in shipment.cargo:
+				incoming[r] = incoming.get(r, 0.0) + float(shipment.cargo[r])
+	for r: String in cargo:
+		if cargo[r] <= 0.0 or r == ColonyContent.DATA:
+			continue
+		var free := maxf(0.0, target.capacity(r) - target.state.amount(r) - incoming.get(r, 0.0))
 		if cargo[r] > free + 0.001:
-			return Tr.t("Trop %s : la colonie d'arrivée n'a de place que pour %s.") % [name, NumberFormatter.format(free)]
+			return Tr.t("Trop %s : l'arrivée n'a de place que pour %s, le surplus sera perdu.") % [
+					Tr.t(ColonyContent.RESOURCE_PARTITIVE[r]), NumberFormatter.format(free)]
 	return ""
 
 
@@ -385,11 +409,9 @@ func _deliver() -> void:
 		if shipment.kind == "colony":
 			shipment.to = _found(shipment)
 		else:
+			# Le surplus perdu à l'arrivée reste compté comme exporté : sinon un réseau aux entrepôts
+			# pleins ne pourrait plus finir ses objectifs d'export.
 			shipment.lost = engines[shipment.to].receive(shipment.cargo, shipment.colonists)
-			# Ce qui est perdu à l'arrivée ne compte pas pour les objectifs d'export.
-			var origin := engines[shipment.from]
-			origin.state.exported_materials = maxf(0.0, origin.state.exported_materials - float(shipment.lost.get(ColonyContent.MATERIALS, 0.0)))
-			origin.state.exported_methane = maxf(0.0, origin.state.exported_methane - float(shipment.lost.get(ColonyContent.METHANE, 0.0)))
 			deliveries += 1
 		_update_info()
 		shipment_arrived.emit(shipment)

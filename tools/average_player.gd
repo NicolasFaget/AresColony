@@ -165,7 +165,12 @@ func _session(campaign: Campaign, profile: Dictionary, rng: RandomNumberGenerato
 		if index != campaign.active:
 			campaign.switch_to(index)
 		var colony := campaign.engine()
-		colony.state.speed = speed
+		# Colonie retrouvée en veille : elle est en pause, il construit avant de relancer le temps.
+		var paused := colony.state.speed == 0 and not colony.vital_low().is_empty()
+		if not paused:
+			# Un monde tout neuf se joue à vitesse normale, jusqu'à son premier oxygène.
+			var settled := colony.planet_id() == "mars" or colony.state.objectives_done.has(colony.planet_id() + "_breath")
+			colony.state.speed = speed if settled else 1
 		run.looks += 1
 		run.worst_health = minf(run.worst_health, colony.average_health())
 		if rng.randf() >= profile.distraction:
@@ -175,10 +180,12 @@ func _session(campaign: Campaign, profile: Dictionary, rng: RandomNumberGenerato
 				ColonyBot.logistics(campaign)
 				shipped = true
 			if _fingerprint(colony) == before:
+				if paused:
+					colony.state.speed = 1
 				run.idle += 1
 				if wanted:
 					run.blocked += 1
-		campaign.advance(LOOK_SECONDS * speed / ColonyEngine.SECONDS_PER_SOL)
+		campaign.advance(LOOK_SECONDS * colony.state.speed / ColonyEngine.SECONDS_PER_SOL)
 		clock[0] += LOOK_SECONDS
 		run.play_seconds += LOOK_SECONDS
 		if campaign.is_complete():

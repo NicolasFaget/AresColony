@@ -325,17 +325,19 @@ func _test_network_outposts() -> void:
 	var too_much := ceres.capacity(R.WATER) + 10.0
 	mars.state.resources[R.WATER] = mars.capacity(R.WATER)
 	if too_much < Campaign.PAYLOAD_UNITS and mars.capacity(R.WATER) > too_much + 10.0:
-		_check(campaign.shipment_problem(0, 1, { R.WATER: too_much }, 0).begins_with("Trop"), "cargaison trop grosse pour l'arrivée")
+		_check(campaign.shipment_problem(0, 1, { R.WATER: too_much }, 0).is_empty() and campaign.shipment_warning(1, { R.WATER: too_much }).begins_with("Trop"),
+				"cargaison trop grosse pour l'arrivée : permise, avec un avertissement")
 	_check(campaign.shipment_problem(0, 1, { R.MATERIALS: 20.0 }, 0).is_empty(), "petite cargaison acceptée")
 	var lost := ceres.receive({ R.WATER: ceres.capacity(R.WATER) * 3.0 }, [])
 	_check(lost.get(R.WATER, 0.0) > 0.0, "perte signalée quand le stockage déborde")
 	# Place libre : le stock déjà présent à l'arrivée compte.
 	var water_room := ceres.capacity(R.WATER)
 	ceres.state.resources[R.WATER] = water_room * 0.8
-	var partial := campaign.shipment_problem(0, 1, { R.WATER: water_room * 0.5 }, 0)
-	_check(partial.begins_with("Trop"), "cargaison refusée quand l'arrivée est presque pleine : " + partial)
-	_check(campaign.shipment_problem(0, 1, { R.WATER: water_room * 0.15 }, 0).is_empty(), "cargaison acceptée dans la place libre")
-	# Exportations : comptées au départ, puis corrigées de ce qui est perdu à l'arrivée.
+	var partial := campaign.shipment_warning(1, { R.WATER: water_room * 0.5 })
+	_check(partial.begins_with("Trop"), "avertissement quand l'arrivée est presque pleine : " + partial)
+	_check(campaign.shipment_problem(0, 1, { R.WATER: water_room * 0.15 }, 0).is_empty() and campaign.shipment_warning(1, { R.WATER: water_room * 0.15 }).is_empty(),
+			"cargaison acceptée sans avertissement dans la place libre")
+	# Exportations : comptées au départ, même si l'arrivée déborde (sinon un réseau plein bloque les objectifs).
 	mars.state.resources[R.METHANE] = 600.0
 	mars.state.resources[R.MATERIALS] = 300.0
 	ceres.state.resources[R.MATERIALS] = 0.0
@@ -349,8 +351,17 @@ func _test_network_outposts() -> void:
 	var arrival: float = campaign.shipments[-1].arrive
 	campaign.time = arrival + 0.1
 	campaign._deliver()
-	_check(_near(mars.state.exported_materials, exported_before + 20.0, 0.01),
-			"la cargaison perdue est retirée de l'export (%.1f)" % (mars.state.exported_materials - exported_before))
+	_check(_near(mars.state.exported_materials, exported_before + 40.0, 0.01),
+			"la cargaison perdue à l'arrivée reste comptée dans l'export (%.1f)" % (mars.state.exported_materials - exported_before))
+	_check(ceres.state.amount(R.MATERIALS) <= ceres.capacity(R.MATERIALS) + 0.01, "le surplus est perdu, pas stocké")
+	# Colonie en veille : on y arrive en pause.
+	ceres.state.speed = 2
+	ceres.state.resources[R.OXYGEN] = 0.0
+	campaign.switch_to(1)
+	_check(ceres.state.speed == 0, "arrivée sur une colonie en veille : le temps est en pause")
+	ceres.state.resources[R.OXYGEN] = ceres.capacity(R.OXYGEN)
+	ceres.state.speed = 1
+	campaign.switch_to(0)
 
 	# Expédition vers Ahuna Mons : le rover revient même en arrière-plan.
 	campaign.switch_to(0)

@@ -1032,7 +1032,11 @@ func _show_cargo() -> void:
 		summary.text = problem if not problem.is_empty() else Tr.t("Carburant : %s kg de méthane · arrivée dans %s sol.") % [
 				NumberFormatter.format(campaign.fuel_cost(origin, region, amounts, crew[0])),
 				NumberFormatter.format(campaign.transit_sols(origin, region))]
-		summary.add_theme_color_override("font_color", Palette.WARNING if not problem.is_empty() else Palette.ACCENT)
+		# Arrivée trop pleine : le vol reste permis, le joueur est prévenu.
+		var warning := campaign.shipment_warning(destination[0], amounts) if problem.is_empty() else ""
+		if not warning.is_empty():
+			summary.text = warning
+		summary.add_theme_color_override("font_color", Palette.WARNING if not (problem.is_empty() and warning.is_empty()) else Palette.ACCENT)
 	refresh_ref.append(refresh)
 	var rows: Array = Campaign.CARGO.duplicate()
 	rows.append("colonists")
@@ -1617,6 +1621,7 @@ func _show_offline_report(report: Dictionary) -> void:
 	if not report.standby.is_empty():
 		body += Tr.t("\n\nVeille sécurisée déclenchée : la réserve %s allait s'épuiser. %s") % [
 			Tr.t(ColonyContent.RESOURCE_PARTITIVE[report.standby]), Tr.t(ColonyEngine.CAUSES.get(report.standby, ""))]
+		body += Tr.t("\n\nLe temps est en pause : construisez ce qui manque, puis relancez-le.")
 	Modal.open(_modal_layer, {
 		"icon": "clock", "title": Tr.t("Pendant votre absence"), "body": body, "extra": box,
 		"confirm_text": "Reprendre",

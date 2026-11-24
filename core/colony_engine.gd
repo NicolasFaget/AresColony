@@ -1992,6 +1992,10 @@ func run_autopilot(sols: float) -> String:
 
 
 ## Réserve vitale sous un quart de sol de consommation (veille sécurisée), ou "".
+func vital_low() -> String:
+	return _vital_low()
+
+
 func _vital_low() -> String:
 	var needs := colonist_needs()
 	for r in ColonyContent.VITAL:

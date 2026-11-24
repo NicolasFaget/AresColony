@@ -242,6 +242,7 @@ static func logistics(campaign: Campaign) -> void:
 				var nitrogen := colony.state.amount(R.NITROGEN) - 5.0
 				var send_nitrogen := nitrogen >= 30.0 and _needs_nitrogen(mars)
 				var shipped := false
+				var sent := false
 				if spare >= 40.0:
 					for to in _by_free_space(campaign, R.MATERIALS, i):
 						var cargo := { R.MATERIALS: minf(spare, 150.0) }
@@ -249,7 +250,11 @@ static func logistics(campaign: Campaign) -> void:
 							cargo[R.NITROGEN] = nitrogen
 						if _ship_cargo(campaign, i, to, cargo):
 							shipped = to == 0 and send_nitrogen
+							sent = true
 							break
+				# Tout le réseau est plein : la fusée part quand même, tant que l'objectif d'export l'exige.
+				if spare >= 150.0 and not sent and not colony.state.objectives_done.has("ceres_export") 						and campaign.shipment_problem(i, 0, { R.MATERIALS: 150.0 }, 0).is_empty():
+					campaign.send_cargo(i, 0, { R.MATERIALS: 150.0 }, 0)
 				if send_nitrogen and not shipped:
 					_ship(campaign, i, 0, R.NITROGEN, nitrogen)
 				# Cérès n'a pas de méthane : Mars lui en envoie, une fois Titan fondée.
@@ -279,9 +284,14 @@ static func logistics(campaign: Campaign) -> void:
 					_ship(campaign, i, 0, R.NITROGEN, nitrogen)
 				var stock := colony.state.amount(R.METHANE) - 30.0
 				if stock >= 150.0:
+					var sent := false
 					for to in _by_free_space(campaign, R.METHANE, i):
 						if _ship(campaign, i, to, R.METHANE, stock):
+							sent = true
 							break
+					# Réseau plein : le méthane part quand même, tant que l'objectif d'export l'exige.
+					if not sent and not colony.state.objectives_done.has("titan_fuel") 							and campaign.shipment_problem(i, 0, { R.METHANE: 100.0 }, 0).is_empty():
+						campaign.send_cargo(i, 0, { R.METHANE: 100.0 }, 0)
 
 
 ## Autres colonies, de celle qui a le plus de place libre pour `resource` à celle qui en a le moins.
@@ -327,7 +337,7 @@ static func _ship(campaign: Campaign, from: int, to: int, resource: String, amou
 	return _ship_cargo(campaign, from, to, { resource: amount })
 
 
-## Envoie la cargaison, réduite de 20 % en 20 % tant qu'elle ne passe pas (place, méthane du vol).
+## Envoie la cargaison, réduite de 20 % en 20 % tant qu'elle ne passe pas (place à l'arrivée, méthane du vol).
 static func _ship_cargo(campaign: Campaign, from: int, to: int, cargo: Dictionary) -> bool:
 	var scale := 1.0
 	while scale > 0.1:
@@ -338,7 +348,7 @@ static func _ship_cargo(campaign: Campaign, from: int, to: int, cargo: Dictionar
 			total += sized[r]
 		if total < 20.0:
 			return false
-		if campaign.shipment_problem(from, to, sized, 0).is_empty():
+		if campaign.shipment_problem(from, to, sized, 0).is_empty() and campaign.shipment_warning(to, sized).is_empty():
 			return campaign.send_cargo(from, to, sized, 0)
 		scale *= 0.8
 	return false

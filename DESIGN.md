@@ -14,6 +14,12 @@ Reste avant publication : fiche Google Play, signature, politique de confidentia
   `godot --headless --path . --import` pour enregistrer les `class_name`.
 - Tests (simulation, sauvegarde, équilibrage par un joueur simulé) :
   `godot --headless --path . -s tests/run_tests.gd` (code de sortie 0 si tout passe).
+- Étude d'équilibrage (joueurs fictifs « expert », « moyen » et « occasionnel », qui jouent par séances de
+  quelques minutes avec des absences hors ligne) :
+  `godot --headless --path . -s tools/average_player.gd -- --players=6 --days=30` (rapport dans `build/`).
+  Repères : le joueur moyen finit Mars seule en 2 jours et la campagne en 11 à 28 jours (environ 6 h de jeu).
+  Deux règles en viennent : une cargaison part même si l'arrivée est pleine (surplus perdu, mais compté
+  comme exporté), et une colonie retrouvée en veille attend le joueur en pause.
 - Captures d'écran (avec fenêtre) :
   `godot --path . --resolution 720x1400 -s tests/capture.gd -- --save=capture --out=<dossier> --scenario=<nom>`
   avec `menu`, `debut`, `milieu`, `synergies`, `fiches`, `ameliorations`, `entretien`, `ere2`, `ere3`,
